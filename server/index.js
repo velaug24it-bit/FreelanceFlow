@@ -16,6 +16,7 @@ const adminRoutes = require('./routes/admin');
 const subscriptionRoutes = require('./routes/subscriptions');
 const marketplaceRoutes = require('./routes/marketplace');
 const connectsRoutes = require('./routes/connects');
+const razorpayRoutes = require('./routes/razorpay');
 
 const app = express();
 
@@ -44,7 +45,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/connects', connectsRoutes);
-
+app.use('/api/razorpay', razorpayRoutes);
 // Test route
 app.get('/api/test', (req, res) => {
     res.json({ message: 'API is working!', timestamp: new Date() });

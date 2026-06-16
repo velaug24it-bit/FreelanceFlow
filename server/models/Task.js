@@ -14,7 +14,10 @@ const taskSchema = new mongoose.Schema({
         type: String, 
         required: true 
     },
-    description: String,
+    description: {
+        type: String,
+        default: ''
+    },
     status: { 
         type: String, 
         enum: ['todo', 'in_progress', 'review', 'done'], 
@@ -25,8 +28,10 @@ const taskSchema = new mongoose.Schema({
         enum: ['low', 'medium', 'high', 'urgent'], 
         default: 'medium' 
     },
-    due_date: Date,
-    assigned_to: String,
+    due_date: {
+        type: Date,
+        default: null
+    },
     created_at: { 
         type: Date, 
         default: Date.now 
@@ -38,5 +43,8 @@ const taskSchema = new mongoose.Schema({
 }, {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
+
+// Index for better performance
+taskSchema.index({ user_id: 1, status: 1 });
 
 module.exports = mongoose.model('Task', taskSchema);
