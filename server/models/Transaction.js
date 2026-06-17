@@ -28,11 +28,10 @@ const transactionSchema = new mongoose.Schema({
 });
 
 // Generate transaction ID before saving
-transactionSchema.pre('save', function(next) {
+transactionSchema.pre('save', function() {
     if (!this.transaction_id) {
         this.transaction_id = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
-    next();
 });
 
 module.exports = mongoose.model('Transaction', transactionSchema);

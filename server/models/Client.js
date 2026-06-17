@@ -7,8 +7,10 @@ const clientSchema = new mongoose.Schema({
     email: { type: String, required: true },
     phone: String,
     address: String,
+    notes: String,
     status: { type: String, default: 'active' },
-    created_at: { type: Date, default: Date.now }
+    created_at: { type: Date, default: Date.now },
+    updated_at: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Client', clientSchema);

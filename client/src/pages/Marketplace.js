@@ -21,6 +21,7 @@ const Marketplace = () => {
     const [bidAmounts, setBidAmounts] = useState({});
     const [estimatedDaysList, setEstimatedDaysList] = useState({});
     const [proposals, setProposals] = useState({});
+    const [phoneNumbers, setPhoneNumbers] = useState({});
     
     const [newProject, setNewProject] = useState({
         title: '',
@@ -125,10 +126,15 @@ const Marketplace = () => {
         setProposals(prev => ({ ...prev, [projectId]: value }));
     };
 
+    const handlePhoneChange = (projectId, value) => {
+        setPhoneNumbers(prev => ({ ...prev, [projectId]: value }));
+    };
+
     const handlePlaceBid = async (projectId) => {
         const bidAmount = bidAmounts[projectId];
         const estimatedDays = estimatedDaysList[projectId];
         const proposal = proposals[projectId];
+        const phone_number = phoneNumbers[projectId];
         
         const bidAmountNum = parseFloat(bidAmount);
         const estimatedDaysNum = parseInt(estimatedDays);
@@ -145,6 +151,10 @@ const Marketplace = () => {
             alert('Please enter a proposal');
             return;
         }
+        if (!phone_number || phone_number.trim() === '') {
+            alert('Please enter your phone number');
+            return;
+        }
         
         const token = localStorage.getItem('token');
         
@@ -154,6 +164,7 @@ const Marketplace = () => {
                 bid_amount: bidAmountNum,
                 estimated_days: estimatedDaysNum,
                 proposal: proposal,
+                phone_number: phone_number,
                 freelancer_name: user?.full_name
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -162,6 +173,7 @@ const Marketplace = () => {
             setBidAmounts(prev => ({ ...prev, [projectId]: '' }));
             setEstimatedDaysList(prev => ({ ...prev, [projectId]: '' }));
             setProposals(prev => ({ ...prev, [projectId]: '' }));
+            setPhoneNumbers(prev => ({ ...prev, [projectId]: '' }));
             setShowBidForm(null);
             fetchData();
             alert('Bid placed successfully!');
@@ -188,13 +200,13 @@ const Marketplace = () => {
         }
     };
 
-    const ProjectCard = ({ project, showBidButton = true, isOwner = false }) => {
+    const renderProjectCard = (project, showBidButton = true, isOwner = false) => {
         const isProjectOwner = project.client_id === user?._id || project.client_name === user?.full_name;
         const showBid = showBidButton && !isProjectOwner && project.status === 'open';
         const isSelectedFreelancer = project.selected_freelancer_id === user?._id;
         
         return (
-            <div style={{
+            <div key={project._id} style={{
                 background: 'white',
                 borderRadius: '12px',
                 padding: '1.5rem',
@@ -394,6 +406,23 @@ const Marketplace = () => {
                                 />
                             </div>
                             <div>
+                                <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Phone Number</label>
+                                <input
+                                    type="tel"
+                                    placeholder="Enter your phone number"
+                                    value={phoneNumbers[project._id] || ''}
+                                    onChange={(e) => handlePhoneChange(project._id, e.target.value)}
+                                    style={{ 
+                                        width: '100%', 
+                                        padding: '0.75rem', 
+                                        border: '1px solid #d1d5db', 
+                                        borderRadius: '6px', 
+                                        fontSize: '1rem',
+                                        backgroundColor: 'white'
+                                    }}
+                                />
+                            </div>
+                            <div>
                                 <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Proposal</label>
                                 <textarea
                                     placeholder="Why are you the best fit for this project? Describe your experience and approach."
@@ -412,15 +441,15 @@ const Marketplace = () => {
                             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                                 <button
                                     onClick={() => handlePlaceBid(project._id)}
-                                    disabled={!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id]}
+                                    disabled={!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id] || !phoneNumbers[project._id]}
                                     style={{
                                         flex: 1,
                                         padding: '0.75rem',
-                                        background: (!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id]) ? '#9ca3af' : '#10b981',
+                                        background: (!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id] || !phoneNumbers[project._id]) ? '#9ca3af' : '#10b981',
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: '6px',
-                                        cursor: (!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id]) ? 'not-allowed' : 'pointer',
+                                        cursor: (!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id] || !phoneNumbers[project._id]) ? 'not-allowed' : 'pointer',
                                         fontWeight: '500'
                                     }}
                                 >
@@ -432,6 +461,7 @@ const Marketplace = () => {
                                         setBidAmounts(prev => ({ ...prev, [project._id]: '' }));
                                         setEstimatedDaysList(prev => ({ ...prev, [project._id]: '' }));
                                         setProposals(prev => ({ ...prev, [project._id]: '' }));
+                                        setPhoneNumbers(prev => ({ ...prev, [project._id]: '' }));
                                     }}
                                     style={{
                                         flex: 1,
@@ -617,13 +647,9 @@ const Marketplace = () => {
                 <div style={{ textAlign: 'center', padding: '2rem' }}>Loading...</div>
             ) : (
                 <>
-                    {activeTab === 'browse' && projects.map(project => (
-                        <ProjectCard key={project._id} project={project} showBidButton={true} isOwner={false} />
-                    ))}
+                    {activeTab === 'browse' && projects.map(project => renderProjectCard(project, true, false))}
                     
-                    {activeTab === 'my-projects' && myProjects.map(project => (
-                        <ProjectCard key={project._id} project={project} showBidButton={false} isOwner={true} />
-                    ))}
+                    {activeTab === 'my-projects' && myProjects.map(project => renderProjectCard(project, false, true))}
                     
                     {activeTab === 'my-bids' && myBids.length === 0 ? (
                         <div style={{
@@ -687,9 +713,7 @@ const Marketplace = () => {
                         ))
                     )}
                     
-                    {activeTab === 'active-projects' && activeProjects.map(project => (
-                        <ProjectCard key={project._id} project={project} showBidButton={false} isOwner={false} />
-                    ))}
+                    {activeTab === 'active-projects' && activeProjects.map(project => renderProjectCard(project, false, false))}
                 </>
             )}
         </div>

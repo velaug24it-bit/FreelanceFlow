@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Client = require('../models/Client');
+const Invoice = require('../models/Invoice');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -66,6 +67,68 @@ router.post('/', verifyToken, async (req, res) => {
     } catch (err) {
         console.error('Error creating project:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Bulk delete projects
+router.delete('/bulk-delete', verifyToken, async (req, res) => {
+    try {
+        const { projectIds } = req.body;
+        if (!projectIds || !Array.isArray(projectIds)) {
+            return res.status(400).json({ error: 'projectIds array is required' });
+        }
+        
+        // Check if any projects have invoices
+        for (const projectId of projectIds) {
+            const invoiceCount = await Invoice.countDocuments({ project_id: projectId });
+            if (invoiceCount > 0) {
+                const project = await Project.findById(projectId);
+                return res.status(400).json({ 
+                    error: `Cannot bulk delete. Project "${project ? project.title : projectId}" has ${invoiceCount} invoice(s).`,
+                    hasInvoices: true,
+                    invoiceCount
+                });
+            }
+        }
+        
+        await Project.deleteMany({ 
+            _id: { $in: projectIds },
+            user_id: req.userId
+        });
+        
+        res.json({ success: true, message: `${projectIds.length} project(s) deleted successfully` });
+    } catch (err) {
+        console.error('Error bulk deleting projects:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Delete project
+router.delete('/:id', verifyToken, async (req, res) => {
+    try {
+        // Check for invoices associated with this project
+        const invoiceCount = await Invoice.countDocuments({ project_id: req.params.id });
+        if (invoiceCount > 0) {
+            return res.status(400).json({ 
+                error: 'Cannot delete project with associated invoices',
+                hasInvoices: true,
+                invoiceCount 
+            });
+        }
+        
+        const project = await Project.findOneAndDelete({ 
+            _id: req.params.id,
+            user_id: req.userId 
+        });
+        
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+        
+        res.json({ success: true, message: 'Project deleted' });
+    } catch (err) {
+        console.error('Error deleting project:', err);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 

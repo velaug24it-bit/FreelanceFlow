@@ -7,6 +7,7 @@ import {
   Crown, Shield, Zap, Briefcase, Menu, X,
   User, ChevronDown, DollarSign
 } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -86,7 +87,7 @@ const Navbar = () => {
       <div style={{
         maxWidth: '1440px',
         margin: '0 auto',
-        padding: '0 2rem',
+        padding: '0 1.5rem',
         height: '72px',
         display: 'flex',
         alignItems: 'center',
@@ -98,8 +99,7 @@ const Navbar = () => {
           alignItems: 'center',
           gap: '0.75rem',
           textDecoration: 'none',
-          flexShrink: 0,
-          marginRight: '2rem'
+          flexShrink: 0
         }}>
           <div style={{
             width: '36px',
@@ -135,7 +135,8 @@ const Navbar = () => {
           flexWrap: 'nowrap',
           overflow: 'visible',
           flex: 1,
-          justifyContent: 'flex-start'
+          justifyContent: 'center',
+          padding: '0 1rem'
         }}>
           {allNavItems.map((item) => (
             <Link
@@ -169,23 +170,25 @@ const Navbar = () => {
           ))}
         </div>
 
-        {/* Right Side - User Dropdown Only */}
+        {/* Right Side - User Dropdown - FIXED */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem',
-          flexShrink: 0,
-          marginLeft: '1.5rem'
+          gap: '0.5rem',
+          flexShrink: 0
         }}>
-          {/* User Profile Dropdown */}
+          {/* Notification Bell */}
+          <NotificationBell />
+
+          {/* User Profile Dropdown - FIXED ALIGNMENT */}
           <div ref={dropdownRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.6rem',
-                padding: '0.3rem 0.8rem 0.3rem 0.3rem',
+                gap: '0.5rem',
+                padding: '0.3rem 0.6rem 0.3rem 0.3rem',
                 background: 'white',
                 border: '1px solid #e5e7eb',
                 borderRadius: '50px',
@@ -253,7 +256,7 @@ const Navbar = () => {
               }} />
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Dropdown Menu - FIXED POSITION */}
             {isDropdownOpen && (
               <div style={{
                 position: 'absolute',

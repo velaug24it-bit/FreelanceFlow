@@ -115,7 +115,7 @@ const Dashboard = () => {
               </thead>
               <tbody>
                 {stats.recentClients.map(client => (
-                  <tr key={client.id}>
+                  <tr key={client._id}>
                     <td>{client.contact_name}</td>
                     <td>{client.company_name || '-'}</td>
                     <td>{client.email}</td>
@@ -137,23 +137,23 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+      
+      {/* Free Tier Notice */}
+      {user?.subscription_tier === 'free' && (
+        <div style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '12px',
+            padding: '1rem',
+            marginTop: '1.5rem',
+            color: 'white'
+        }}>
+            <p>You're on the Free plan. <a href="/subscription" style={{color: 'white', fontWeight: 'bold'}}>
+                Upgrade to Pro → 
+            </a> for unlimited clients, invoices, and advanced features.</p>
+        </div>
+      )}
     </div>
   );
-// Add to Dashboard.js
-{user?.subscription_tier === 'free' && (
-    <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        borderRadius: '12px',
-        padding: '1rem',
-        marginBottom: '1rem',
-        color: 'white'
-    }}>
-        <p>You're on the Free plan. <a href="/subscription" style={{color: 'white', fontWeight: 'bold'}}>
-            Upgrade to Pro → 
-        </a> for unlimited clients, invoices, and advanced features.</p>
-    </div>
-)}
-
 };
 
 export default Dashboard;

@@ -7,6 +7,7 @@ const bidSchema = new mongoose.Schema({
     bid_amount: { type: Number, required: true },
     estimated_days: { type: Number, required: true },
     proposal: { type: String, required: true },
+    phone_number: { type: String, required: true },
     portfolio_link: String,
     status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
     created_at: { type: Date, default: Date.now }

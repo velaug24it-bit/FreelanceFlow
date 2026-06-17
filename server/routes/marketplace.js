@@ -7,6 +7,7 @@ const Bid = require('../models/Bid');
 const Contract = require('../models/Contract');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const NotificationHelper = require('../utils/notificationHelper');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -23,7 +24,7 @@ const verifyToken = (req, res, next) => {
 
 // ============ CLIENT ROUTES ============
 
-// Post a new project
+// Post a new project - WITH NOTIFICATION
 router.post('/projects', verifyToken, async (req, res) => {
     try {
         const { title, description, category, budget_min, budget_max, duration, skills_required, deadline } = req.body;
@@ -52,6 +53,21 @@ router.post('/projects', verifyToken, async (req, res) => {
                 updated_by_name: user.full_name
             }]
         });
+        
+        // ========== NOTIFICATION: New Project for all freelancers ==========
+        const freelancers = await User.find({ role: 'freelancer' });
+        
+        if (freelancers.length > 0) {
+            await NotificationHelper.createBulkNotifications({
+                userIds: freelancers.map(f => f._id),
+                type: 'new_project',
+                title: '🆕 New Project Available',
+                message: `${user.full_name} posted a new project: "${title}" - Budget: $${budget_min} - $${budget_max}`,
+                referenceId: project._id,
+                referenceType: 'project',
+                actionUrl: `/marketplace/projects/${project._id}`
+            });
+        }
         
         res.status(201).json({ success: true, project });
     } catch (err) {
@@ -103,9 +119,45 @@ router.get('/projects/:id', verifyToken, async (req, res) => {
     }
 });
 
-// ============ BIDDING ROUTES ============
+// Get awarded projects for freelancer
+router.get('/my-awarded-projects', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        
+        const projects = await ProjectPost.find({
+            selected_freelancer_id: userId,
+            status: { $in: ['in_progress', 'review', 'completed'] }
+        })
+        .populate('client_id', 'full_name email company_name')
+        .sort({ created_at: -1 });
+        
+        const projectsWithContracts = await Promise.all(projects.map(async (project) => {
+            const contract = await Contract.findOne({
+                project_id: project._id,
+                freelancer_id: userId
+            });
+            
+            return {
+                ...project.toObject(),
+                contract_details: contract ? {
+                    agreed_amount: contract.agreed_amount,
+                    start_date: contract.start_date,
+                    end_date: contract.end_date,
+                    status: contract.status
+                } : null
+            };
+        }));
+        
+        res.json({ projects: projectsWithContracts });
+    } catch (err) {
+        console.error('Error fetching awarded projects:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
-// Place a bid - FIXED
+// ============ BIDDING ROUTES WITH NOTIFICATIONS ============
+
+// Place a bid - WITH NOTIFICATION
 router.post('/bids', verifyToken, async (req, res) => {
     try {
         const { project_id, bid_amount, estimated_days, proposal, portfolio_link } = req.body;
@@ -126,13 +178,13 @@ router.post('/bids', verifyToken, async (req, res) => {
         }
         
         const bid = await Bid.create({
-            project_id: project_id,
+            project_id,
             freelancer_id: req.userId,
             freelancer_name: user.full_name,
-            bid_amount: bid_amount,
-            estimated_days: estimated_days,
-            proposal: proposal,
-            portfolio_link: portfolio_link || '',
+            bid_amount,
+            estimated_days,
+            proposal,
+            portfolio_link,
             status: 'pending'
         });
         
@@ -142,7 +194,19 @@ router.post('/bids', verifyToken, async (req, res) => {
         
         await ProjectPost.findByIdAndUpdate(project_id, { $inc: { bids_count: 1 } });
         
-        console.log('✅ Bid placed:', bid._id, 'by user:', user.full_name);
+        // ========== NOTIFICATION: Bid Received for Client ==========
+        const project = await ProjectPost.findById(project_id);
+        if (project) {
+            await NotificationHelper.createNotification({
+                userId: project.client_id,
+                type: 'bid_received',
+                title: '📩 New Bid Received',
+                message: `${user.full_name} placed a bid of $${bid_amount} on your project "${project.title}"`,
+                referenceId: project._id,
+                referenceType: 'project',
+                actionUrl: `/marketplace/projects/${project._id}`
+            });
+        }
         
         res.status(201).json({ success: true, bid });
     } catch (err) {
@@ -161,28 +225,17 @@ router.get('/projects/:projectId/bids', verifyToken, async (req, res) => {
     }
 });
 
-// Get my bids - FIXED
+// Get my bids
 router.get('/my-bids', verifyToken, async (req, res) => {
     try {
-        const userId = req.userId;
-        console.log('Fetching bids for user:', userId);
-        
-        const bids = await Bid.find({ freelancer_id: userId })
-            .populate({
-                path: 'project_id',
-                select: 'title description status client_name budget_min budget_max'
-            })
-            .sort({ created_at: -1 });
-        
-        console.log(`Found ${bids.length} bids for user`);
+        const bids = await Bid.find({ freelancer_id: req.userId }).populate('project_id').sort({ created_at: -1 });
         res.json({ bids });
     } catch (err) {
-        console.error('Error fetching bids:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Accept a bid and create contract
+// Accept a bid and create contract - WITH NOTIFICATION
 router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
     try {
         const bid = await Bid.findById(req.params.bidId);
@@ -237,8 +290,6 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             status: 'active'
         });
         
-        console.log('✅ Contract created:', contract._id);
-        
         await Transaction.create({
             project_id: project._id,
             client_id: project.client_id,
@@ -251,6 +302,28 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             transaction_id: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         });
         
+        // ========== NOTIFICATION: Bid Accepted for Freelancer ==========
+        await NotificationHelper.createNotification({
+            userId: bid.freelancer_id,
+            type: 'bid_accepted',
+            title: '🎉 Bid Accepted!',
+            message: `Your bid of $${bid.bid_amount} for "${project.title}" has been accepted!`,
+            referenceId: project._id,
+            referenceType: 'project',
+            actionUrl: `/marketplace/projects/${project._id}`
+        });
+        
+        // ========== NOTIFICATION: Contract Created for Both Parties ==========
+        await NotificationHelper.createBulkNotifications({
+            userIds: [project.client_id, bid.freelancer_id],
+            type: 'contract_created',
+            title: '📝 Contract Created',
+            message: `Contract created for project "${project.title}" with amount $${bid.bid_amount}`,
+            referenceId: contract._id,
+            referenceType: 'contract',
+            actionUrl: `/contracts/${contract._id}`
+        });
+        
         res.json({ success: true, contract });
     } catch (err) {
         console.error('Error accepting bid:', err);
@@ -258,147 +331,9 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
     }
 });
 
-// ============ CONTRACT ROUTES ============
+// ============ STATUS UPDATE WITH NOTIFICATION ============
 
-// Get my contracts - FIXED
-router.get('/my-contracts', verifyToken, async (req, res) => {
-    try {
-        const userId = req.userId;
-        
-        console.log('🔍 Fetching contracts for user:', userId);
-        
-        // Get contracts where user is either client OR freelancer
-        const contracts = await Contract.find({
-            $or: [
-                { client_id: userId },
-                { freelancer_id: userId }
-            ]
-        })
-        .populate({
-            path: 'project_id',
-            select: 'title description status client_name budget_min budget_max'
-        })
-        .populate({
-            path: 'client_id',
-            select: 'full_name email company_name'
-        })
-        .populate({
-            path: 'freelancer_id',
-            select: 'full_name email'
-        })
-        .sort({ created_at: -1 });
-        
-        console.log(`📋 Found ${contracts.length} contracts for user`);
-        
-        // Format the response with role information
-        const formattedContracts = contracts.map(contract => {
-            const isClient = contract.client_id._id.toString() === userId.toString();
-            return {
-                _id: contract._id,
-                project: contract.project_id,
-                agreed_amount: contract.agreed_amount,
-                status: contract.status,
-                start_date: contract.start_date,
-                end_date: contract.end_date,
-                created_at: contract.created_at,
-                role: isClient ? 'client' : 'freelancer',
-                client: contract.client_id,
-                freelancer: contract.freelancer_id,
-                client_fee: contract.client_fee,
-                platform_earnings: contract.platform_earnings,
-                total_client_charge: contract.total_client_charge
-            };
-        });
-        
-        res.json({ contracts: formattedContracts });
-    } catch (err) {
-        console.error('❌ Error fetching contracts:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Debug route - Check all contracts for a user
-router.get('/debug-contracts', verifyToken, async (req, res) => {
-    try {
-        const userId = req.userId;
-        
-        const asClient = await Contract.find({ client_id: userId });
-        const asFreelancer = await Contract.find({ freelancer_id: userId });
-        
-        // Get all bids for this user
-        const bids = await Bid.find({ freelancer_id: userId });
-        
-        res.json({
-            userId: userId,
-            asClient: asClient,
-            asFreelancer: asFreelancer,
-            total: asClient.length + asFreelancer.length,
-            bids: bids,
-            allContracts: await Contract.find({})
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// Manually create a contract from accepted bid
-router.post('/create-contract/:bidId', verifyToken, async (req, res) => {
-    try {
-        const bid = await Bid.findById(req.params.bidId);
-        if (!bid) {
-            return res.status(404).json({ error: 'Bid not found' });
-        }
-        
-        if (bid.status !== 'accepted') {
-            return res.status(400).json({ error: 'Bid is not accepted' });
-        }
-        
-        // Check if contract already exists
-        const existing = await Contract.findOne({
-            project_id: bid.project_id,
-            freelancer_id: bid.freelancer_id
-        });
-        
-        if (existing) {
-            return res.json({ message: 'Contract already exists', contract: existing });
-        }
-        
-        const project = await ProjectPost.findById(bid.project_id);
-        if (!project) {
-            return res.status(404).json({ error: 'Project not found' });
-        }
-        
-        // Calculate fees
-        const CLIENT_FEE_PERCENTAGE = 5;
-        const clientFee = (bid.bid_amount * CLIENT_FEE_PERCENTAGE) / 100;
-        const platformEarns = clientFee;
-        const clientTotal = bid.bid_amount + clientFee;
-        
-        // Create contract
-        const contract = await Contract.create({
-            project_id: bid.project_id,
-            client_id: project.client_id,
-            freelancer_id: bid.freelancer_id,
-            agreed_amount: bid.bid_amount,
-            client_fee: clientFee,
-            platform_earnings: platformEarns,
-            total_client_charge: clientTotal,
-            start_date: new Date(),
-            end_date: new Date(Date.now() + (bid.estimated_days * 24 * 60 * 60 * 1000)),
-            status: 'active'
-        });
-        
-        console.log('✅ Contract manually created:', contract._id);
-        
-        res.json({ success: true, contract });
-    } catch (err) {
-        console.error('Error creating contract:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// ============ STATUS UPDATE ROUTES ============
-
+// Update project status - WITH NOTIFICATION
 router.put('/projects/:id/status', verifyToken, async (req, res) => {
     try {
         const { status, progress, message, current_phase } = req.body;
@@ -444,6 +379,39 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             { new: true }
         );
         
+        // ========== NOTIFICATION: Project Status Updated ==========
+        const statusMessages = {
+            'in_progress': 'started working on',
+            'review': 'sent for review',
+            'completed': 'marked as completed'
+        };
+        
+        const statusAction = statusMessages[status] || `updated status to ${status}`;
+        
+        if (isClient && project.selected_freelancer_id) {
+            // Client updated status → Notify freelancer
+            await NotificationHelper.createNotification({
+                userId: project.selected_freelancer_id,
+                type: 'project_status_updated',
+                title: '📋 Project Status Updated',
+                message: `The client has ${statusAction} "${project.title}"`,
+                referenceId: project._id,
+                referenceType: 'project',
+                actionUrl: `/marketplace/projects/${project._id}`
+            });
+        } else if (isFreelancer) {
+            // Freelancer updated status → Notify client
+            await NotificationHelper.createNotification({
+                userId: project.client_id,
+                type: 'project_status_updated',
+                title: '📋 Project Status Updated',
+                message: `${user.full_name} has ${statusAction} "${project.title}"`,
+                referenceId: project._id,
+                referenceType: 'project',
+                actionUrl: `/marketplace/projects/${project._id}`
+            });
+        }
+        
         res.json({ success: true, project: updatedProject });
     } catch (err) {
         console.error('Error updating project status:', err);
@@ -466,6 +434,20 @@ router.get('/projects/:id/history', verifyToken, async (req, res) => {
         }
         
         res.json({ history: project.status_updates || [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============ CONTRACT ROUTES ============
+
+// Get my contracts
+router.get('/my-contracts', verifyToken, async (req, res) => {
+    try {
+        const contracts = await Contract.find({
+            $or: [{ client_id: req.userId }, { freelancer_id: req.userId }]
+        }).populate('project_id').sort({ created_at: -1 });
+        res.json({ contracts });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

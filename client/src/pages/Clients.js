@@ -83,7 +83,7 @@ const Clients = () => {
             </thead>
             <tbody>
               {clients.map(client => (
-                <tr key={client.id}>
+                <tr key={client._id}>
                   <td>{client.contact_name}</td>
                   <td>{client.company_name || '-'}</td>
                   <td>{client.email}</td>
@@ -102,14 +102,14 @@ const Clients = () => {
                     <button
                       className="btn btn-secondary"
                       style={{ marginRight: '0.5rem', padding: '0.25rem 0.5rem' }}
-                      onClick={() => navigate(`/clients/${client.id}/edit`)}
+                      onClick={() => navigate(`/clients/${client._id}/edit`)}
                     >
                       Edit
                     </button>
                     <button
                       className="btn btn-danger"
                       style={{ padding: '0.25rem 0.5rem' }}
-                      onClick={() => handleDelete(client.id)}
+                      onClick={() => handleDelete(client._id)}
                     >
                       Delete
                     </button>
