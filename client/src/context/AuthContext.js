@@ -4,6 +4,9 @@ import axios from 'axios';
 // API URL - uses environment variable or falls back to localhost
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+// For debugging
+console.log('🔧 API_URL:', API_URL);
+
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -30,13 +33,14 @@ export const AuthProvider = ({ children }) => {
 
     const verifyToken = async () => {
         try {
+            console.log('🔍 Verifying token...');
             const response = await axios.get(`${API_URL}/auth/verify`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUser(response.data.user);
+            console.log('✅ Token verified');
         } catch (err) {
-            console.error('Token verification failed:', err);
-            // If token is invalid, clear it
+            console.error('❌ Token verification failed:', err);
             localStorage.removeItem('token');
             setToken(null);
             setUser(null);
@@ -48,19 +52,22 @@ export const AuthProvider = ({ children }) => {
     // Login function
     const login = async (email, password) => {
         try {
+            console.log('🔑 Login attempt:', email);
             const response = await axios.post(`${API_URL}/auth/login`, { email, password });
             
             if (response.data.success) {
                 const { token, user } = response.data;
                 localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
                 setToken(token);
                 setUser(user);
+                console.log('✅ Login successful');
                 return { success: true, user };
             } else {
                 return { success: false, error: 'Login failed' };
             }
         } catch (err) {
-            console.error('Login error:', err);
+            console.error('❌ Login error:', err);
             return { 
                 success: false, 
                 error: err.response?.data?.error || 'Invalid credentials' 
@@ -71,19 +78,22 @@ export const AuthProvider = ({ children }) => {
     // Register function
     const register = async (userData) => {
         try {
+            console.log('📝 Registration attempt:', userData.email);
             const response = await axios.post(`${API_URL}/auth/register`, userData);
             
             if (response.data.success) {
                 const { token, user } = response.data;
                 localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(user));
                 setToken(token);
                 setUser(user);
+                console.log('✅ Registration successful');
                 return { success: true, user };
             } else {
                 return { success: false, error: 'Registration failed' };
             }
         } catch (err) {
-            console.error('Registration error:', err);
+            console.error('❌ Registration error:', err);
             return { 
                 success: false, 
                 error: err.response?.data?.error || 'Registration failed' 
@@ -94,20 +104,23 @@ export const AuthProvider = ({ children }) => {
     // Admin Login function
     const adminLogin = async (email, password) => {
         try {
+            console.log('👑 Admin login attempt:', email);
             const response = await axios.post(`${API_URL}/auth/admin-login`, { email, password });
             
             if (response.data.success) {
                 const { token, user } = response.data;
                 localStorage.setItem('token', token);
                 localStorage.setItem('isAdmin', 'true');
+                localStorage.setItem('user', JSON.stringify(user));
                 setToken(token);
                 setUser(user);
+                console.log('✅ Admin login successful');
                 return { success: true, user };
             } else {
                 return { success: false, error: 'Admin login failed' };
             }
         } catch (err) {
-            console.error('Admin login error:', err);
+            console.error('❌ Admin login error:', err);
             return { 
                 success: false, 
                 error: err.response?.data?.error || 'Invalid admin credentials' 
@@ -117,6 +130,7 @@ export const AuthProvider = ({ children }) => {
 
     // Logout function
     const logout = () => {
+        console.log('👋 Logging out');
         localStorage.removeItem('token');
         localStorage.removeItem('isAdmin');
         localStorage.removeItem('user');
