@@ -27,10 +27,8 @@ connectDB();
 // ============ CORS CONFIGURATION ============
 const allowedOrigins = [
     'http://localhost:3000',
-    'http://localhost:3001',
-    'https://freelanceflow-frontend-uh18.onrender.com',
-    'https://freelanceflow-frontend.onrender.com',
-    'https://freelanceflow-client.onrender.com'
+    'https://freelanceflow-frontend.onrender.com',  // Add your frontend URL
+    'https://freelanceflow-frontend-uh18.onrender.com'
 ];
 
 // CORS middleware - this handles preflight automatically
