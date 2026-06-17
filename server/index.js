@@ -25,29 +25,35 @@ const app = express();
 connectDB();
 
 // ============ CORS CONFIGURATION ============
-// Add your frontend URLs here
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://freelanceflow-frontend-uh18.onrender.com',  // <-- YOUR FRONTEND URL
-    'https://freelanceflow-frontend.onrender.com'
+    'https://freelanceflow-frontend.onrender.com',  // Add your frontend URL
+    'https://freelanceflow-frontend-uh18.onrender.com'
 ];
 
+// CORS middleware - this handles preflight automatically
 app.use(cors({
     origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
+        
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
             console.log('⚠️ Blocked CORS from:', origin);
-            // For testing, allow all origins
+            // Allow all origins for testing
             callback(null, true);
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Authorization']
 }));
 
+// REMOVED: app.options('*', cors()); - This was causing the error
+
+// Middleware
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
@@ -79,10 +85,28 @@ app.get('/api', (req, res) => {
         message: 'FreelanceFlow API is running!',
         version: '1.0.0',
         status: 'online',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        endpoints: {
+            auth: '/api/auth',
+            clients: '/api/clients',
+            projects: '/api/projects',
+            invoices: '/api/invoices',
+            expenses: '/api/expenses',
+            tasks: '/api/tasks',
+            reports: '/api/reports',
+            admin: '/api/admin',
+            subscriptions: '/api/subscriptions',
+            marketplace: '/api/marketplace',
+            connects: '/api/connects',
+            razorpay: '/api/razorpay',
+            notifications: '/api/notifications',
+            test: '/api/test',
+            health: '/api/health'
+        }
     });
 });
 
+// Test routes
 app.get('/api/test', (req, res) => {
     res.json({
         message: 'API is working!',
@@ -118,7 +142,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use((req, res) => {
     res.status(404).json({
         error: 'Route not found',
-        path: req.path
+        path: req.path,
+        message: 'The requested endpoint does not exist'
     });
 });
 
@@ -131,9 +156,11 @@ app.use((err, req, res, next) => {
     });
 });
 
+// ============ START SERVER ============
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/test`);
+    console.log(`🏠 Root: http://localhost:${PORT}/`);
     console.log(`✅ CORS enabled for: ${allowedOrigins.join(', ')}`);
 });
