@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// At the top of the file
+const API_URL = 'https://freelanceflow-server.onrender.com/api';
 
 const AuthContext = createContext();
 

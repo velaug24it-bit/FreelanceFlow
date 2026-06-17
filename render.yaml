@@ -1,0 +1,9 @@
+services:
+  - type: static
+    name: freelanceflow-frontend
+    rootDir: client
+    buildCommand: npm run build
+    publish: build
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://freelanceflow-server.onrender.com/api

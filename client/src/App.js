@@ -28,6 +28,21 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminFreelancers from './pages/AdminFreelancers';
 
+// In client/src/index.js or App.js
+import axios from 'axios';
+
+// Set default headers for all axios requests
+axios.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
 function App() {
   return (
     <AuthProvider>
