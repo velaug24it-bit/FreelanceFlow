@@ -29,8 +29,7 @@ app.use(helmet());
 app.use(cors({
     origin: [
         'http://localhost:3000',
-        'https://freelanceflow-frontend.onrender.com',
-        'https://freelanceflow-client.onrender.com'
+        'https://freelanceflow-frontend.onrender.com'  // Add your frontend URL
     ],
     credentials: true
 }));
