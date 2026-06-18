@@ -8,12 +8,15 @@ const NotificationHelper = require('../utils/notificationHelper');
 
 const verifyToken = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Access denied' });
+    if (!token) {
+        return res.status(401).json({ error: 'Access denied. No token provided.' });
+    }
     try {
         const verified = jwt.verify(token, process.env.JWT_SECRET);
         req.userId = verified.id;
         next();
     } catch (err) {
+        console.error('Token verification failed:', err);
         res.status(401).json({ error: 'Invalid token' });
     }
 };
@@ -22,57 +25,107 @@ const verifyToken = (req, res, next) => {
 router.get('/', verifyToken, async (req, res) => {
     try {
         const invoices = await Invoice.find({ user_id: req.userId })
-            .populate('client_id', 'contact_name company_name')
+            .populate('client_id', 'contact_name company_name email')
             .sort({ created_at: -1 });
         res.json({ invoices });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error fetching invoices:', err);
+        res.status(500).json({ error: 'Failed to fetch invoices' });
     }
 });
 
 // Get single invoice
 router.get('/:id', verifyToken, async (req, res) => {
     try {
-        const invoice = await Invoice.findOne({ _id: req.params.id, user_id: req.userId });
+        const invoice = await Invoice.findOne({
+            _id: req.params.id,
+            user_id: req.userId
+        }).populate('client_id', 'contact_name company_name email');
+
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
         res.json({ invoice });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error fetching invoice:', err);
+        res.status(500).json({ error: 'Failed to fetch invoice' });
     }
 });
 
-// Create invoice - WITH NOTIFICATION
+// Create invoice
 router.post('/', verifyToken, async (req, res) => {
     try {
         const { client_id, due_date, tax_rate, notes, items, subtotal, total_amount } = req.body;
-        
+
+        console.log('📝 Creating invoice with data:', req.body);
+
+        // Validate required fields
         if (!client_id) {
             return res.status(400).json({ error: 'Client ID is required' });
         }
-        
+
+        if (!mongoose.Types.ObjectId.isValid(client_id)) {
+            return res.status(400).json({ error: 'Invalid client ID format' });
+        }
+
+        // Verify client exists and belongs to user
+        const client = await Client.findOne({
+            _id: client_id,
+            user_id: req.userId
+        });
+
+        if (!client) {
+            return res.status(404).json({ error: 'Client not found' });
+        }
+
+        // Validate items
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'At least one invoice item is required' });
+        }
+
+        // Validate each item
+        for (const item of items) {
+            if (!item.description || !item.description.trim()) {
+                return res.status(400).json({ error: 'Item description is required' });
+            }
+            if (!item.quantity || item.quantity <= 0) {
+                return res.status(400).json({ error: 'Item quantity must be greater than 0' });
+            }
+            if (item.unit_price === undefined || item.unit_price < 0) {
+                return res.status(400).json({ error: 'Item unit price must be a positive number' });
+            }
+        }
+
+        // Generate invoice number
         const invoice_number = `INV-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-        const tax_amount = subtotal * (tax_rate / 100);
-        
+
+        // Calculate tax amount
+        const taxAmount = subtotal * (tax_rate / 100);
+
+        // Create invoice
         const invoice = await Invoice.create({
             user_id: req.userId,
-            client_id,
+            client_id: client_id,
             invoice_number,
-            subtotal,
-            tax_rate,
-            tax_amount,
-            total_amount,
-            due_date,
-            notes,
-            items,
-            status: 'pending'
+            status: 'pending',
+            subtotal: subtotal || 0,
+            tax_rate: tax_rate || 0,
+            tax_amount: taxAmount || 0,
+            total_amount: total_amount || subtotal + taxAmount,
+            currency: 'USD',
+            due_date: due_date || null,
+            notes: notes || '',
+            items: items.map(item => ({
+                description: item.description.trim(),
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                total_price: item.quantity * item.unit_price
+            }))
         });
-        
-        // ========== NOTIFICATION: Invoice Created for Client ==========
-        const client = await Client.findById(client_id);
+
+        console.log('✅ Invoice created successfully:', invoice_number);
+
+        // Create notification
         if (client) {
             await NotificationHelper.createNotification({
                 userId: client.user_id,
@@ -82,40 +135,50 @@ router.post('/', verifyToken, async (req, res) => {
                 referenceId: invoice._id,
                 referenceType: 'invoice',
                 actionUrl: `/invoices/${invoice._id}`
-            });
+            }).catch(err => console.error('Notification error:', err));
         }
-        
-        console.log('Invoice created successfully:', invoice_number);
-        res.status(201).json({ success: true, invoice });
+
+        res.status(201).json({
+            success: true,
+            invoice,
+            message: 'Invoice created successfully'
+        });
     } catch (err) {
-        console.error('Error creating invoice:', err);
-        res.status(500).json({ error: err.message });
+        console.error('❌ Error creating invoice:', err);
+        res.status(500).json({
+            error: 'Failed to create invoice',
+            details: err.message
+        });
     }
 });
 
-// Update invoice status (mark as paid) - WITH NOTIFICATION
+// Update invoice status (mark as paid)
 router.patch('/:id/status', verifyToken, async (req, res) => {
     try {
         const { status } = req.body;
         const invoiceId = req.params.id;
-        
-        const invoice = await Invoice.findOne({ _id: invoiceId, user_id: req.userId });
+
+        const invoice = await Invoice.findOne({
+            _id: invoiceId,
+            user_id: req.userId
+        });
+
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
-        
+
         const updateData = { status };
         if (status === 'paid') {
             updateData.paid_at = new Date();
         }
-        
+
         const updatedInvoice = await Invoice.findByIdAndUpdate(
             invoiceId,
             updateData,
             { new: true }
         );
-        
-        // ========== NOTIFICATION: Invoice Paid ==========
+
+        // Create notification for payment
         if (status === 'paid') {
             await NotificationHelper.createNotification({
                 userId: req.userId,
@@ -125,9 +188,9 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
                 referenceId: invoice._id,
                 referenceType: 'invoice',
                 actionUrl: `/invoices/${invoice._id}`
-            });
-            
-            // Also notify the client (if they have a user account)
+            }).catch(err => console.error('Notification error:', err));
+
+            // Also notify the client
             if (invoice.client_id) {
                 const client = await Client.findById(invoice.client_id);
                 if (client) {
@@ -139,26 +202,41 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
                         referenceId: invoice._id,
                         referenceType: 'invoice',
                         actionUrl: `/invoices/${invoice._id}`
-                    });
+                    }).catch(err => console.error('Notification error:', err));
                 }
             }
         }
-        
-        res.json({ success: true, invoice: updatedInvoice });
+
+        res.json({
+            success: true,
+            invoice: updatedInvoice,
+            message: 'Invoice status updated'
+        });
     } catch (err) {
         console.error('Error updating invoice:', err);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Failed to update invoice' });
     }
 });
 
 // Delete invoice
 router.delete('/:id', verifyToken, async (req, res) => {
     try {
-        await Invoice.findByIdAndDelete({ _id: req.params.id, user_id: req.userId });
-        res.json({ success: true, message: 'Invoice deleted' });
+        const invoice = await Invoice.findOneAndDelete({
+            _id: req.params.id,
+            user_id: req.userId
+        });
+
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Invoice deleted successfully'
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error deleting invoice:', err);
+        res.status(500).json({ error: 'Failed to delete invoice' });
     }
 });
 

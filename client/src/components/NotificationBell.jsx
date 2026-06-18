@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import io from 'socket.io-client';
-import { SOCKET_URL } from '../config/api';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5000';
 
 const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
@@ -25,28 +27,39 @@ const NotificationBell = () => {
         // Initialize socket connection
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
-        
+
         if (token && user.id) {
-            const newSocket = io(SOCKET_URL, {
-                query: { userId: user.id },
-                transports: ['websocket']
-            });
-            
-            newSocket.on('connect', () => {
-                console.log('🔌 Connected to notification server');
-            });
-            
-            newSocket.on('new_notification', (notification) => {
-                console.log('🔔 New notification received:', notification);
-                setNotifications(prev => [notification, ...prev]);
-                setUnreadCount(prev => prev + 1);
-            });
-            
-            setSocket(newSocket);
-            
-            return () => {
-                newSocket.disconnect();
-            };
+            try {
+                const newSocket = io(SOCKET_URL, {
+                    query: { userId: user.id },
+                    transports: ['websocket', 'polling'],
+                    withCredentials: true
+                });
+
+                newSocket.on('connect', () => {
+                    console.log('🔌 Connected to notification server');
+                });
+
+                newSocket.on('connect_error', (error) => {
+                    console.log('⚠️ Socket connection error:', error.message);
+                });
+
+                newSocket.on('new_notification', (notification) => {
+                    console.log('🔔 New notification received:', notification);
+                    setNotifications(prev => [notification, ...prev]);
+                    setUnreadCount(prev => prev + 1);
+                });
+
+                setSocket(newSocket);
+
+                return () => {
+                    if (newSocket.connected) {
+                        newSocket.disconnect();
+                    }
+                };
+            } catch (err) {
+                console.log('⚠️ Socket initialization failed:', err.message);
+            }
         }
     }, []);
 
@@ -64,7 +77,12 @@ const NotificationBell = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get('/api/notifications', {
+            if (!token) {
+                setLoading(false);
+                return;
+            }
+
+            const response = await axios.get(`${API_URL}/notifications`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications(response.data.notifications || []);
@@ -79,7 +97,9 @@ const NotificationBell = () => {
     const fetchUnreadCount = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('/api/notifications/unread-count', {
+            if (!token) return;
+
+            const response = await axios.get(`${API_URL}/notifications/unread-count`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUnreadCount(response.data.unreadCount || 0);
@@ -91,7 +111,7 @@ const NotificationBell = () => {
     const markAsRead = async (id) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.put(`/api/notifications/${id}/read`, {}, {
+            await axios.put(`${API_URL}/notifications/${id}/read`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications(prev => prev.map(n => n._id === id ? { ...n, is_read: true } : n));
@@ -104,7 +124,7 @@ const NotificationBell = () => {
     const markAllAsRead = async () => {
         try {
             const token = localStorage.getItem('token');
-            await axios.put('/api/notifications/mark-all-read', {}, {
+            await axios.put(`${API_URL}/notifications/mark-all-read`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
@@ -117,7 +137,7 @@ const NotificationBell = () => {
     const deleteNotification = async (id) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`/api/notifications/${id}`, {
+            await axios.delete(`${API_URL}/notifications/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const deleted = notifications.find(n => n._id === id);
@@ -133,7 +153,7 @@ const NotificationBell = () => {
     const clearAll = async () => {
         try {
             const token = localStorage.getItem('token');
-            await axios.delete('/api/notifications', {
+            await axios.delete(`${API_URL}/notifications`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications([]);
@@ -148,10 +168,10 @@ const NotificationBell = () => {
         if (!notification.is_read) {
             try {
                 const token = localStorage.getItem('token');
-                await axios.put(`/api/notifications/${notification._id}/read`, {}, {
+                await axios.put(`${API_URL}/notifications/${notification._id}/read`, {}, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setNotifications(prev => prev.map(n => 
+                setNotifications(prev => prev.map(n =>
                     n._id === notification._id ? { ...n, is_read: true } : n
                 ));
                 setUnreadCount(prev => Math.max(0, prev - 1));
@@ -159,51 +179,90 @@ const NotificationBell = () => {
                 console.error('Error marking as read:', err);
             }
         }
-        
+
+        // Close dropdown
+        setIsOpen(false);
+
         // Navigate based on action_url or reference_type
         if (notification.action_url) {
             navigate(notification.action_url);
-        } else if (notification.reference_type) {
-            switch (notification.reference_type) {
-                case 'project':
-                    navigate(`/projects/${notification.reference_id}`);
-                    break;
-                case 'invoice':
-                    navigate(`/invoices/${notification.reference_id}`);
-                    break;
-                case 'contract':
-                    navigate(`/contracts/${notification.reference_id}`);
-                    break;
-                case 'subscription':
-                    navigate('/subscription');
-                    break;
-                default:
-                    break;
-            }
+            return;
         }
-        
-        setIsOpen(false);
+
+        // Handle different notification types
+        const type = notification.type;
+        const refId = notification.reference_id;
+        const refType = notification.reference_type;
+
+        console.log('🔍 Navigating notification:', { type, refId, refType });
+
+        // Navigate based on type
+        switch (type) {
+            case 'invoice_created':
+            case 'invoice_paid':
+            case 'payment_received':
+                if (refId) {
+                    navigate(`/invoices/${refId}`);
+                } else {
+                    navigate('/invoices');
+                }
+                break;
+
+            case 'project_completed':
+            case 'project_status_updated':
+            case 'bid_accepted':
+            case 'bid_received':
+            case 'bid_rejected':
+                if (refId) {
+                    navigate(`/projects/${refId}`);
+                } else {
+                    navigate('/projects');
+                }
+                break;
+
+            case 'subscription_expiring':
+            case 'subscription_expired':
+                navigate('/subscriptions');
+                break;
+
+            default:
+                // If no specific navigation, try to use reference_type
+                if (refType === 'project' && refId) {
+                    navigate(`/projects/${refId}`);
+                } else if (refType === 'invoice' && refId) {
+                    navigate(`/invoices/${refId}`);
+                } else if (refType === 'contract' && refId) {
+                    navigate(`/contracts/${refId}`);
+                } else {
+                    // Default: close the notification and stay on current page
+                    console.log('ℹ️ No navigation target for notification:', notification);
+                }
+                break;
+        }
     };
 
     const getTypeIcon = (type) => {
-        switch (type) {
-            case 'bid_received': return '📩';
-            case 'bid_accepted': return '🎉';
-            case 'bid_rejected': return '😔';
-            case 'project_assigned': return '📋';
-            case 'project_status_updated': return '🔄';
-            case 'invoice_paid': return '💰';
-            case 'invoice_created': return '📄';
-            case 'contract_created': return '📝';
-            case 'new_project': return '🆕';
-            case 'subscription_expiring': return '⚠️';
-            case 'subscription_expired': return '❌';
-            case 'payment_received': return '💳';
-            default: return '🔔';
-        }
+        const iconMap = {
+            'bid_received': '📩',
+            'bid_accepted': '🎉',
+            'bid_rejected': '😔',
+            'project_assigned': '📋',
+            'project_status_updated': '🔄',
+            'project_completed': '✅',
+            'invoice_paid': '💰',
+            'invoice_created': '📄',
+            'contract_created': '📝',
+            'new_project': '🆕',
+            'subscription_expiring': '⚠️',
+            'subscription_expired': '❌',
+            'payment_received': '💳',
+            'payment_released': '💸'
+        };
+        return iconMap[type] || '🔔';
     };
 
     const getTimeAgo = (dateStr) => {
+        if (!dateStr) return 'Just now';
         const now = new Date();
         const date = new Date(dateStr);
         const diffMs = now - date;

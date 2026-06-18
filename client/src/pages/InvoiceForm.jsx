@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const InvoiceForm = () => {
     const navigate = useNavigate();
     const [clients, setClients] = useState([]);
@@ -9,7 +11,6 @@ const InvoiceForm = () => {
     const [error, setError] = useState('');
     const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: 0 }]);
     const [selectedClientId, setSelectedClientId] = useState('');
-    const [selectedClientName, setSelectedClientName] = useState('');
     const [formData, setFormData] = useState({
         due_date: '',
         tax_rate: 0,
@@ -23,13 +24,21 @@ const InvoiceForm = () => {
     const fetchClients = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get('/api/clients', {
+            if (!token) {
+                setError('Please login to create an invoice');
+                return;
+            }
+
+            const response = await axios.get(`${API_URL}/clients`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            console.log('Fetched clients:', response.data.clients);
-            setClients(response.data.clients || []);
+
+            console.log('Fetched clients:', response.data);
+            const clientsData = response.data.clients || response.data || [];
+            setClients(clientsData);
         } catch (err) {
             console.error('Failed to fetch clients:', err);
+            setError('Failed to load clients. Please refresh and try again.');
         }
     };
 
@@ -50,6 +59,8 @@ const InvoiceForm = () => {
         } else {
             updatedItems[index][field] = parseFloat(value) || 0;
         }
+        // Calculate total price for the item
+        updatedItems[index].total_price = (updatedItems[index].quantity || 0) * (updatedItems[index].unit_price || 0);
         setItems(updatedItems);
     };
 
@@ -68,64 +79,89 @@ const InvoiceForm = () => {
     const handleClientChange = (e) => {
         const clientId = e.target.value;
         setSelectedClientId(clientId);
-        const client = clients.find(c => c._id === clientId);
-        if (client) {
-            setSelectedClientName(client.contact_name);
-            console.log('Selected client:', client.contact_name);
-        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        
+        setError('');
+
         console.log('=== FORM SUBMISSION ===');
         console.log('Selected client ID:', selectedClientId);
-        console.log('Selected client name:', selectedClientName);
-        
-        if (!selectedClientName) {
+        console.log('Items:', items);
+
+        if (!selectedClientId) {
             setError('Please select a client from the dropdown');
             return;
         }
-        
+
         if (items.length === 0 || !items[0].description) {
-            setError('Please add at least one invoice item');
+            setError('Please add at least one invoice item with a description');
             return;
         }
-        
+
+        const emptyItem = items.some(item => !item.description.trim());
+        if (emptyItem) {
+            setError('Please fill in all item descriptions');
+            return;
+        }
+
         setLoading(true);
-        setError('');
 
         try {
             const token = localStorage.getItem('token');
-            
+            if (!token) {
+                setError('Please login to create an invoice');
+                setLoading(false);
+                return;
+            }
+
+            const subtotal = calculateSubtotal();
+            const taxAmount = calculateTax();
+            const totalAmount = calculateTotal();
+
             const invoiceData = {
-                client_name: selectedClientName,
-                due_date: formData.due_date,
+                client_id: selectedClientId,
+                due_date: formData.due_date || null,
                 tax_rate: parseFloat(formData.tax_rate) || 0,
-                notes: formData.notes,
+                notes: formData.notes || '',
                 items: items.map(item => ({
-                    description: item.description,
+                    description: item.description.trim(),
                     quantity: parseFloat(item.quantity) || 1,
-                    unit_price: parseFloat(item.unit_price) || 0
+                    unit_price: parseFloat(item.unit_price) || 0,
+                    total_price: (parseFloat(item.quantity) || 1) * (parseFloat(item.unit_price) || 0)
                 })),
-                subtotal: calculateSubtotal(),
-                total_amount: calculateTotal()
+                subtotal: subtotal,
+                total_amount: totalAmount
             };
-            
-            console.log('Sending to backend:', invoiceData);
-            
-            const response = await axios.post('/api/invoices', invoiceData, {
-                headers: { Authorization: `Bearer ${token}` }
+
+            console.log('Sending invoice data:', invoiceData);
+
+            const response = await axios.post(`${API_URL}/invoices`, invoiceData, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
-            
+
             console.log('Response:', response.data);
-            
-            if (response.data.success) {
+
+            if (response.data.success || response.data.invoice) {
+                alert('✅ Invoice created successfully!');
                 navigate('/invoices');
+            } else {
+                setError('Failed to create invoice. Please try again.');
             }
         } catch (err) {
-            console.error('Error:', err.response?.data || err.message);
-            setError(err.response?.data?.error || 'Failed to create invoice');
+            console.error('❌ Error creating invoice:', err);
+            console.error('❌ Error response:', err.response?.data);
+
+            if (err.response?.data?.error) {
+                setError(err.response.data.error);
+            } else if (err.response?.data?.message) {
+                setError(err.response.data.message);
+            } else {
+                setError('Failed to create invoice. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -134,23 +170,26 @@ const InvoiceForm = () => {
     return (
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
             <h2 style={{ marginBottom: '1.5rem' }}>Create New Invoice</h2>
-            
+
             {error && (
                 <div style={{
                     background: '#fee2e2',
                     color: '#991b1b',
-                    padding: '0.75rem',
+                    padding: '0.75rem 1rem',
                     borderRadius: '8px',
-                    marginBottom: '1rem'
+                    marginBottom: '1rem',
+                    border: '1px solid #fecaca'
                 }}>
                     {error}
                 </div>
             )}
-            
+
             <form onSubmit={handleSubmit}>
                 {/* Client Selection */}
                 <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Select Client *</label>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                        Select Client *
+                    </label>
                     <select
                         value={selectedClientId}
                         onChange={handleClientChange}
@@ -165,15 +204,20 @@ const InvoiceForm = () => {
                     >
                         <option value="">-- Select a client --</option>
                         {clients.map(client => (
-                            <option key={client._id} value={client._id}>
+                            <option key={client._id || client.id} value={client._id || client.id}>
                                 {client.contact_name} {client.company_name ? `(${client.company_name})` : ''}
                             </option>
                         ))}
                     </select>
+                    {clients.length === 0 && (
+                        <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                            No clients found. <a href="/clients/new" style={{ color: '#3b82f6' }}>Add a client first</a>
+                        </p>
+                    )}
                 </div>
 
                 {/* Show selected client */}
-                {selectedClientName && (
+                {selectedClientId && (
                     <div style={{
                         marginBottom: '1rem',
                         padding: '0.75rem',
@@ -181,7 +225,7 @@ const InvoiceForm = () => {
                         borderRadius: '8px',
                         color: '#065f46'
                     }}>
-                        ✓ Client selected: <strong>{selectedClientName}</strong>
+                        ✓ Client selected: <strong>{clients.find(c => (c._id || c.id) === selectedClientId)?.contact_name || 'Selected'}</strong>
                     </div>
                 )}
 
@@ -196,7 +240,8 @@ const InvoiceForm = () => {
                                 width: '100%',
                                 padding: '0.75rem',
                                 border: '1px solid #d1d5db',
-                                borderRadius: '8px'
+                                borderRadius: '8px',
+                                fontSize: '1rem'
                             }}
                         />
                     </div>
@@ -206,20 +251,24 @@ const InvoiceForm = () => {
                         <input
                             type="number"
                             step="0.1"
+                            min="0"
+                            max="100"
                             value={formData.tax_rate}
                             onChange={(e) => setFormData({ ...formData, tax_rate: parseFloat(e.target.value) || 0 })}
                             style={{
                                 width: '100%',
                                 padding: '0.75rem',
                                 border: '1px solid #d1d5db',
-                                borderRadius: '8px'
+                                borderRadius: '8px',
+                                fontSize: '1rem'
                             }}
+                            placeholder="0"
                         />
                     </div>
                 </div>
 
                 <h3 style={{ margin: '1.5rem 0 1rem' }}>Invoice Items</h3>
-                
+
                 {items.map((item, index) => (
                     <div key={index} style={{
                         marginBottom: '1rem',
@@ -229,7 +278,7 @@ const InvoiceForm = () => {
                         background: '#f9fafb'
                     }}>
                         <div style={{ marginBottom: '0.75rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Description</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Description *</label>
                             <input
                                 type="text"
                                 placeholder="Item description"
@@ -240,11 +289,12 @@ const InvoiceForm = () => {
                                     width: '100%',
                                     padding: '0.75rem',
                                     border: '1px solid #d1d5db',
-                                    borderRadius: '8px'
+                                    borderRadius: '8px',
+                                    fontSize: '1rem'
                                 }}
                             />
                         </div>
-                        
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '1rem', alignItems: 'end' }}>
                             <div>
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Quantity</label>
@@ -253,12 +303,14 @@ const InvoiceForm = () => {
                                     value={item.quantity}
                                     onChange={(e) => updateItem(index, 'quantity', e.target.value)}
                                     min="1"
+                                    step="1"
                                     required
                                     style={{
                                         width: '100%',
                                         padding: '0.75rem',
                                         border: '1px solid #d1d5db',
-                                        borderRadius: '8px'
+                                        borderRadius: '8px',
+                                        fontSize: '1rem'
                                     }}
                                 />
                             </div>
@@ -275,7 +327,8 @@ const InvoiceForm = () => {
                                         width: '100%',
                                         padding: '0.75rem',
                                         border: '1px solid #d1d5db',
-                                        borderRadius: '8px'
+                                        borderRadius: '8px',
+                                        fontSize: '1rem'
                                     }}
                                 />
                             </div>
@@ -289,13 +342,23 @@ const InvoiceForm = () => {
                                         color: '#dc2626',
                                         border: 'none',
                                         borderRadius: '8px',
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        fontSize: '0.875rem',
+                                        fontWeight: '500'
                                     }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = '#fecaca'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = '#fee2e2'}
                                 >
                                     Remove
                                 </button>
                             )}
                         </div>
+                        {/* Show item total - removed the unwanted zero display */}
+                        {item.quantity > 0 && item.unit_price > 0 && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                Item Total: <strong>${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}</strong>
+                            </div>
+                        )}
                     </div>
                 ))}
 
@@ -309,8 +372,11 @@ const InvoiceForm = () => {
                         border: 'none',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        marginBottom: '1.5rem'
+                        marginBottom: '1.5rem',
+                        transition: 'background 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
                 >
                     + Add Item
                 </button>
@@ -339,7 +405,9 @@ const InvoiceForm = () => {
                             width: '100%',
                             padding: '0.75rem',
                             border: '1px solid #d1d5db',
-                            borderRadius: '8px'
+                            borderRadius: '8px',
+                            fontSize: '1rem',
+                            resize: 'vertical'
                         }}
                     />
                 </div>
@@ -351,14 +419,20 @@ const InvoiceForm = () => {
                         style={{
                             flex: 1,
                             padding: '0.75rem',
-                            background: '#10b981',
+                            background: loading ? '#9ca3af' : '#10b981',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
-                            cursor: 'pointer',
+                            cursor: loading ? 'not-allowed' : 'pointer',
                             fontSize: '1rem',
                             fontWeight: '500',
-                            opacity: loading ? 0.5 : 1
+                            transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                            if (!loading) e.currentTarget.style.background = '#059669';
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!loading) e.currentTarget.style.background = '#10b981';
                         }}
                     >
                         {loading ? 'Creating Invoice...' : 'Create Invoice'}
@@ -373,8 +447,11 @@ const InvoiceForm = () => {
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            transition: 'background 0.2s'
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#4b5563'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = '#6b7280'}
                     >
                         Cancel
                     </button>

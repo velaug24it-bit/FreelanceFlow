@@ -1,10 +1,25 @@
 const mongoose = require('mongoose');
 
 const invoiceItemSchema = new mongoose.Schema({
-    description: String,
-    quantity: Number,
-    unit_price: Number,
-    total_price: Number
+    description: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    quantity: {
+        type: Number,
+        required: true,
+        min: 1
+    },
+    unit_price: {
+        type: Number,
+        required: true,
+        min: 0
+    },
+    total_price: {
+        type: Number,
+        required: true
+    }
 });
 
 const invoiceSchema = new mongoose.Schema({
@@ -15,7 +30,8 @@ const invoiceSchema = new mongoose.Schema({
     },
     client_id: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Client'
+        ref: 'Client',
+        required: true
     },
     project_id: {
         type: mongoose.Schema.Types.ObjectId,
@@ -29,11 +45,12 @@ const invoiceSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: ['draft', 'pending', 'paid', 'overdue'],
-        default: 'draft'
+        default: 'pending'
     },
     subtotal: {
         type: Number,
-        required: true
+        required: true,
+        default: 0
     },
     tax_rate: {
         type: Number,
@@ -45,27 +62,35 @@ const invoiceSchema = new mongoose.Schema({
     },
     total_amount: {
         type: Number,
-        required: true
+        required: true,
+        default: 0
     },
     currency: {
         type: String,
         default: 'USD'
     },
-    due_date: Date,
-    paid_at: Date,
-    notes: String,
-    items: [invoiceItemSchema],
-    stripe_payment_intent_id: String,
-    created_at: {
-        type: Date,
-        default: Date.now
+    due_date: {
+        type: Date
     },
-    updated_at: {
-        type: Date,
-        default: Date.now
-    }
+    paid_at: {
+        type: Date
+    },
+    notes: {
+        type: String,
+        trim: true
+    },
+    items: [invoiceItemSchema]
 }, {
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+    timestamps: {
+        createdAt: 'created_at',
+        updatedAt: 'updated_at'
+    }
 });
+
+// Create indexes for better performance
+invoiceSchema.index({ user_id: 1 });
+invoiceSchema.index({ client_id: 1 });
+invoiceSchema.index({ status: 1 });
+invoiceSchema.index({ invoice_number: 1 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

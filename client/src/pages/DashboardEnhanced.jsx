@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { 
-  DollarSign, Users, Briefcase, FileText, 
+import {
+  DollarSign, Users, Briefcase, FileText,
   Plus, Bell, CreditCard, PieChart, Calendar,
   TrendingUp, TrendingDown, Minus, Crown
 } from 'lucide-react';
@@ -35,29 +35,29 @@ const DashboardEnhanced = () => {
   const fetchRealData = async () => {
     try {
       const token = localStorage.getItem('token');
-      
+
       const [clientsRes, projectsRes, invoicesRes] = await Promise.all([
         axios.get('/api/clients', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/invoices', { headers: { Authorization: `Bearer ${token}` } })
       ]);
-      
+
       const clients = clientsRes.data.clients || [];
       const projects = projectsRes.data.projects || [];
       const invoices = invoicesRes.data.invoices || [];
-      
+
       const currentRevenue = invoices
         .filter(inv => inv.status === 'paid')
         .reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
-      
+
       const pendingInvoices = invoices.filter(inv => inv.status === 'pending');
       const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
-      
+
       const revenueTrend = clients.length > 0 ? 12 : 0;
       const clientsTrend = clients.length > 0 ? 5 : 0;
       const projectsTrend = projects.filter(p => p.status !== 'completed').length > 0 ? 2 : 0;
       const pendingTrend = pendingInvoices.length > 0 ? 0 : 0;
-      
+
       setStats({
         total_revenue: currentRevenue,
         previous_revenue: currentRevenue * 0.88,
@@ -73,9 +73,9 @@ const DashboardEnhanced = () => {
         pending_trend: pendingTrend,
         pending_count: pendingInvoices.length
       });
-      
+
       setRecentInvoices(invoices.slice(0, 5));
-      
+
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -126,34 +126,34 @@ const DashboardEnhanced = () => {
   };
 
   const statCards = [
-    { 
-      title: 'Total Revenue', 
-      value: `$${stats.total_revenue.toLocaleString()}`, 
-      icon: DollarSign, 
+    {
+      title: 'Total Revenue',
+      value: `$${stats.total_revenue.toLocaleString()}`,
+      icon: DollarSign,
       color: 'bg-green-500',
       trend: renderTrend(stats.revenue_trend, true),
       trendValue: `${stats.revenue_trend}% from last month`
     },
-    { 
-      title: 'Total Clients', 
-      value: stats.total_clients, 
-      icon: Users, 
+    {
+      title: 'Total Clients',
+      value: stats.total_clients,
+      icon: Users,
       color: 'bg-blue-500',
       trend: renderTrend(stats.clients_trend, false),
       trendValue: `${stats.clients_trend > 0 ? '+' : ''}${stats.clients_trend} from last month`
     },
-    { 
-      title: 'Active Projects', 
-      value: stats.active_projects, 
-      icon: Briefcase, 
+    {
+      title: 'Active Projects',
+      value: stats.active_projects,
+      icon: Briefcase,
       color: 'bg-purple-500',
       trend: renderTrend(stats.projects_trend, false),
       trendValue: `${stats.projects_trend > 0 ? '+' : ''}${stats.projects_trend} from last month`
     },
-    { 
-      title: 'Pending Invoices', 
-      value: `$${stats.pending_invoices_amount.toLocaleString()}`, 
-      icon: FileText, 
+    {
+      title: 'Pending Invoices',
+      value: `$${stats.pending_invoices_amount.toLocaleString()}`,
+      icon: FileText,
       color: 'bg-yellow-500',
       trend: renderTrend(stats.pending_trend, false),
       trendValue: `${stats.pending_count} invoice${stats.pending_count !== 1 ? 's' : ''} pending`
@@ -190,7 +190,7 @@ const DashboardEnhanced = () => {
               {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
-          
+
           {/* Plan Badge - FIXED with correct closing quote */}
           <div style={{
             display: 'flex',
@@ -204,8 +204,8 @@ const DashboardEnhanced = () => {
             <Crown size={20} color={getPlanColor()} />
             <div>
               <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Current Plan</div>
-              <div style={{ 
-                fontSize: '1.1rem', 
+              <div style={{
+                fontSize: '1.1rem',
                 fontWeight: '700',
                 color: getPlanColor()
               }}>
@@ -214,7 +214,7 @@ const DashboardEnhanced = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Subscription Status Message */}
         {getPlanDisplay() === 'Free' && (
           <div style={{
@@ -231,8 +231,8 @@ const DashboardEnhanced = () => {
             <span style={{ color: '#92400e' }}>
               You are on the Free plan. Upgrade to Pro for more features!
             </span>
-            <a 
-              href="/subscription" 
+            <a
+              href="/subscription"
               style={{
                 padding: '0.5rem 1rem',
                 background: '#f59e0b',
@@ -320,14 +320,14 @@ const DashboardEnhanced = () => {
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             transition: 'transform 0.2s, box-shadow 0.2s'
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-4px)';
-            e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-          }}>
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <div style={{ background: card.color, padding: '0.5rem', borderRadius: '12px' }}>
                 <card.icon size={20} color="white" />
