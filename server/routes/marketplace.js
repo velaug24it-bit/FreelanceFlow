@@ -80,7 +80,26 @@ router.post('/projects', verifyToken, async (req, res) => {
 router.get('/my-projects', verifyToken, async (req, res) => {
     try {
         const projects = await ProjectPost.find({ client_id: req.userId }).sort({ created_at: -1 });
-        res.json({ projects });
+        const projectsWithContracts = await Promise.all(projects.map(async (project) => {
+            const contract = await Contract.findOne({ project_id: project._id });
+            const acceptedBid = await Bid.findOne({
+                project_id: project._id,
+                status: 'accepted'
+            });
+
+            return {
+                ...project.toObject(),
+                contract_details: contract ? {
+                    agreed_amount: contract.agreed_amount,
+                    client_fee: contract.client_fee,
+                    total_client_charge: contract.total_client_charge,
+                    status: contract.status
+                } : null,
+                freelancer_payment_phone: acceptedBid?.phone_number || null
+            };
+        }));
+
+        res.json({ projects: projectsWithContracts });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -160,7 +179,7 @@ router.get('/my-awarded-projects', verifyToken, async (req, res) => {
 // Place a bid - WITH NOTIFICATION
 router.post('/bids', verifyToken, async (req, res) => {
     try {
-        const { project_id, bid_amount, estimated_days, proposal, portfolio_link } = req.body;
+        const { project_id, bid_amount, estimated_days, proposal, phone_number, portfolio_link } = req.body;
         
         const user = await User.findById(req.userId);
         const CONNECTS_COST = 1;
@@ -184,6 +203,7 @@ router.post('/bids', verifyToken, async (req, res) => {
             bid_amount,
             estimated_days,
             proposal,
+            phone_number,
             portfolio_link,
             status: 'pending'
         });

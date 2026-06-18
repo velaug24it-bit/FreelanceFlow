@@ -18,9 +18,12 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
         current_phase: project.current_phase || 'development'
     });
 
+    const getId = (value) => value?._id || value?.id || value;
+
     // Check if user is client or freelancer for this project
-    const isClientUser = project.client_id?._id === user?._id || project.client_id === user?.id;
-    const isFreelancerUser = project.selected_freelancer_id?._id === user?._id || project.selected_freelancer_id === user?.id;
+    const userId = getId(user);
+    const isClientUser = getId(project.client_id)?.toString() === userId?.toString();
+    const isFreelancerUser = getId(project.selected_freelancer_id)?.toString() === userId?.toString();
 
     useEffect(() => {
         if (showHistory) {

@@ -76,6 +76,10 @@ const SubscriptionPlans = () => {
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
+            if (!data.key) {
+                throw new Error('Razorpay key was not returned by the server');
+            }
             
             // Open Razorpay Checkout
             const options = {
@@ -93,21 +97,31 @@ const SubscriptionPlans = () => {
                     color: '#667eea'
                 },
                 handler: async (response) => {
-                    // Verify payment
-                    const verifyRes = await axios.post('/api/razorpay/verify-payment', {
-                        razorpay_order_id: response.razorpay_order_id,
-                        razorpay_payment_id: response.razorpay_payment_id,
-                        razorpay_signature: response.razorpay_signature,
-                        planName: plan.name,
-                        amount: plan.price
-                    }, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    
-                    if (verifyRes.data.success) {
-                        setMessage({ type: 'success', text: `Successfully upgraded to ${plan.name} plan!` });
-                        fetchCurrentSubscription();
-                        setTimeout(() => window.location.reload(), 2000);
+                    try {
+                        // Verify payment
+                        const verifyRes = await axios.post('/api/razorpay/verify-payment', {
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature,
+                            planName: plan.name,
+                            amount: plan.price
+                        }, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        });
+                        
+                        if (verifyRes.data.success) {
+                            setMessage({ type: 'success', text: `Successfully upgraded to ${plan.name} plan!` });
+                            fetchCurrentSubscription();
+                            setTimeout(() => window.location.reload(), 2000);
+                        }
+                    } catch (err) {
+                        console.error('Payment verification error:', err);
+                        setMessage({
+                            type: 'error',
+                            text: err.response?.data?.error || 'Payment verification failed. Please contact support.'
+                        });
+                    } finally {
+                        setProcessing(null);
                     }
                 },
                 modal: {
@@ -118,6 +132,13 @@ const SubscriptionPlans = () => {
             };
             
             const razorpayInstance = new window.Razorpay(options);
+            razorpayInstance.on('payment.failed', (response) => {
+                setProcessing(null);
+                setMessage({
+                    type: 'error',
+                    text: response.error?.description || 'Payment failed. Please try again.'
+                });
+            });
             razorpayInstance.open();
             
         } catch (err) {

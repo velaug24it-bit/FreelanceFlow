@@ -42,6 +42,23 @@ const CONNECTS_PACKAGES = [
     { id: 4, connects: 800, price: 50, label: 'Business' }
 ];
 
+const verifyRazorpaySignature = (orderId, paymentId, signature) => {
+    if (!orderId || !paymentId || !signature) {
+        return false;
+    }
+
+    const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(`${orderId}|${paymentId}`)
+        .digest('hex');
+
+    const expectedBuffer = Buffer.from(expectedSignature);
+    const receivedBuffer = Buffer.from(signature);
+
+    return expectedBuffer.length === receivedBuffer.length &&
+        crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+};
+
 // ============ GET CONNECTS PACKAGES ============
 router.get('/connects-packages', async (req, res) => {
     try {
@@ -111,6 +128,14 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
         } = req.body;
         
         console.log('Verifying payment:', { razorpay_order_id, razorpay_payment_id });
+
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({ error: 'Missing payment verification fields' });
+        }
+
+        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+            return res.status(400).json({ error: 'Invalid payment signature. Check that Razorpay key ID and secret are from the same mode.' });
+        }
         
         // Verify signature
         const body = razorpay_order_id + '|' + razorpay_payment_id;
@@ -220,6 +245,14 @@ router.post('/verify-connects', verifyToken, async (req, res) => {
             razorpay_signature,
             packageId
         } = req.body;
+
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !packageId) {
+            return res.status(400).json({ error: 'Missing payment verification fields' });
+        }
+
+        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
+            return res.status(400).json({ error: 'Invalid payment signature. Check that Razorpay key ID and secret are from the same mode.' });
+        }
         
         // Verify signature
         const body = razorpay_order_id + '|' + razorpay_payment_id;
@@ -232,7 +265,10 @@ router.post('/verify-connects', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'Invalid signature' });
         }
         
-        const pkg = CONNECTS_PACKAGES.find(p => p.id === packageId);
+        const pkg = CONNECTS_PACKAGES.find(p => p.id === Number(packageId));
+        if (!pkg) {
+            return res.status(400).json({ error: 'Invalid package' });
+        }
         
         // Add connects to user
         await User.findByIdAndUpdate(req.userId, {

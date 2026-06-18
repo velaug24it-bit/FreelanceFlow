@@ -22,6 +22,7 @@ import Pricing from './pages/Pricing';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Marketplace from './pages/Marketplace';
 import ConnectsShop from './pages/ConnectsShop';
+import RazorpayCheckout from './pages/RazorpayCheckout';
 
 // Admin Pages
 import AdminLogin from './pages/AdminLogin';
@@ -95,6 +96,15 @@ function App() {
                 <>
                   <Navbar />
                   <ConnectsShop />
+                </>
+              </ProtectedRoute>
+            } />
+
+            <Route path="/checkout" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <RazorpayCheckout />
                 </>
               </ProtectedRoute>
             } />

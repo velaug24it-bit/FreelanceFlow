@@ -140,8 +140,31 @@ const projectPostSchema = new mongoose.Schema({
     // Payment tracking
     payment_status: {
         type: String,
-        enum: ['unpaid', 'pending', 'paid'],
+        enum: ['unpaid', 'pending', 'processing', 'paid', 'failed', 'refunded'],
         default: 'unpaid'
+    },
+
+    payment_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Payment'
+    },
+
+    release_requested: {
+        type: Boolean,
+        default: false
+    },
+
+    release_requested_at: {
+        type: Date
+    },
+
+    amount_released: {
+        type: Number,
+        default: 0
+    },
+
+    payment_released_at: {
+        type: Date
     }
 
 }, {

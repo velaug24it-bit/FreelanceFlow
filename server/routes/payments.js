@@ -4,6 +4,10 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const auth = require('../middleware/auth');
 const Project = require('../models/Project');
+const ProjectPost = require('../models/ProjectPost');
+const Contract = require('../models/Contract');
+const Bid = require('../models/Bid');
+const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Notification = require('../models/Notification');
@@ -25,17 +29,37 @@ router.post('/request-payment/:projectId', auth, async (req, res) => {
     const { projectId } = req.params;
     const clientId = req.userId;
 
-    const project = await Project.findById(projectId)
+    let project = await Project.findById(projectId)
       .populate('user_id', 'full_name email')
       .populate('client_id', 'full_name email')
       .populate('selected_freelancer_id', 'full_name email subscription_tier');
+    let contract = null;
+    let acceptedBid = null;
+    let isMarketplaceProject = false;
+
+    if (!project) {
+      project = await ProjectPost.findById(projectId)
+        .populate('client_id', 'full_name email')
+        .populate('selected_freelancer_id', 'full_name email subscription_tier');
+      isMarketplaceProject = !!project;
+
+      if (project) {
+        contract = await Contract.findOne({ project_id: projectId });
+        acceptedBid = await Bid.findOne({
+          project_id: projectId,
+          freelancer_id: project.selected_freelancer_id,
+          status: 'accepted'
+        });
+      }
+    }
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
     // Check if user is the client
-    if (project.client_id._id.toString() !== clientId) {
+    const projectClientId = project.client_id?._id || project.client_id;
+    if (projectClientId.toString() !== clientId) {
       return res.status(403).json({ error: 'Only the client can release payment' });
     }
 
@@ -44,51 +68,71 @@ router.post('/request-payment/:projectId', auth, async (req, res) => {
       return res.status(400).json({ error: 'Project must be completed to release payment' });
     }
 
-    // Check if payment already requested
-    if (project.release_requested) {
-      return res.status(400).json({ error: 'Payment already requested for this project' });
-    }
-
     // Check if freelancer exists
     if (!project.selected_freelancer_id) {
       return res.status(400).json({ error: 'No freelancer assigned to this project' });
     }
 
     // Calculate amounts
-    const amount = project.budget || 0;
-    const fee = calculateFee(amount, project.selected_freelancer_id.subscription_tier || 'free');
-    const netAmount = amount - fee;
+    const freelancerId = project.selected_freelancer_id?._id || project.selected_freelancer_id;
+    const freelancerTier = project.selected_freelancer_id?.subscription_tier || 'free';
+    const freelancerPhone = acceptedBid?.phone_number;
+    const agreedAmount = contract?.agreed_amount || project.budget || project.budget_max || 0;
+    const fee = isMarketplaceProject
+      ? (contract?.client_fee || 0)
+      : calculateFee(agreedAmount, freelancerTier);
+    const clientCharge = isMarketplaceProject
+      ? (contract?.total_client_charge || agreedAmount + fee)
+      : agreedAmount;
+    const netAmount = isMarketplaceProject ? agreedAmount : agreedAmount - fee;
+
+    if (!agreedAmount || agreedAmount <= 0 || !clientCharge || clientCharge <= 0) {
+      return res.status(400).json({ error: 'Project payment amount is missing. Accept a valid bid before release.' });
+    }
 
     // Create Razorpay order
     const orderOptions = {
-      amount: amount * 100, // Convert to paise
+      amount: Math.round(clientCharge * 100), // Convert to paise
       currency: 'INR',
-      receipt: `payment_${projectId}_${Date.now()}`,
+      receipt: `pay_${projectId.toString().slice(-8)}_${Date.now().toString().slice(-8)}`,
       notes: {
         projectId: projectId,
         clientId: clientId,
-        freelancerId: project.selected_freelancer_id._id,
-        amount: amount,
+        freelancerId: freelancerId.toString(),
+        amount: agreedAmount,
         fee: fee,
-        netAmount: netAmount
+        netAmount: netAmount,
+        freelancerPhone: freelancerPhone || '',
+        type: isMarketplaceProject ? 'marketplace_project' : 'project'
       }
     };
 
     const order = await razorpay.orders.create(orderOptions);
 
-    // Create payment record
-    const payment = new Payment({
+    // Create or refresh a pending payment record
+    const payment = await Payment.findOneAndUpdate({
       project_id: projectId,
-      client_id: clientId,
-      freelancer_id: project.selected_freelancer_id._id,
-      amount: amount,
+      status: { $in: ['pending', 'failed'] }
+    }, {
+      project_id: projectId,
+      client_id: projectClientId,
+      freelancer_id: freelancerId,
+      amount: clientCharge,
       currency: 'INR',
       status: 'pending',
       order_id: order.id,
       fee: fee,
-      net_amount: netAmount
+      net_amount: netAmount,
+      freelancer_phone: freelancerPhone,
+      payout_status: 'pending',
+      notes: freelancerPhone
+        ? `Freelancer payout phone: ${freelancerPhone}`
+        : 'Freelancer payout phone not provided'
+    }, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
     });
-    await payment.save();
 
     // Update project
     project.release_requested = true;
@@ -106,7 +150,9 @@ router.post('/request-payment/:projectId', auth, async (req, res) => {
       payment: payment,
       project: project,
       fee: fee,
-      netAmount: netAmount
+      netAmount: netAmount,
+      clientCharge,
+      freelancerPhone
     });
 
   } catch (err) {
@@ -149,11 +195,38 @@ router.post('/verify-payment', auth, async (req, res) => {
     await payment.save();
 
     // Update project
-    const project = await Project.findById(projectId);
+    let project = await Project.findById(projectId);
+    let isMarketplaceProject = false;
+    if (!project) {
+      project = await ProjectPost.findById(projectId);
+      isMarketplaceProject = !!project;
+    }
+
     if (project) {
-      project.payment_status = 'processing';
+      project.payment_status = isMarketplaceProject ? 'paid' : 'processing';
       project.amount_released = payment.amount;
+      if (isMarketplaceProject) {
+        project.payment_released_at = new Date();
+      }
       await project.save();
+    }
+
+    if (isMarketplaceProject) {
+      payment.status = 'completed';
+      payment.released_at = new Date();
+      payment.payout_status = payment.freelancer_phone ? 'manual_required' : 'pending';
+      await payment.save();
+
+      await Contract.findOneAndUpdate({ project_id: projectId }, { status: 'completed' });
+      await Transaction.findOneAndUpdate(
+        { project_id: projectId },
+        {
+          status: 'completed',
+          payment_method: 'razorpay',
+          payment_id: razorpay_payment_id,
+          completed_at: new Date()
+        }
+      );
     }
 
     // Create notification for freelancer

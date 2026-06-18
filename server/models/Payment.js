@@ -59,6 +59,14 @@ const paymentSchema = new mongoose.Schema({
   net_amount: {
     type: Number,
     default: 0
+  },
+  freelancer_phone: {
+    type: String
+  },
+  payout_status: {
+    type: String,
+    enum: ['pending', 'manual_required', 'released'],
+    default: 'pending'
   }
 }, {
   timestamps: {

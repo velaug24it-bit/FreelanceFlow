@@ -125,6 +125,10 @@ const ConnectsShop = () => {
             if (!data.orderId) {
                 throw new Error('No order ID received');
             }
+
+            if (!data.key) {
+                throw new Error('Razorpay key was not returned by the server');
+            }
             
             // Open Razorpay Checkout
             const options = {
@@ -170,8 +174,10 @@ const ConnectsShop = () => {
                         console.error('❌ Verification error:', err);
                         setMessage({ 
                             type: 'error', 
-                            text: 'Payment verification failed. Please contact support.' 
+                            text: err.response?.data?.error || 'Payment verification failed. Please contact support.' 
                         });
+                    } finally {
+                        setProcessing(null);
                     }
                 },
                 modal: {
@@ -182,6 +188,13 @@ const ConnectsShop = () => {
             };
             
             const razorpayInstance = new window.Razorpay(options);
+            razorpayInstance.on('payment.failed', (response) => {
+                setProcessing(null);
+                setMessage({
+                    type: 'error',
+                    text: response.error?.description || 'Payment failed. Please try again.'
+                });
+            });
             razorpayInstance.open();
             
         } catch (err) {

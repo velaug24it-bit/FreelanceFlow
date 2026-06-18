@@ -11,9 +11,19 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const contract = project.contract_details || {};
+  const paymentStatus = project.payment_status || 'unpaid';
+  const clientCharge = payment?.amount || contract.total_client_charge || contract.agreed_amount || project.budget || project.budget_max || 0;
+  const freelancerReceives = payment?.net_amount || contract.agreed_amount || project.budget || project.budget_max || 0;
+  const platformFee = payment?.fee || contract.client_fee || Math.max(clientCharge - freelancerReceives, 0);
+  const freelancerPhone = payment?.freelancer_phone || project.freelancer_payment_phone;
+
+  if (!project.budget && clientCharge) {
+    project.budget = clientCharge;
+  }
 
   useEffect(() => {
-    if (project.payment_status && project.payment_status !== 'pending') {
+    if (project.payment_status) {
       fetchPaymentDetails();
     }
   }, [project._id]);
@@ -50,7 +60,12 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   };
 
   const handleReleasePayment = async () => {
-    const amount = project.budget || 0;
+    if (!clientCharge || clientCharge <= 0) {
+      setError('Payment amount is missing. Accept a valid bid before release.');
+      return;
+    }
+
+    const amount = clientCharge;
     if (!window.confirm(`Are you sure you want to release payment of ₹${amount} to the freelancer?`)) {
       return;
     }
@@ -146,19 +161,23 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   };
 
   const getStatusBadge = () => {
-    const status = project.payment_status || 'pending';
+    const status = paymentStatus;
     const badges = {
+      unpaid: { color: '#f59e0b', text: 'Payment Pending', icon: Clock },
       pending: { color: '#f59e0b', text: 'Payment Pending', icon: Clock },
       processing: { color: '#3b82f6', text: 'Processing...', icon: Loader },
       completed: { color: '#10b981', text: 'Payment Completed ✓', icon: CheckCircle },
       failed: { color: '#ef4444', text: 'Payment Failed', icon: AlertCircle },
+      paid: { color: '#10b981', text: 'Payment Paid', icon: CheckCircle },
       refunded: { color: '#6b7280', text: 'Refunded', icon: AlertCircle }
     };
     return badges[status] || badges.pending;
   };
 
   // Check if user is client
-  const isClientUser = isClient || project.client_id?._id === user?.id || project.client_id === user?.id;
+  const getId = (value) => value?._id || value?.id || value;
+  const isClientUser = isClient || getId(project.client_id)?.toString() === getId(user)?.toString();
+  const canPay = isClientUser && ['unpaid', 'pending', 'failed'].includes(paymentStatus);
 
   // Don't show payment if project is not completed
   if (project.status !== 'completed') {
@@ -221,7 +240,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
         borderRadius: '8px'
       }}>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Project Budget</p>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Client Pays</p>
           <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>
             ₹{project.budget || 0}
           </p>
@@ -279,7 +298,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
       )}
 
       {/* Show appropriate button based on role and status */}
-      {isClientUser && project.payment_status === 'pending' && (
+      {canPay && (
         <button
           onClick={handleReleasePayment}
           disabled={processing}
@@ -320,7 +339,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
         </button>
       )}
 
-      {isFreelancer && project.payment_status === 'pending' && (
+      {isFreelancer && ['unpaid', 'pending', 'failed'].includes(paymentStatus) && (
         <div style={{
           textAlign: 'center',
           padding: '0.75rem',
@@ -338,7 +357,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
         </div>
       )}
 
-      {project.payment_status === 'completed' && (
+      {['paid', 'completed'].includes(paymentStatus) && (
         <div style={{
           textAlign: 'center',
           padding: '0.75rem',
