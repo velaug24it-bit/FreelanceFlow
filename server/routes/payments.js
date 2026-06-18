@@ -8,17 +8,13 @@ const Project = require('../models/Project');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 
-// ============================================
-// RAZORPAY INITIALIZATION
-// ============================================
+// Initialize Razorpay
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-// ============================================
-// MIDDLEWARE
-// ============================================
+// Verify token middleware
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
@@ -34,9 +30,7 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// ============================================
-// CALCULATE PLATFORM FEE
-// ============================================
+// Calculate platform fee
 const calculateFee = (amount, userTier) => {
   const tier = userTier?.toLowerCase() || 'free';
   const feePercentage = tier === 'business' ? 1 : tier === 'pro' ? 2 : 5;
@@ -84,24 +78,29 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Invalid project ID format' });
     }
 
-    const project = await Project.findById(projectId)
+    // Find project - using findOne with proper population
+    const project = await Project.findOne({ _id: projectId })
       .populate('client_id', 'full_name email')
       .populate('selected_freelancer_id', 'full_name email subscription_tier');
 
     if (!project) {
+      console.log(`❌ Project not found: ${projectId}`);
       return res.status(404).json({ error: 'Project not found' });
     }
 
     console.log(`✅ Project found: ${project.title}`);
     console.log(`📊 Project status: ${project.status}`);
-    console.log(`💰 Budget: ${project.budget_max}`);
+    console.log(`💰 Budget max: ${project.budget_max}`);
 
     // Check if user is the client
     if (!project.client_id) {
       return res.status(400).json({ error: 'No client assigned to this project' });
     }
 
-    if (project.client_id._id.toString() !== clientId) {
+    // Check if user is the client
+    const clientIdStr = project.client_id._id ? project.client_id._id.toString() : project.client_id.toString();
+    if (clientIdStr !== clientId) {
+      console.log(`❌ User ${clientId} is not the client. Client is: ${clientIdStr}`);
       return res.status(403).json({ error: 'Only the client can release payment' });
     }
 
@@ -120,7 +119,7 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'No freelancer assigned to this project' });
     }
 
-    // Calculate amount
+    // Calculate amount using budget_max
     const amount = project.budget_max || 0;
     if (amount <= 0) {
       return res.status(400).json({ error: 'Invalid project budget' });
@@ -169,13 +168,24 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
       description: `Payment for project: ${project.title}`
     });
     await payment.save();
+    console.log(`✅ Payment record created: ${payment._id}`);
 
-    // Update project
-    project.release_requested = true;
-    project.release_requested_at = new Date();
-    project.payment_id = payment._id;
-    project.payment_status = 'pending';
-    await project.save();
+    // IMPORTANT FIX: Use findOneAndUpdate instead of save to avoid validation issues
+    await Project.findOneAndUpdate(
+      { _id: projectId },
+      {
+        $set: {
+          release_requested: true,
+          release_requested_at: new Date(),
+          payment_id: payment._id,
+          payment_status: 'pending'
+        }
+      }
+    );
+    console.log(`✅ Project updated: ${projectId}`);
+
+    // Get updated project for response
+    const updatedProject = await Project.findById(projectId);
 
     res.json({
       success: true,
@@ -184,23 +194,25 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
       amount: order.amount,
       currency: order.currency,
       payment: payment,
-      project: project,
+      project: updatedProject,
       fee: fee,
       netAmount: netAmount
     });
 
   } catch (err) {
     console.error('❌ Error requesting payment:', err);
-    console.error('❌ Razorpay error:', err.error);
+    console.error('❌ Error details:', err.message);
+    console.error('❌ Error stack:', err.stack);
+
     res.status(500).json({
       error: 'Failed to process payment request',
-      details: err.error?.description || err.message
+      details: err.message
     });
   }
 });
 
 // ============================================
-// VERIFY PAYMENT - UPDATED
+// VERIFY PAYMENT
 // ============================================
 router.post('/verify-payment', verifyToken, async (req, res) => {
   try {
@@ -211,7 +223,7 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
       projectId
     } = req.body;
 
-    console.log(`🔍 Verifying project payment: ${razorpay_payment_id}`);
+    console.log(`🔍 Verifying payment: ${razorpay_payment_id}`);
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: 'Missing payment verification data' });
@@ -240,12 +252,17 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
     payment.paid_at = new Date();
     await payment.save();
 
-    // Update project
-    const project = await Project.findById(projectId);
-    if (project) {
-      project.payment_status = 'processing';
-      project.amount_released = payment.amount;
-      await project.save();
+    // Update project using findOneAndUpdate
+    if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+      await Project.findOneAndUpdate(
+        { _id: projectId },
+        {
+          $set: {
+            payment_status: 'processing',
+            amount_released: payment.amount
+          }
+        }
+      );
     }
 
     res.json({
@@ -292,12 +309,18 @@ router.post('/reset-payment/:projectId', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Payment already completed, cannot reset' });
     }
 
-    // Reset project
-    project.release_requested = false;
-    project.release_requested_at = null;
-    project.payment_id = null;
-    project.payment_status = 'pending';
-    await project.save();
+    // Reset project using findOneAndUpdate
+    await Project.findOneAndUpdate(
+      { _id: projectId },
+      {
+        $set: {
+          release_requested: false,
+          release_requested_at: null,
+          payment_id: null,
+          payment_status: 'pending'
+        }
+      }
+    );
 
     // Delete pending payment records
     await Payment.deleteMany({
@@ -314,38 +337,15 @@ router.post('/reset-payment/:projectId', verifyToken, async (req, res) => {
 
   } catch (err) {
     console.error('❌ Error resetting payment:', err);
-    res.status(500).json({ error: 'Failed to reset payment' });
+    res.status(500).json({
+      error: 'Failed to reset payment',
+      details: err.message
+    });
   }
 });
 
 // ============================================
-// GET ALL PAYMENTS FOR USER
-// ============================================
-router.get('/my-payments', verifyToken, async (req, res) => {
-  try {
-    const userId = req.userId;
-
-    const payments = await Payment.find({
-      $or: [
-        { client_id: userId },
-        { freelancer_id: userId },
-        { user_id: userId }
-      ]
-    })
-      .populate('project_id', 'title')
-      .populate('client_id', 'full_name email')
-      .populate('freelancer_id', 'full_name email')
-      .sort({ created_at: -1 });
-
-    res.json({ payments });
-  } catch (err) {
-    console.error('❌ Error fetching user payments:', err);
-    res.status(500).json({ error: 'Failed to fetch payments' });
-  }
-});
-
-// ============================================
-// WEBHOOK
+// CONFIRM PAYMENT (Webhook)
 // ============================================
 router.post('/webhook/payment-confirmed', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
@@ -358,29 +358,23 @@ router.post('/webhook/payment-confirmed', express.raw({ type: 'application/json'
       const paymentId = paymentEntity.id;
 
       const payment = await Payment.findOne({ order_id: orderId });
-      if (payment && payment.status !== 'completed') {
+      if (payment) {
         payment.status = 'completed';
         payment.payment_id = paymentId;
         payment.released_at = new Date();
         await payment.save();
 
-        // Update project if it's a project payment
-        if (payment.project_id) {
-          const project = await Project.findById(payment.project_id);
-          if (project) {
-            project.payment_status = 'completed';
-            project.payment_released_at = new Date();
-            await project.save();
-          }
+        const project = await Project.findById(payment.project_id);
+        if (project) {
+          project.payment_status = 'completed';
+          project.payment_released_at = new Date();
+          await project.save();
         }
 
-        // Update freelancer's revenue
-        if (payment.freelancer_id) {
-          const freelancer = await User.findById(payment.freelancer_id);
-          if (freelancer) {
-            freelancer.total_revenue = (freelancer.total_revenue || 0) + payment.net_amount;
-            await freelancer.save();
-          }
+        const freelancer = await User.findById(payment.freelancer_id);
+        if (freelancer) {
+          freelancer.total_revenue = (freelancer.total_revenue || 0) + payment.net_amount;
+          await freelancer.save();
         }
 
         console.log(`✅ Payment completed: ${paymentId}`);
@@ -389,8 +383,44 @@ router.post('/webhook/payment-confirmed', express.raw({ type: 'application/json'
 
     res.json({ received: true });
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('❌ Webhook error:', err);
     res.status(500).send('Webhook processing failed');
+  }
+});
+
+// ============================================
+// GET PAYMENT STATS
+// ============================================
+router.get('/stats', verifyToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const payments = await Payment.find({
+      $or: [
+        { client_id: userId },
+        { freelancer_id: userId },
+        { user_id: userId }
+      ]
+    });
+
+    const completed = payments.filter(p => p.status === 'completed');
+    const totalEarned = completed
+      .filter(p => p.freelancer_id && p.freelancer_id.toString() === userId)
+      .reduce((sum, p) => sum + (p.net_amount || p.amount || 0), 0);
+
+    const totalSpent = completed
+      .filter(p => p.client_id && p.client_id.toString() === userId)
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+
+    res.json({
+      totalEarned,
+      totalSpent,
+      totalTransactions: payments.length,
+      completedTransactions: completed.length
+    });
+  } catch (err) {
+    console.error('❌ Error fetching payment stats:', err);
+    res.status(500).json({ error: 'Failed to fetch payment stats' });
   }
 });
 
