@@ -1,68 +1,62 @@
 const mongoose = require('mongoose');
 
-const projectSchema = new mongoose.Schema({
-  user_id: {
+const projectPostSchema = new mongoose.Schema({
+  client_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  client_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Client'
+  client_name: {
+    type: String,
+    required: true
   },
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: true
   },
   description: {
     type: String,
-    trim: true
+    required: true
+  },
+  category: {
+    type: String,
+    required: true
+  },
+  budget_min: {
+    type: Number,
+    required: true
+  },
+  budget_max: {
+    type: Number,
+    required: true
+  },
+  duration: {
+    type: String,
+    required: true
+  },
+  skills_required: {
+    type: [String],
+    default: []
+  },
+  attachments: {
+    type: [String],
+    default: []
   },
   status: {
     type: String,
-    enum: ['active', 'completed', 'on_hold', 'cancelled'],
-    default: 'active'
+    enum: ['open', 'in_progress', 'completed', 'cancelled'],
+    default: 'open'
   },
-  project_type: {
-    type: String,
-    enum: ['web_development', 'mobile_app', 'design', 'consulting', 'marketing', 'other'],
-    default: 'web_development'
-  },
-  budget: {
+  bids_count: {
     type: Number,
     default: 0
   },
-  currency: {
-    type: String,
-    default: 'USD'
-  },
-  start_date: {
-    type: Date
-  },
-  due_date: {
-    type: Date
-  },
-  progress: {
-    type: Number,
-    min: 0,
-    max: 100,
-    default: 0
-  },
-  current_phase: {
-    type: String,
-    enum: ['planning', 'development', 'testing', 'deployment', 'completed'],
-    default: 'planning'
-  },
-  completed_at: {
+  deadline: {
     type: Date
   },
   selected_freelancer_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  },
-  selected_freelancer_name: {
-    type: String
   },
   // Payment fields
   payment_status: {
@@ -92,12 +86,13 @@ const projectSchema = new mongoose.Schema({
   timestamps: {
     createdAt: 'created_at',
     updatedAt: 'updated_at'
-  }
+  },
+  collection: 'projectposts' // <-- Specify the collection name
 });
 
-// Index for better query performance
-projectSchema.index({ user_id: 1 });
-projectSchema.index({ client_id: 1 });
-projectSchema.index({ status: 1 });
+// Create indexes
+projectPostSchema.index({ client_id: 1 });
+projectPostSchema.index({ status: 1 });
+projectPostSchema.index({ category: 1 });
 
-module.exports = mongoose.model('Project', projectSchema);
+module.exports = mongoose.model('Project', projectPostSchema);

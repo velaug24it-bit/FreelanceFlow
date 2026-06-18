@@ -22,34 +22,17 @@ const paymentSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'USD'
+    default: 'INR'
   },
   status: {
     type: String,
     enum: ['pending', 'processing', 'completed', 'failed', 'refunded'],
     default: 'pending'
   },
-  payment_method: {
-    type: String,
-    enum: ['razorpay', 'stripe', 'bank_transfer', 'manual'],
-    default: 'razorpay'
-  },
-  transaction_id: {
-    type: String
-  },
   order_id: {
     type: String
   },
   payment_id: {
-    type: String
-  },
-  paid_at: {
-    type: Date
-  },
-  released_at: {
-    type: Date
-  },
-  notes: {
     type: String
   },
   fee: {
@@ -60,13 +43,11 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  freelancer_phone: {
-    type: String
+  paid_at: {
+    type: Date
   },
-  payout_status: {
-    type: String,
-    enum: ['pending', 'manual_required', 'released'],
-    default: 'pending'
+  released_at: {
+    type: Date
   }
 }, {
   timestamps: {
@@ -74,5 +55,11 @@ const paymentSchema = new mongoose.Schema({
     updatedAt: 'updated_at'
   }
 });
+
+// Indexes for better performance
+paymentSchema.index({ project_id: 1 });
+paymentSchema.index({ client_id: 1 });
+paymentSchema.index({ freelancer_id: 1 });
+paymentSchema.index({ order_id: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

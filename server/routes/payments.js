@@ -2,64 +2,118 @@ const express = require('express');
 const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const auth = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Project = require('../models/Project');
-const ProjectPost = require('../models/ProjectPost');
-const Contract = require('../models/Contract');
-const Bid = require('../models/Bid');
-const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
-const Notification = require('../models/Notification');
 
+// Initialize Razorpay
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
-// Calculate platform fee (e.g., 5% for free, 2% for pro)
-const calculateFee = (amount, userTier) => {
-  const feePercentage = userTier === 'pro' ? 2 : userTier === 'business' ? 1 : 5;
-  return (amount * feePercentage) / 100;
+// Verify token middleware
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied' });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.id;
+    next();
+  } catch (err) {
+    console.error('Token verification failed:', err.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
 };
 
-// Request payment for completed project (Client side)
-router.post('/request-payment/:projectId', auth, async (req, res) => {
+// Calculate platform fee
+const calculateFee = (amount, userTier) => {
+  const tier = userTier?.toLowerCase() || 'free';
+  const feePercentage = tier === 'business' ? 1 : tier === 'pro' ? 2 : 5;
+  return Math.round((amount * feePercentage) / 100 * 100) / 100;
+};
+
+// ============================================
+// TEST ROUTE
+// ============================================
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Payment routes are working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ============================================
+// GET PAYMENT DETAILS FOR PROJECT
+// ============================================
+router.get('/project/:projectId', verifyToken, async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    console.log(`🔍 Fetching payment for project: ${projectId}`);
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
+    }
+
+    const payment = await Payment.findOne({ project_id: projectId })
+      .populate('client_id', 'full_name email')
+      .populate('freelancer_id', 'full_name email');
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Payment not found for this project' });
+    }
+
+    res.json({ payment });
+  } catch (err) {
+    console.error('❌ Error fetching payment:', err);
+    res.status(500).json({
+      error: 'Failed to fetch payment details',
+      details: err.message
+    });
+  }
+});
+
+// ============================================
+// REQUEST PAYMENT FOR COMPLETED PROJECT - FIXED
+// ============================================
+router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
   try {
     const { projectId } = req.params;
     const clientId = req.userId;
 
-    let project = await Project.findById(projectId)
-      .populate('user_id', 'full_name email')
-      .populate('client_id', 'full_name email')
-      .populate('selected_freelancer_id', 'full_name email subscription_tier');
-    let contract = null;
-    let acceptedBid = null;
-    let isMarketplaceProject = false;
+    console.log(`🔍 Requesting payment for project: ${projectId}`);
+    console.log(`👤 Client ID: ${clientId}`);
 
-    if (!project) {
-      project = await ProjectPost.findById(projectId)
-        .populate('client_id', 'full_name email')
-        .populate('selected_freelancer_id', 'full_name email subscription_tier');
-      isMarketplaceProject = !!project;
-
-      if (project) {
-        contract = await Contract.findOne({ project_id: projectId });
-        acceptedBid = await Bid.findOne({
-          project_id: projectId,
-          freelancer_id: project.selected_freelancer_id,
-          status: 'accepted'
-        });
-      }
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
     }
 
+    // Find project
+    const project = await Project.findById(projectId)
+      .populate('client_id', 'full_name email')
+      .populate('selected_freelancer_id', 'full_name email subscription_tier');
+
     if (!project) {
+      console.log(`❌ Project not found: ${projectId}`);
       return res.status(404).json({ error: 'Project not found' });
     }
 
+    console.log(`✅ Project found: ${project.title}`);
+    console.log(`📊 Project status: ${project.status}`);
+    console.log(`💰 Budget min: ${project.budget_min}, max: ${project.budget_max}`);
+
     // Check if user is the client
-    const projectClientId = project.client_id?._id || project.client_id;
-    if (projectClientId.toString() !== clientId) {
+    if (!project.client_id) {
+      return res.status(400).json({ error: 'No client assigned to this project' });
+    }
+
+    if (project.client_id._id.toString() !== clientId) {
+      console.log(`❌ User ${clientId} is not the client. Client is: ${project.client_id._id}`);
       return res.status(403).json({ error: 'Only the client can release payment' });
     }
 
@@ -68,71 +122,70 @@ router.post('/request-payment/:projectId', auth, async (req, res) => {
       return res.status(400).json({ error: 'Project must be completed to release payment' });
     }
 
+    // Check if payment already requested
+    if (project.release_requested) {
+      return res.status(400).json({ error: 'Payment already requested for this project' });
+    }
+
     // Check if freelancer exists
     if (!project.selected_freelancer_id) {
       return res.status(400).json({ error: 'No freelancer assigned to this project' });
     }
 
-    // Calculate amounts
-    const freelancerId = project.selected_freelancer_id?._id || project.selected_freelancer_id;
-    const freelancerTier = project.selected_freelancer_id?.subscription_tier || 'free';
-    const freelancerPhone = acceptedBid?.phone_number;
-    const agreedAmount = contract?.agreed_amount || project.budget || project.budget_max || 0;
-    const fee = isMarketplaceProject
-      ? (contract?.client_fee || 0)
-      : calculateFee(agreedAmount, freelancerTier);
-    const clientCharge = isMarketplaceProject
-      ? (contract?.total_client_charge || agreedAmount + fee)
-      : agreedAmount;
-    const netAmount = isMarketplaceProject ? agreedAmount : agreedAmount - fee;
-
-    if (!agreedAmount || agreedAmount <= 0 || !clientCharge || clientCharge <= 0) {
-      return res.status(400).json({ error: 'Project payment amount is missing. Accept a valid bid before release.' });
+    // Calculate amount - using budget_max as the project budget
+    const amount = project.budget_max || 0;
+    if (amount <= 0) {
+      return res.status(400).json({ error: 'Invalid project budget' });
     }
+
+    const fee = calculateFee(amount, project.selected_freelancer_id.subscription_tier);
+    const netAmount = amount - fee;
+
+    console.log(`💰 Amount: ${amount}, Fee: ${fee}, Net: ${netAmount}`);
+
+    // ============================================
+    // FIX: Create a short receipt (max 40 characters)
+    // ============================================
+    const shortUserId = req.userId.toString().slice(-4);
+    const timestamp = Date.now().toString().slice(-6);
+    const receipt = `pay_${shortUserId}_${timestamp}`; // Max 40 chars
+
+    console.log(`📝 Receipt: ${receipt} (${receipt.length} chars)`);
 
     // Create Razorpay order
     const orderOptions = {
-      amount: Math.round(clientCharge * 100), // Convert to paise
+      amount: amount * 100,
       currency: 'INR',
-      receipt: `pay_${projectId.toString().slice(-8)}_${Date.now().toString().slice(-8)}`,
+      receipt: receipt, // Now short enough
       notes: {
         projectId: projectId,
         clientId: clientId,
-        freelancerId: freelancerId.toString(),
-        amount: agreedAmount,
-        fee: fee,
-        netAmount: netAmount,
-        freelancerPhone: freelancerPhone || '',
-        type: isMarketplaceProject ? 'marketplace_project' : 'project'
+        freelancerId: project.selected_freelancer_id._id.toString(),
+        amount: amount.toString(),
+        fee: fee.toString(),
+        netAmount: netAmount.toString()
       }
     };
 
-    const order = await razorpay.orders.create(orderOptions);
+    console.log('📦 Order options:', JSON.stringify(orderOptions, null, 2));
 
-    // Create or refresh a pending payment record
-    const payment = await Payment.findOneAndUpdate({
+    const order = await razorpay.orders.create(orderOptions);
+    console.log(`✅ Razorpay order created: ${order.id}`);
+
+    // Create payment record
+    const payment = new Payment({
       project_id: projectId,
-      status: { $in: ['pending', 'failed'] }
-    }, {
-      project_id: projectId,
-      client_id: projectClientId,
-      freelancer_id: freelancerId,
-      amount: clientCharge,
+      client_id: clientId,
+      freelancer_id: project.selected_freelancer_id._id,
+      amount: amount,
       currency: 'INR',
       status: 'pending',
       order_id: order.id,
       fee: fee,
-      net_amount: netAmount,
-      freelancer_phone: freelancerPhone,
-      payout_status: 'pending',
-      notes: freelancerPhone
-        ? `Freelancer payout phone: ${freelancerPhone}`
-        : 'Freelancer payout phone not provided'
-    }, {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
+      net_amount: netAmount
     });
+    await payment.save();
+    console.log(`✅ Payment record created: ${payment._id}`);
 
     // Update project
     project.release_requested = true;
@@ -140,6 +193,7 @@ router.post('/request-payment/:projectId', auth, async (req, res) => {
     project.payment_id = payment._id;
     project.payment_status = 'pending';
     await project.save();
+    console.log(`✅ Project updated: ${project._id}`);
 
     res.json({
       success: true,
@@ -150,19 +204,34 @@ router.post('/request-payment/:projectId', auth, async (req, res) => {
       payment: payment,
       project: project,
       fee: fee,
-      netAmount: netAmount,
-      clientCharge,
-      freelancerPhone
+      netAmount: netAmount
     });
 
   } catch (err) {
-    console.error('Error requesting payment:', err);
-    res.status(500).json({ error: 'Failed to process payment request' });
+    console.error('❌ Error requesting payment:', err);
+    console.error('❌ Error details:', err.error || err.message);
+
+    // Check if it's a Razorpay validation error
+    if (err.error?.code === 'BAD_REQUEST_ERROR') {
+      return res.status(400).json({
+        error: 'Payment request validation failed',
+        details: err.error?.description || err.message,
+        razorpayError: err.error
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to process payment request',
+      details: err.message,
+      razorpayError: err.error
+    });
   }
 });
 
-// Verify payment (Client completes payment)
-router.post('/verify-payment', auth, async (req, res) => {
+// ============================================
+// VERIFY PAYMENT
+// ============================================
+router.post('/verify-payment', verifyToken, async (req, res) => {
   try {
     const {
       razorpay_order_id,
@@ -171,11 +240,17 @@ router.post('/verify-payment', auth, async (req, res) => {
       projectId
     } = req.body;
 
+    console.log(`🔍 Verifying payment: ${razorpay_payment_id}`);
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing payment verification data' });
+    }
+
     // Verify signature
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(body)
+      .update(body.toString())
       .digest('hex');
 
     if (expectedSignature !== razorpay_signature) {
@@ -195,54 +270,12 @@ router.post('/verify-payment', auth, async (req, res) => {
     await payment.save();
 
     // Update project
-    let project = await Project.findById(projectId);
-    let isMarketplaceProject = false;
-    if (!project) {
-      project = await ProjectPost.findById(projectId);
-      isMarketplaceProject = !!project;
-    }
-
+    const project = await Project.findById(projectId);
     if (project) {
-      project.payment_status = isMarketplaceProject ? 'paid' : 'processing';
+      project.payment_status = 'processing';
       project.amount_released = payment.amount;
-      if (isMarketplaceProject) {
-        project.payment_released_at = new Date();
-      }
       await project.save();
     }
-
-    if (isMarketplaceProject) {
-      payment.status = 'completed';
-      payment.released_at = new Date();
-      payment.payout_status = payment.freelancer_phone ? 'manual_required' : 'pending';
-      await payment.save();
-
-      await Contract.findOneAndUpdate({ project_id: projectId }, { status: 'completed' });
-      await Transaction.findOneAndUpdate(
-        { project_id: projectId },
-        {
-          status: 'completed',
-          payment_method: 'razorpay',
-          payment_id: razorpay_payment_id,
-          completed_at: new Date()
-        }
-      );
-    }
-
-    // Create notification for freelancer
-    const freelancer = await User.findById(payment.freelancer_id);
-    const client = await User.findById(payment.client_id);
-
-    await Notification.create({
-      user_id: payment.freelancer_id,
-      type: 'payment_received',
-      title: 'Payment Received!',
-      message: `${client.full_name} has released payment of ₹${payment.amount} for project "${project.title}"`,
-      reference_type: 'project',
-      reference_id: projectId,
-      action_url: `/projects/${projectId}`,
-      is_read: false
-    });
 
     res.json({
       success: true,
@@ -251,15 +284,24 @@ router.post('/verify-payment', auth, async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error verifying payment:', err);
-    res.status(500).json({ error: 'Payment verification failed' });
+    console.error('❌ Error verifying payment:', err);
+    res.status(500).json({
+      error: 'Payment verification failed',
+      details: err.message
+    });
   }
 });
 
-// Confirm payment completion (After Razorpay webhook)
+// ============================================
+// CONFIRM PAYMENT (Webhook)
+// ============================================
 router.post('/webhook/payment-confirmed', async (req, res) => {
   try {
     const { order_id } = req.body;
+
+    if (!order_id) {
+      return res.status(400).json({ error: 'Missing order_id' });
+    }
 
     const payment = await Payment.findOne({ order_id });
     if (!payment) {
@@ -286,47 +328,66 @@ router.post('/webhook/payment-confirmed', async (req, res) => {
       await freelancer.save();
     }
 
-    // Update client's spent
-    const client = await User.findById(payment.client_id);
-    if (client) {
-      client.total_spent = (client.total_spent || 0) + payment.amount;
-      await client.save();
-    }
-
-    // Send notification to freelancer
-    await Notification.create({
-      user_id: payment.freelancer_id,
-      type: 'payment_released',
-      title: 'Payment Released!',
-      message: `Payment of ₹${payment.amount} has been released for project "${project.title}"`,
-      reference_type: 'project',
-      reference_id: project._id,
-      action_url: `/projects/${project._id}`,
-      is_read: false
-    });
-
     res.json({ success: true });
 
   } catch (err) {
-    console.error('Error confirming payment:', err);
+    console.error('❌ Error confirming payment:', err);
     res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
 
-// Get payment details
-router.get('/project/:projectId', auth, async (req, res) => {
+// ============================================
+// RESET PAYMENT STATUS
+// ============================================
+router.post('/reset-payment/:projectId', verifyToken, async (req, res) => {
   try {
     const { projectId } = req.params;
-    
-    const payment = await Payment.findOne({ project_id: projectId })
-      .populate('client_id', 'full_name email')
-      .populate('freelancer_id', 'full_name email');
+    const clientId = req.userId;
 
-    res.json({ payment });
+    console.log(`🔄 Resetting payment for project: ${projectId}`);
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({ error: 'Invalid project ID format' });
+    }
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Check if user is the client
+    if (project.client_id.toString() !== clientId) {
+      return res.status(403).json({ error: 'Only the client can reset payment' });
+    }
+
+    // Reset project payment status
+    project.release_requested = false;
+    project.release_requested_at = null;
+    project.payment_id = null;
+    project.payment_status = 'pending';
+    await project.save();
+
+    // Delete any pending payment records
+    await Payment.deleteMany({
+      project_id: projectId,
+      status: { $in: ['pending', 'processing'] }
+    });
+
+    console.log(`✅ Payment reset for project: ${projectId}`);
+
+    res.json({
+      success: true,
+      message: 'Payment status reset successfully'
+    });
+
   } catch (err) {
-    console.error('Error fetching payment:', err);
-    res.status(500).json({ error: 'Failed to fetch payment details' });
+    console.error('❌ Error resetting payment:', err);
+    res.status(500).json({
+      error: 'Failed to reset payment',
+      details: err.message
+    });
   }
 });
+
 
 module.exports = router;

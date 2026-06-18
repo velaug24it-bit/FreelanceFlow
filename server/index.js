@@ -19,6 +19,7 @@ const connectsRoutes = require('./routes/connects');
 const razorpayRoutes = require('./routes/razorpay');
 const notificationRoutes = require('./routes/notifications');
 const checkoutRoutes = require('./routes/checkout');
+const paymentRoutes = require('./routes/payments');
 
 const app = express();
 
@@ -37,7 +38,7 @@ app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -139,6 +140,7 @@ app.use('/api/connects', connectsRoutes);
 app.use('/api/razorpay', razorpayRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api', checkoutRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // ============ 404 HANDLER ============
 app.use((req, res) => {
