@@ -1,38 +1,67 @@
 const mongoose = require('mongoose');
 
-const projectPostSchema = new mongoose.Schema({
-  client_id: {
+const projectSchema = new mongoose.Schema({
+  // Common fields for both types
+  user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
+  client_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   client_name: {
-    type: String,
-    required: true
+    type: String
   },
   title: {
     type: String,
     required: true
   },
   description: {
-    type: String,
-    required: true
+    type: String
   },
-  category: {
+  status: {
     type: String,
-    required: true
+    enum: ['active', 'completed', 'on_hold', 'cancelled', 'open', 'in_progress', 'review'],
+    default: 'active'
   },
+  project_type: {
+    type: String,
+    enum: ['web_development', 'mobile_app', 'design', 'consulting', 'marketing', 'other'],
+    default: 'web_development'
+  },
+
+  // Regular project fields
+  budget: {
+    type: Number,
+    default: 0
+  },
+  currency: {
+    type: String,
+    default: 'USD'
+  },
+  start_date: {
+    type: Date
+  },
+  due_date: {
+    type: Date
+  },
+
+  // Marketplace project fields
   budget_min: {
     type: Number,
-    required: true
+    default: 0
   },
   budget_max: {
     type: Number,
-    required: true
+    default: 0
+  },
+  category: {
+    type: String
   },
   duration: {
-    type: String,
-    required: true
+    type: String
   },
   skills_required: {
     type: [String],
@@ -42,22 +71,37 @@ const projectPostSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
-  status: {
-    type: String,
-    enum: ['open', 'in_progress', 'completed', 'cancelled'],
-    default: 'open'
+  deadline: {
+    type: Date
   },
-  bids_count: {
+
+  // Common tracking fields
+  progress: {
     type: Number,
+    min: 0,
+    max: 100,
     default: 0
   },
-  deadline: {
+  current_phase: {
+    type: String,
+    enum: ['planning', 'development', 'testing', 'deployment', 'completed'],
+    default: 'planning'
+  },
+  completed_at: {
     type: Date
   },
   selected_freelancer_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  selected_freelancer_name: {
+    type: String
+  },
+  bids_count: {
+    type: Number,
+    default: 0
+  },
+
   // Payment fields
   payment_status: {
     type: String,
@@ -87,12 +131,12 @@ const projectPostSchema = new mongoose.Schema({
     createdAt: 'created_at',
     updatedAt: 'updated_at'
   },
-  collection: 'projectposts' // <-- Specify the collection name
+  collection: 'projectposts'
 });
 
-// Create indexes
-projectPostSchema.index({ client_id: 1 });
-projectPostSchema.index({ status: 1 });
-projectPostSchema.index({ category: 1 });
+// Indexes
+projectSchema.index({ user_id: 1 });
+projectSchema.index({ client_id: 1 });
+projectSchema.index({ status: 1 });
 
-module.exports = mongoose.model('Project', projectPostSchema);
+module.exports = mongoose.model('Project', projectSchema);

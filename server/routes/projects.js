@@ -278,4 +278,83 @@ router.delete('/bulk-delete', verifyToken, async (req, res) => {
     }
 });
 
+// Create a new project (Regular Project)
+router.post('/', verifyToken, async (req, res) => {
+    try {
+        const {
+            client_id,
+            title,
+            description,
+            budget,
+            due_date,
+            project_type,
+            status
+        } = req.body;
+
+        console.log('📝 Creating regular project:', { title, budget, client_id });
+
+        // Validate required fields
+        if (!title) {
+            return res.status(400).json({ error: 'Project title is required' });
+        }
+
+        // Validate client_id
+        let validClientId = null;
+        if (client_id) {
+            if (mongoose.Types.ObjectId.isValid(client_id)) {
+                const clientExists = await Client.findOne({
+                    _id: client_id,
+                    user_id: req.userId
+                });
+                if (clientExists) {
+                    validClientId = client_id;
+                }
+            }
+        }
+
+        // Get client name if client exists
+        let clientName = null;
+        if (validClientId) {
+            const client = await Client.findById(validClientId);
+            clientName = client?.contact_name;
+        }
+
+        // Create project with all fields (marketplace fields get defaults)
+        const projectData = {
+            user_id: req.userId,
+            client_id: validClientId,
+            client_name: clientName,
+            title: title.trim(),
+            description: description ? description.trim() : '',
+            budget: parseFloat(budget) || 0,
+            budget_min: 0,
+            budget_max: 0,
+            due_date: due_date || null,
+            project_type: project_type || 'web_development',
+            status: status || 'active',
+            category: 'general',
+            duration: 'Not specified'
+        };
+
+        const project = await Project.create(projectData);
+
+        // Populate client info for response
+        const populatedProject = await Project.findById(project._id)
+            .populate('client_id', 'contact_name company_name');
+
+        res.status(201).json({
+            success: true,
+            project: populatedProject,
+            message: 'Project created successfully'
+        });
+
+    } catch (err) {
+        console.error('❌ Error creating project:', err);
+        res.status(500).json({
+            error: 'Failed to create project',
+            details: err.message
+        });
+    }
+});
+
 module.exports = router;
