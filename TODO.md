@@ -1,0 +1,9 @@
+- [x] Inspect existing marketplace project status update flow.
+- [x] Inspect ProjectPost + Transaction + ProjectStatus UI.
+- [x] Add `payment_status` to `server/models/ProjectPost.js`.
+- [x] Update marketplace status route to set `payment_status='unpaid'` when status becomes `completed`.
+- [ ] Add Razorpay endpoints for project completion payment (create order + verify payment) in `server/routes/razorpay.js`.
+- [ ] Update Razorpay webhook to handle `type='project_completion'` (optional but recommended).
+- [ ] Update client `ProjectStatus.jsx` to show “Pay to finish” button for clients when `project.status==='completed' && project.payment_status!=='paid'`.
+- [ ] Ensure marketplace project detail page passes required fields (`payment_status`, transaction/project amount) into `ProjectStatus`.
+- [ ] Run server/client smoke test: complete project -> pay -> UI updates.

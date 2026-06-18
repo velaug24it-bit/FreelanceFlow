@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import io from 'socket.io-client';
+import { SOCKET_URL } from '../config/api';
 
 const NotificationBell = () => {
     const [notifications, setNotifications] = useState([]);
@@ -26,7 +27,7 @@ const NotificationBell = () => {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
         
         if (token && user.id) {
-            const newSocket = io('http://localhost:5000', {
+            const newSocket = io(SOCKET_URL, {
                 query: { userId: user.id },
                 transports: ['websocket']
             });

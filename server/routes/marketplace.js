@@ -361,7 +361,10 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
         
         if (status === 'completed') {
             updateData.completed_at = new Date();
+            // When freelancer marks project completed, client must pay to finalize/release
+            updateData.payment_status = 'unpaid';
         }
+
         
         const statusUpdate = {
             message: message || `Project status updated to ${status}`,
@@ -370,6 +373,7 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             updated_by: userId,
             updated_by_name: user.full_name
         };
+
         
         updateData.$push = { status_updates: statusUpdate };
         

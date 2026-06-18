@@ -137,3 +137,7 @@ session-*
 .env.production
 .env.staging
 .env.development
+
+# Frontend public build-time environment files
+!.env.development
+!.env.production

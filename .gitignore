@@ -42,3 +42,7 @@ uploads/
 .cache/
 tmp/
 temp/
+
+# Frontend public build-time environment files
+!client/.env.development
+!client/.env.production

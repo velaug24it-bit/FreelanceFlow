@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import ProjectPayment from './ProjectPayment';
+import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config/api';
 
 const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
+    const { user } = useAuth();
     const [showHistory, setShowHistory] = useState(false);
     const [statusHistory, setStatusHistory] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -14,6 +18,10 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
         current_phase: project.current_phase || 'development'
     });
 
+    // Check if user is client or freelancer for this project
+    const isClientUser = project.client_id?._id === user?._id || project.client_id === user?.id;
+    const isFreelancerUser = project.selected_freelancer_id?._id === user?._id || project.selected_freelancer_id === user?.id;
+
     useEffect(() => {
         if (showHistory) {
             fetchHistory();
@@ -23,7 +31,9 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
     const fetchHistory = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`/api/marketplace/projects/${project._id}/history`, {
+            if (!token) return;
+
+            const response = await axios.get(`${API_URL}/marketplace/projects/${project._id}/history`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setStatusHistory(response.data.history || []);
@@ -41,7 +51,13 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.put(`/api/marketplace/projects/${project._id}/status`, statusData, {
+            if (!token) {
+                alert('Please login to update status');
+                setLoading(false);
+                return;
+            }
+
+            const response = await axios.put(`${API_URL}/marketplace/projects/${project._id}/status`, statusData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
@@ -56,10 +72,10 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
             if (onStatusUpdate) {
                 onStatusUpdate(response.data.project);
             }
-            alert('Status updated successfully!');
+            alert('✅ Status updated successfully!');
         } catch (err) {
             console.error('Failed to update status:', err);
-            alert('Failed to update status');
+            alert('❌ Failed to update status: ' + (err.response?.data?.error || err.message));
         } finally {
             setLoading(false);
         }
@@ -159,10 +175,13 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             border: 'none',
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            fontSize: '0.875rem'
+                            fontSize: '0.875rem',
+                            transition: 'background 0.2s'
                         }}
+                        onMouseEnter={(e) => e.target.style.background = '#2563eb'}
+                        onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
                     >
-                        Update Status
+                        {showStatusForm ? 'Cancel' : 'Update Status'}
                     </button>
                 )}
 
@@ -178,7 +197,16 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                         fontSize: '0.875rem',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem'
+                        gap: '0.5rem',
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                        e.target.style.background = '#f3f4f6';
+                        e.target.style.borderColor = '#9ca3af';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.background = 'transparent';
+                        e.target.style.borderColor = '#d1d5db';
                     }}
                 >
                     {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -198,7 +226,9 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                     <h4 style={{ marginBottom: '0.75rem' }}>Update Project Status</h4>
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
                         <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block' }}>Status</label>
+                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                Status
+                            </label>
                             <select
                                 value={statusData.status}
                                 onChange={(e) => setStatusData({ ...statusData, status: e.target.value })}
@@ -206,7 +236,8 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                     width: '100%',
                                     padding: '0.5rem',
                                     border: '1px solid #d1d5db',
-                                    borderRadius: '6px'
+                                    borderRadius: '6px',
+                                    fontSize: '0.875rem'
                                 }}
                             >
                                 {statusOptions.map(opt => (
@@ -215,7 +246,9 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             </select>
                         </div>
                         <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block' }}>Progress (%)</label>
+                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                Progress ({statusData.progress}%)
+                            </label>
                             <input
                                 type="range"
                                 min="0"
@@ -224,10 +257,11 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                 onChange={(e) => setStatusData({ ...statusData, progress: parseInt(e.target.value) })}
                                 style={{ width: '100%' }}
                             />
-                            <div style={{ textAlign: 'center', fontSize: '0.875rem' }}>{statusData.progress}%</div>
                         </div>
                         <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block' }}>Phase</label>
+                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                Phase
+                            </label>
                             <select
                                 value={statusData.current_phase}
                                 onChange={(e) => setStatusData({ ...statusData, current_phase: e.target.value })}
@@ -235,7 +269,8 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                     width: '100%',
                                     padding: '0.5rem',
                                     border: '1px solid #d1d5db',
-                                    borderRadius: '6px'
+                                    borderRadius: '6px',
+                                    fontSize: '0.875rem'
                                 }}
                             >
                                 {phaseOptions.map(phase => (
@@ -244,7 +279,9 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             </select>
                         </div>
                         <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block' }}>Update Message</label>
+                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                Update Message *
+                            </label>
                             <textarea
                                 placeholder="Describe what was done..."
                                 value={statusData.message}
@@ -254,22 +291,32 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                     width: '100%',
                                     padding: '0.5rem',
                                     border: '1px solid #d1d5db',
-                                    borderRadius: '6px'
+                                    borderRadius: '6px',
+                                    fontSize: '0.875rem',
+                                    resize: 'vertical'
                                 }}
                             />
                         </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <button
                                 onClick={handleStatusUpdate}
                                 disabled={loading}
                                 style={{
-                                    padding: '0.5rem 1rem',
+                                    padding: '0.5rem 1.5rem',
                                     background: '#10b981',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
-                                    opacity: loading ? 0.5 : 1
+                                    opacity: loading ? 0.5 : 1,
+                                    transition: 'background 0.2s',
+                                    fontWeight: '500'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!loading) e.target.style.background = '#059669';
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!loading) e.target.style.background = '#10b981';
                                 }}
                             >
                                 {loading ? 'Updating...' : 'Update Status'}
@@ -277,13 +324,17 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             <button
                                 onClick={() => setShowStatusForm(false)}
                                 style={{
-                                    padding: '0.5rem 1rem',
+                                    padding: '0.5rem 1.5rem',
                                     background: '#6b7280',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '6px',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    transition: 'background 0.2s',
+                                    fontWeight: '500'
                                 }}
+                                onMouseEnter={(e) => e.target.style.background = '#4b5563'}
+                                onMouseLeave={(e) => e.target.style.background = '#6b7280'}
                             >
                                 Cancel
                             </button>
@@ -297,25 +348,28 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 <div style={{ marginTop: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
                     <h4 style={{ marginBottom: '0.75rem' }}>Status History</h4>
                     {statusHistory.length === 0 ? (
-                        <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>No updates yet</p>
+                        <p style={{ color: '#6b7280', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>
+                            No updates yet
+                        </p>
                     ) : (
                         statusHistory.slice().reverse().map((update, idx) => (
                             <div key={idx} style={{
                                 padding: '0.75rem',
                                 borderBottom: '1px solid #e5e7eb',
-                                background: idx === 0 ? '#eff6ff' : 'transparent'
+                                background: idx === 0 ? '#eff6ff' : 'transparent',
+                                borderRadius: idx === 0 ? '8px' : '0'
                             }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                    <div>
-                                        <p style={{ fontWeight: '500' }}>{update.message}</p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{update.message}</p>
                                         <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#6b7280', flexWrap: 'wrap' }}>
-                                            <span>Status: {getStatusLabel(update.status)}</span>
-                                            <span>Progress: {update.progress}%</span>
-                                            <span>By: {update.updated_by_name}</span>
+                                            <span>Status: <strong>{getStatusLabel(update.status)}</strong></span>
+                                            <span>Progress: <strong>{update.progress}%</strong></span>
+                                            <span>By: <strong>{update.updated_by_name || 'System'}</strong></span>
                                         </div>
                                     </div>
-                                    <span style={{ fontSize: '0.7rem', color: '#9ca3af' }}>
-                                        {new Date(update.created_at).toLocaleDateString()}
+                                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                                        {new Date(update.created_at).toLocaleDateString()} {new Date(update.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                     </span>
                                 </div>
                             </div>
@@ -332,10 +386,22 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                     background: '#d1fae5',
                     borderRadius: '6px',
                     fontSize: '0.875rem',
-                    color: '#065f46'
+                    color: '#065f46',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                 }}>
-                    👨‍💻 Working with: {project.selected_freelancer_name}
+                    👨‍💻 Working with: <strong>{project.selected_freelancer_name}</strong>
                 </div>
+            )}
+
+            {/* Payment Section - Show only when project is completed */}
+            {project.status === 'completed' && (
+                <ProjectPayment 
+                    project={project} 
+                    isClient={isClientUser}
+                    isFreelancer={isFreelancerUser}
+                />
             )}
         </div>
     );
