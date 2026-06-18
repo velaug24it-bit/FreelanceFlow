@@ -1,21 +1,31 @@
 const mongoose = require('mongoose');
 
 const paymentSchema = new mongoose.Schema({
+  // For Project Payments
   project_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project',
-    required: true
+    required: false  // Changed from required: true
   },
   client_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false  // Changed from required: true
   },
   freelancer_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false  // Changed from required: true
   },
+
+  // For Connects Purchases
+  user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  },
+
+  // Common fields
   amount: {
     type: Number,
     required: true
@@ -29,11 +39,28 @@ const paymentSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'completed', 'failed', 'refunded'],
     default: 'pending'
   },
+  payment_method: {
+    type: String,
+    enum: ['razorpay', 'stripe', 'bank_transfer', 'manual'],
+    default: 'razorpay'
+  },
+  transaction_id: {
+    type: String
+  },
   order_id: {
     type: String
   },
   payment_id: {
     type: String
+  },
+  description: {
+    type: String
+  },
+  paid_at: {
+    type: Date
+  },
+  released_at: {
+    type: Date
   },
   fee: {
     type: Number,
@@ -43,11 +70,13 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  paid_at: {
-    type: Date
+  // For Connects Purchases
+  package_id: {
+    type: String
   },
-  released_at: {
-    type: Date
+  connects_purchased: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: {
@@ -57,9 +86,11 @@ const paymentSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
+paymentSchema.index({ user_id: 1 });
 paymentSchema.index({ project_id: 1 });
 paymentSchema.index({ client_id: 1 });
 paymentSchema.index({ freelancer_id: 1 });
 paymentSchema.index({ order_id: 1 });
+paymentSchema.index({ transaction_id: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);
