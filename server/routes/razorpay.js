@@ -6,17 +6,27 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 
-// Initialize Razorpay with error handling
+// ============================================
+// RAZORPAY INITIALIZATION WITH BETTER ERROR HANDLING
+// ============================================
+console.log('🔑 Razorpay Key ID:', process.env.RAZORPAY_KEY_ID ? '✅ Set' : '❌ Missing');
+console.log('🔑 Razorpay Key Secret:', process.env.RAZORPAY_KEY_SECRET ? '✅ Set' : '❌ Missing');
+
 let razorpay;
 try {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+        throw new Error('Razorpay credentials missing in .env file');
+    }
+
     razorpay = new Razorpay({
         key_id: process.env.RAZORPAY_KEY_ID,
         key_secret: process.env.RAZORPAY_KEY_SECRET
     });
     console.log('✅ Razorpay initialized successfully');
-    console.log('   Key ID:', process.env.RAZORPAY_KEY_ID);
+    console.log(`   Key ID: ${process.env.RAZORPAY_KEY_ID}`);
 } catch (err) {
     console.error('❌ Razorpay initialization failed:', err.message);
+    razorpay = null;
 }
 
 // Verify token middleware
@@ -30,6 +40,7 @@ const verifyToken = (req, res, next) => {
         req.userId = decoded.id;
         next();
     } catch (err) {
+        console.error('Token verification failed:', err.message);
         res.status(401).json({ error: 'Invalid token' });
     }
 };
@@ -42,24 +53,51 @@ const CONNECTS_PACKAGES = [
     { id: 4, connects: 800, price: 50, label: 'Business' }
 ];
 
-const verifyRazorpaySignature = (orderId, paymentId, signature) => {
-    if (!orderId || !paymentId || !signature) {
-        return false;
+// ============================================
+// TEST CONFIGURATION ENDPOINT
+// ============================================
+router.get('/test-config', async (req, res) => {
+    try {
+        if (!razorpay) {
+            return res.status(500).json({
+                success: false,
+                message: 'Razorpay not initialized',
+                keyId: process.env.RAZORPAY_KEY_ID ? 'Set' : 'Not Set',
+                keySecret: process.env.RAZORPAY_KEY_SECRET ? 'Set' : 'Not Set'
+            });
+        }
+
+        // Test if we can create a minimal order
+        const testOrder = await razorpay.orders.create({
+            amount: 100, // ₹1
+            currency: 'INR',
+            receipt: 'test_receipt',
+            notes: { test: true }
+        });
+
+        res.json({
+            success: true,
+            message: '✅ Razorpay configured correctly!',
+            keyId: process.env.RAZORPAY_KEY_ID,
+            orderId: testOrder.id,
+            keySecret: process.env.RAZORPAY_KEY_SECRET ? '✅ Set (hidden)' : '❌ Not Set'
+        });
+    } catch (err) {
+        console.error('❌ Razorpay test failed:', err);
+        res.status(500).json({
+            success: false,
+            error: err.error?.description || err.message,
+            statusCode: err.statusCode,
+            keyId: process.env.RAZORPAY_KEY_ID ? 'Set' : 'Not Set',
+            keySecret: process.env.RAZORPAY_KEY_SECRET ? 'Set' : 'Not Set',
+            razorpayError: err.error
+        });
     }
+});
 
-    const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-        .update(`${orderId}|${paymentId}`)
-        .digest('hex');
-
-    const expectedBuffer = Buffer.from(expectedSignature);
-    const receivedBuffer = Buffer.from(signature);
-
-    return expectedBuffer.length === receivedBuffer.length &&
-        crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
-};
-
-// ============ GET CONNECTS PACKAGES ============
+// ============================================
+// GET CONNECTS PACKAGES
+// ============================================
 router.get('/connects-packages', async (req, res) => {
     try {
         res.json({ packages: CONNECTS_PACKAGES });
@@ -69,23 +107,25 @@ router.get('/connects-packages', async (req, res) => {
     }
 });
 
-// ============ SUBSCRIPTION PAYMENT ============
+// ============================================
+// SUBSCRIPTION PAYMENT
+// ============================================
 
 // Create order for subscription
 router.post('/create-order', verifyToken, async (req, res) => {
     try {
         if (!razorpay) {
-            throw new Error('Razorpay not initialized. Check your API keys.');
+            throw new Error('Razorpay not initialized. Check your API keys in .env file.');
         }
-        
+
         const { planId, planName, amount } = req.body;
-        
-        console.log(`Creating Razorpay order for ${planName} - ₹${amount}`);
-        
+
+        console.log(`📦 Creating Razorpay order for ${planName} - ₹${amount}`);
+
         const shortUserId = req.userId.toString().slice(-6);
         const timestamp = Date.now().toString().slice(-8);
         const receipt = `sub_${shortUserId}_${timestamp}`;
-        
+
         const options = {
             amount: Math.round(amount * 100),
             currency: 'INR',
@@ -97,11 +137,11 @@ router.post('/create-order', verifyToken, async (req, res) => {
                 type: 'subscription'
             }
         };
-        
+
         const order = await razorpay.orders.create(options);
-        
+
         console.log(`✅ Order created: ${order.id}`);
-        
+
         res.json({
             success: true,
             orderId: order.id,
@@ -109,10 +149,25 @@ router.post('/create-order', verifyToken, async (req, res) => {
             currency: order.currency,
             key: process.env.RAZORPAY_KEY_ID
         });
-        
+
     } catch (err) {
-        console.error('Order creation error:', err);
-        res.status(500).json({ error: err.message });
+        console.error('❌ Order creation error:', err);
+        console.error('❌ Error details:', err.error || err.message);
+
+        // Check if it's a Razorpay authentication error
+        if (err.statusCode === 401 || err.error?.code === 'BAD_REQUEST_ERROR') {
+            return res.status(500).json({
+                error: 'Payment service authentication failed',
+                details: 'Please check your Razorpay API keys in .env file',
+                razorpayError: err.error,
+                statusCode: err.statusCode
+            });
+        }
+
+        res.status(500).json({
+            error: 'Failed to create order',
+            details: err.message
+        });
     }
 });
 
@@ -126,37 +181,35 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
             planName,
             amount
         } = req.body;
-        
-        console.log('Verifying payment:', { razorpay_order_id, razorpay_payment_id });
+
+        console.log(`🔍 Verifying payment: ${razorpay_payment_id} for ${planName} plan`);
 
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
             return res.status(400).json({ error: 'Missing payment verification fields' });
         }
 
-        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
-            return res.status(400).json({ error: 'Invalid payment signature. Check that Razorpay key ID and secret are from the same mode.' });
-        }
-        
         // Verify signature
         const body = razorpay_order_id + '|' + razorpay_payment_id;
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
             .update(body.toString())
             .digest('hex');
-        
+
         if (expectedSignature !== razorpay_signature) {
             console.log('❌ Invalid signature');
-            return res.status(400).json({ error: 'Invalid signature' });
+            return res.status(400).json({
+                error: 'Invalid signature. Check that Razorpay key ID and secret are from the same mode.'
+            });
         }
-        
+
         console.log(`✅ Payment verified: ${razorpay_payment_id}`);
-        
+
         // Update user's subscription
         await User.findByIdAndUpdate(req.userId, {
             subscription_tier: planName.toLowerCase(),
             subscription_status: 'active'
         });
-        
+
         // Record payment
         await Payment.create({
             user_id: req.userId,
@@ -168,43 +221,45 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
             transaction_id: razorpay_payment_id,
             paid_at: new Date()
         });
-        
+
         console.log(`✅ Subscription activated: ${planName} plan for user ${req.userId}`);
-        
+
         res.json({
             success: true,
             message: `Successfully upgraded to ${planName} plan!`,
             plan: planName
         });
-        
+
     } catch (err) {
-        console.error('Payment verification error:', err);
+        console.error('❌ Payment verification error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ============ CONNECTS PAYMENT ============
+// ============================================
+// CONNECTS PAYMENT
+// ============================================
 
 // Create order for connects
 router.post('/create-connects-order', verifyToken, async (req, res) => {
     try {
         if (!razorpay) {
-            throw new Error('Razorpay not initialized. Check your API keys.');
+            throw new Error('Razorpay not initialized. Check your API keys in .env file.');
         }
-        
+
         const { packageId } = req.body;
         const pkg = CONNECTS_PACKAGES.find(p => p.id === packageId);
-        
+
         if (!pkg) {
             return res.status(400).json({ error: 'Invalid package' });
         }
-        
-        console.log(`Creating connects order: ${pkg.connects} connects for ₹${pkg.price}`);
-        
+
+        console.log(`📦 Creating connects order: ${pkg.connects} connects for ₹${pkg.price}`);
+
         const shortUserId = req.userId.toString().slice(-6);
         const timestamp = Date.now().toString().slice(-8);
         const receipt = `conn_${shortUserId}_${timestamp}`;
-        
+
         const options = {
             amount: Math.round(pkg.price * 100),
             currency: 'INR',
@@ -216,11 +271,11 @@ router.post('/create-connects-order', verifyToken, async (req, res) => {
                 type: 'connects'
             }
         };
-        
+
         const order = await razorpay.orders.create(options);
-        
+
         console.log(`✅ Connects order created: ${order.id}`);
-        
+
         res.json({
             success: true,
             orderId: order.id,
@@ -229,10 +284,25 @@ router.post('/create-connects-order', verifyToken, async (req, res) => {
             key: process.env.RAZORPAY_KEY_ID,
             package: pkg
         });
-        
+
     } catch (err) {
         console.error('❌ Connects order error:', err);
-        res.status(500).json({ error: err.message });
+        console.error('❌ Error details:', err.error || err.message);
+
+        // Check if it's a Razorpay authentication error
+        if (err.statusCode === 401 || err.error?.code === 'BAD_REQUEST_ERROR') {
+            return res.status(500).json({
+                error: 'Payment service authentication failed',
+                details: 'Please check your Razorpay API keys in .env file',
+                razorpayError: err.error,
+                statusCode: err.statusCode
+            });
+        }
+
+        res.status(500).json({
+            error: 'Failed to create connects order',
+            details: err.message
+        });
     }
 });
 
@@ -246,38 +316,42 @@ router.post('/verify-connects', verifyToken, async (req, res) => {
             packageId
         } = req.body;
 
+        console.log(`🔍 Verifying connects payment: ${razorpay_payment_id}`);
+
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !packageId) {
             return res.status(400).json({ error: 'Missing payment verification fields' });
         }
 
-        if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
-            return res.status(400).json({ error: 'Invalid payment signature. Check that Razorpay key ID and secret are from the same mode.' });
-        }
-        
         // Verify signature
         const body = razorpay_order_id + '|' + razorpay_payment_id;
         const expectedSignature = crypto
             .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
             .update(body.toString())
             .digest('hex');
-        
+
         if (expectedSignature !== razorpay_signature) {
-            return res.status(400).json({ error: 'Invalid signature' });
+            console.log('❌ Invalid signature');
+            return res.status(400).json({
+                error: 'Invalid signature. Check that Razorpay key ID and secret are from the same mode.'
+            });
         }
-        
+
         const pkg = CONNECTS_PACKAGES.find(p => p.id === Number(packageId));
         if (!pkg) {
             return res.status(400).json({ error: 'Invalid package' });
         }
-        
+
+        console.log(`✅ Payment verified: ${razorpay_payment_id}`);
+
         // Add connects to user
-        await User.findByIdAndUpdate(req.userId, {
-            $inc: { 
-                connects_balance: pkg.connects,
-                total_connects_purchased: pkg.connects
-            }
-        });
-        
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        user.connects_balance = (user.connects_balance || 0) + pkg.connects;
+        await user.save();
+
         // Record payment
         await Payment.create({
             user_id: req.userId,
@@ -289,52 +363,57 @@ router.post('/verify-connects', verifyToken, async (req, res) => {
             transaction_id: razorpay_payment_id,
             paid_at: new Date()
         });
-        
+
+        console.log(`✅ ${pkg.connects} connects added to user ${req.userId}`);
+
         res.json({
             success: true,
-            message: `Added ${pkg.connects} connects to your account!`
+            message: `Added ${pkg.connects} connects to your account!`,
+            newBalance: user.connects_balance
         });
-        
+
     } catch (err) {
-        console.error('Connects verification error:', err);
+        console.error('❌ Connects verification error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// ============ WEBHOOK ============
+// ============================================
+// WEBHOOK
+// ============================================
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
     try {
         const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
         const signature = req.headers['x-razorpay-signature'];
-        
+
         if (secret && secret !== 'whsec_test_your_webhook_secret') {
             const expectedSignature = crypto
                 .createHmac('sha256', secret)
                 .update(req.body)
                 .digest('hex');
-            
+
             if (expectedSignature !== signature) {
                 console.log('❌ Invalid webhook signature');
                 return res.status(400).send('Invalid signature');
             }
         }
-        
+
         const event = JSON.parse(req.body);
         console.log('📨 Webhook received:', event.event);
-        
+
         if (event.event === 'payment.captured') {
             const payment = event.payload.payment.entity;
             const orderId = payment.order_id;
             const paymentId = payment.id;
             const amount = payment.amount / 100;
-            
+
             console.log(`💰 Payment captured: ${paymentId} - ₹${amount}`);
-            
+
             try {
                 const order = await razorpay.orders.fetch(orderId);
                 const userId = order.notes?.userId;
                 const type = order.notes?.type;
-                
+
                 if (userId) {
                     if (type === 'subscription') {
                         await User.findByIdAndUpdate(userId, {
@@ -354,12 +433,24 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 console.error('Error processing webhook:', err);
             }
         }
-        
+
         res.json({ received: true });
     } catch (err) {
         console.error('Webhook error:', err);
         res.status(500).send('Webhook processing failed');
     }
+});
+
+// ============================================
+// HEALTH CHECK
+// ============================================
+router.get('/health', (req, res) => {
+    res.json({
+        status: razorpay ? 'healthy' : 'unhealthy',
+        razorpay: razorpay ? 'initialized' : 'not initialized',
+        keyId: process.env.RAZORPAY_KEY_ID ? 'set' : 'missing',
+        keySecret: process.env.RAZORPAY_KEY_SECRET ? 'set' : 'missing'
+    });
 });
 
 module.exports = router;
