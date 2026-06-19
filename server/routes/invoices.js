@@ -175,7 +175,7 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
         const updatedInvoice = await Invoice.findByIdAndUpdate(
             invoiceId,
             updateData,
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         // Create notification for payment

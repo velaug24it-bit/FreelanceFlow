@@ -9,7 +9,7 @@ const projectSchema = new mongoose.Schema({
   },
   client_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Client'
   },
   client_name: {
     type: String

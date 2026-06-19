@@ -73,7 +73,7 @@ router.put('/:id', verifyToken, async (req, res) => {
         const task = await Task.findOneAndUpdate(
             { _id: req.params.id, user_id: req.userId },
             { title, description, status, priority, due_date, updated_at: Date.now() },
-            { new: true }
+            { returnDocument: 'after' }
         );
         
         if (!task) {
@@ -99,7 +99,7 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
         const task = await Task.findOneAndUpdate(
             { _id: req.params.id, user_id: req.userId },
             { status, updated_at: Date.now() },
-            { new: true }
+            { returnDocument: 'after' }
         );
         
         if (!task) {

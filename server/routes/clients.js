@@ -74,7 +74,7 @@ router.put('/:id', verifyToken, async (req, res) => {
         const client = await Client.findOneAndUpdate(
             { _id: req.params.id, user_id: req.userId },
             { company_name, contact_name, email, phone, address, notes, updated_at: Date.now() },
-            { new: true }
+            { returnDocument: 'after' }
         );
         
         if (!client) {

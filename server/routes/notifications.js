@@ -19,6 +19,9 @@ const verifyToken = (req, res, next) => {
 // Get all notifications for the logged-in user
 router.get('/', verifyToken, async (req, res) => {
     try {
+        // Prevent intermediate caches or browsers from returning 304 Not Modified
+        // for authenticated notification responses.
+        res.set('Cache-Control', 'no-store');
         const notifications = await Notification.find({ user_id: req.userId })
             .sort({ created_at: -1 })
             .limit(50);
@@ -38,6 +41,8 @@ router.get('/', verifyToken, async (req, res) => {
 // Get unread count only (lightweight endpoint for polling)
 router.get('/unread-count', verifyToken, async (req, res) => {
     try {
+        // Ensure unread-count is always fresh
+        res.set('Cache-Control', 'no-store');
         const unreadCount = await Notification.countDocuments({
             user_id: req.userId,
             is_read: false
@@ -55,7 +60,7 @@ router.put('/:id/read', verifyToken, async (req, res) => {
         const notification = await Notification.findOneAndUpdate(
             { _id: req.params.id, user_id: req.userId },
             { is_read: true },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!notification) {

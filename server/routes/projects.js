@@ -67,6 +67,7 @@ router.post('/', verifyToken, async (req, res) => {
 
         // Validate client_id is a valid ObjectId
         let validClientId = null;
+        let validClientName = '';
         if (client_id) {
             if (mongoose.Types.ObjectId.isValid(client_id)) {
                 // Check if client exists and belongs to user
@@ -76,6 +77,8 @@ router.post('/', verifyToken, async (req, res) => {
                 });
                 if (clientExists) {
                     validClientId = client_id;
+                    // Also store a human-readable client name to simplify frontend rendering
+                    validClientName = clientExists.contact_name || clientExists.company_name || '';
                 } else {
                     return res.status(400).json({ error: 'Invalid client selected' });
                 }
@@ -97,6 +100,7 @@ router.post('/', verifyToken, async (req, res) => {
 
         if (validClientId) {
             projectData.client_id = validClientId;
+            if (validClientName) projectData.client_name = validClientName;
         }
 
         const project = await Project.create(projectData);
@@ -137,7 +141,7 @@ router.put('/:id', verifyToken, async (req, res) => {
                 progress: progress !== undefined ? progress : 0,
                 current_phase: current_phase || 'planning'
             },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).populate('client_id', 'contact_name company_name');
 
         if (!project) {
@@ -168,7 +172,7 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
         const project = await Project.findOneAndUpdate(
             { _id: req.params.id, user_id: req.userId },
             updateData,
-            { new: true }
+            { returnDocument: 'after' }
         ).populate('client_id', 'contact_name company_name');
 
         if (!project) {

@@ -24,7 +24,7 @@ async function fixPassword() {
                 subscription_plan: 'business',
                 subscription_status: 'active'
             },
-            { new: true }
+            { returnDocument: 'after' }
         ).select('email role');
 
         if (!user) {

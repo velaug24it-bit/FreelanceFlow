@@ -185,6 +185,15 @@ const NotificationBell = () => {
 
         // Navigate based on action_url or reference_type
         if (notification.action_url) {
+            try {
+                const url = new URL(notification.action_url, window.location.origin);
+                if (url.origin !== window.location.origin) {
+                    window.open(notification.action_url, '_blank');
+                    return;
+                }
+            } catch (e) {
+                // invalid URL -> fallback to navigate
+            }
             navigate(notification.action_url);
             return;
         }

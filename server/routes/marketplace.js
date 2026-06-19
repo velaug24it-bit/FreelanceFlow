@@ -400,7 +400,7 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
         const updatedProject = await ProjectPost.findByIdAndUpdate(
             projectId,
             updateData,
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         // ========== NOTIFICATION: Project Status Updated ==========

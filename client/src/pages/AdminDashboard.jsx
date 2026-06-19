@@ -202,81 +202,42 @@ const AdminDashboard = () => {
   })).reverse();
 
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading admin dashboard...</div>;
+    return <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>Loading admin dashboard...</div>;
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6' }}>
+    <div className="admin-dashboard">
       {/* Admin Navbar */}
-      <nav style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '1rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        color: 'white'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <nav className="admin-nav">
+        <div className="admin-nav-left">
           <Shield size={28} />
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>FreelanceFlow Admin</h1>
-            <p style={{ fontSize: '0.75rem', opacity: 0.9 }}>Platform Management Dashboard</p>
+            <h1 className="admin-brand">FreelanceFlow Admin</h1>
+            <p className="admin-sub">Platform Management Dashboard</p>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            background: 'rgba(255,255,255,0.2)',
-            border: 'none',
-            borderRadius: '8px',
-            color: 'white',
-            cursor: 'pointer'
-          }}
-        >
+        <button onClick={handleLogout} className="btn btn-ghost admin-logout">
           <LogOut size={18} />
-          Logout
+          <span style={{ marginLeft: 8 }}>Logout</span>
         </button>
       </nav>
 
-      <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="admin-container">
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="admin-header">
           <div>
-            <h1 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Admin Dashboard</h1>
-            <p style={{ color: '#6b7280' }}>Manage all customers and track platform revenue</p>
+            <h1 className="page-title">Admin Dashboard</h1>
+            <p className="muted">Manage all customers and track platform revenue</p>
           </div>
-          <button
-            onClick={exportReport}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.75rem 1.5rem',
-              background: '#10b981',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
-          >
+          <button onClick={exportReport} className="btn btn-success">
             <Download size={18} />
-            Export Report
+            <span style={{ marginLeft: 8 }}>Export Report</span>
           </button>
         </div>
 
         {/* Stats Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div className="stats-grid">
+          <div className="card stat-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
               <div style={{ background: '#3b82f620', padding: '0.5rem', borderRadius: '12px' }}>
                 <Users size={24} color="#3b82f6" />
@@ -285,10 +246,9 @@ const AdminDashboard = () => {
             </div>
             <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalUsers}</p>
           </div>
-
-          <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '16px', padding: '1.5rem', color: 'white' }}>
+          <div className="card stat-card stat-card--accent">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '12px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.12)', padding: '0.5rem', borderRadius: '12px' }}>
                 <DollarSign size={24} />
               </div>
               <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Revenue</span>
@@ -296,7 +256,7 @@ const AdminDashboard = () => {
             <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatCurrency(revenue.totalEarnings)}</p>
           </div>
 
-          <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div className="card stat-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
               <div style={{ background: '#f59e0b20', padding: '0.5rem', borderRadius: '12px' }}>
                 <Crown size={24} color="#f59e0b" />
@@ -305,8 +265,7 @@ const AdminDashboard = () => {
             </div>
             <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.activeSubscriptions}</p>
           </div>
-
-          <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div className="card stat-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
               <div style={{ background: '#10b98120', padding: '0.5rem', borderRadius: '12px' }}>
                 <TrendingUp size={24} color="#10b981" />
@@ -320,13 +279,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Revenue Chart */}
-        <div style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
+        <div className="card chart-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Monthly Revenue</h3>
             <span style={{ fontSize: '0.75rem', color: '#6b7280', padding: '0.25rem 0.5rem', background: '#f3f4f6', borderRadius: '4px' }}>
@@ -360,13 +313,7 @@ const AdminDashboard = () => {
 
         {/* Plan Distribution */}
         {users.length > 0 && (
-          <div style={{
-            background: 'white',
-            borderRadius: '16px',
-            padding: '1.5rem',
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
+          <div className="card plan-distribution">
             <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>Plan Distribution</h3>
             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
               {['free', 'pro', 'business'].map(plan => {
@@ -397,7 +344,7 @@ const AdminDashboard = () => {
         )}
 
         {/* Search & Filter */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-filter">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
             <Search size={18} color="#6b7280" />
             <input
@@ -421,7 +368,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Customers Table */}
-        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div className="card customers-table" style={{ overflow: 'hidden' }}>
           <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
             <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>All Customers</h3>
             <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Manage subscriptions and track revenue</p>
@@ -487,35 +434,20 @@ const AdminDashboard = () => {
                       </button>
                       <button
                         onClick={() => { 
-                          setSelectedUser(user); 
-                          setEditData({ 
-                            plan: user.plan || 'free', 
-                            status: user.status || 'active' 
-                          }); 
-                          setShowEditModal(true); 
+                          setSelectedUser(user);
+                          setEditData({
+                            plan: user.plan || 'free',
+                            status: user.status || 'active'
+                          });
+                          setShowEditModal(true);
                         }}
-                        style={{ 
-                          padding: '0.35rem 0.75rem', 
-                          background: '#3b82f6', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: '6px', 
-                          cursor: 'pointer', 
-                          marginRight: '0.5rem' 
-                        }}
+                        className="btn btn-primary btn-sm"
                       >
                         <Edit size={14} />
                       </button>
                       <button
                         onClick={() => deleteUser(user.id, user.full_name)}
-                        style={{ 
-                          padding: '0.35rem 0.75rem', 
-                          background: '#ef4444', 
-                          color: 'white', 
-                          border: 'none', 
-                          borderRadius: '6px', 
-                          cursor: 'pointer' 
-                        }}
+                        className="btn btn-danger btn-sm"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -529,16 +461,16 @@ const AdminDashboard = () => {
 
         {/* User Detail Modal */}
         {showUserDetail && userDetail && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, overflow: 'auto', padding: '2rem' }}>
-            <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '900px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
+          <div className="modal-overlay">
+            <div className="modal modal-lg">
+              <div className="modal-header">
                 <div>
                   <h2 style={{ fontSize: '1.5rem' }}>{userDetail.user?.name || 'User'}</h2>
                   <p style={{ color: '#6b7280' }}>{userDetail.user?.email}</p>
                   <p style={{ color: '#6b7280' }}>Plan: <strong>{userDetail.user?.subscription_tier || 'Free'}</strong></p>
                   <p style={{ color: '#6b7280' }}>Connects: <strong>{userDetail.user?.connects_balance || 0}</strong></p>
                 </div>
-                <button onClick={() => setShowUserDetail(false)} style={{ padding: '0.5rem 1rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                <button onClick={() => setShowUserDetail(false)} className="btn btn-danger">
                   Close
                 </button>
               </div>
@@ -604,7 +536,7 @@ const AdminDashboard = () => {
                           <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
                             <td style={{ padding: '0.5rem' }}>{project.title}</td>
                             <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                              <span style={{ padding: '0.25rem 0.5rem', borderRadius: '12px', fontSize: '0.7rem', background: project.status === 'completed' ? '#d1fae5' : '#fef3c7', color: project.status === 'completed' ? '#065f46' : '#92400e' }}>
+                              <span className={`badge ${project.status === 'completed' ? 'badge--active' : 'badge--inactive'}`}>
                                 {project.status}
                               </span>
                             </td>
@@ -634,7 +566,7 @@ const AdminDashboard = () => {
                             <td style={{ padding: '0.5rem' }}>{invoice.number}</td>
                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(invoice.amount)}</td>
                             <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                              <span style={{ padding: '0.25rem 0.5rem', borderRadius: '12px', fontSize: '0.7rem', background: invoice.status === 'paid' ? '#d1fae5' : '#fef3c7', color: invoice.status === 'paid' ? '#065f46' : '#92400e' }}>
+                              <span className={`badge ${invoice.status === 'paid' ? 'badge--active' : 'badge--inactive'}`}>
                                 {invoice.status}
                               </span>
                             </td>
@@ -651,8 +583,8 @@ const AdminDashboard = () => {
 
         {/* Edit Modal */}
         {showEditModal && selectedUser && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-            <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', maxWidth: '500px', width: '90%' }}>
+          <div className="modal-overlay">
+            <div className="modal modal-sm">
               <h3>Update Subscription</h3>
               <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Customer: <strong>{selectedUser.full_name}</strong></p>
               
@@ -661,7 +593,7 @@ const AdminDashboard = () => {
                 <select
                   value={editData.plan}
                   onChange={(e) => setEditData({ ...editData, plan: e.target.value })}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px' }}
+                  className="form-control"
                 >
                   <option value="free">Free</option>
                   <option value="pro">Pro ($19/month)</option>
@@ -674,7 +606,7 @@ const AdminDashboard = () => {
                 <select
                   value={editData.status}
                   onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px' }}
+                  className="form-control"
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
@@ -683,10 +615,10 @@ const AdminDashboard = () => {
               </div>
               
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <button onClick={() => updateSubscription(selectedUser.id)} style={{ flex: 1, padding: '0.75rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
+                <button onClick={() => updateSubscription(selectedUser.id)} className="btn btn-success" style={{ flex: 1 }}>
                   Save Changes
                 </button>
-                <button onClick={() => setShowEditModal(false)} style={{ flex: 1, padding: '0.75rem', background: '#6b7280', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
+                <button onClick={() => setShowEditModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>
                   Cancel
                 </button>
               </div>
