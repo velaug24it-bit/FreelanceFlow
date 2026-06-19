@@ -7,6 +7,8 @@ const Bid = require('../models/Bid');
 const Contract = require('../models/Contract');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const Client = require('../models/Client');
+const Project = require('../models/Project');
 const NotificationHelper = require('../utils/notificationHelper');
 
 // Verify token middleware
@@ -321,6 +323,80 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             status: 'pending',
             transaction_id: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         });
+
+        // --- Sync client and project records for both freelancer and client users ---
+        try {
+            const ownerUser = await User.findById(project.client_id);
+
+            // Ensure freelancer has this client in their `clients` list
+            const existingClient = await Client.findOne({ user_id: bid.freelancer_id, email: ownerUser?.email });
+            let createdClient = existingClient;
+            if (!existingClient) {
+                createdClient = await Client.create({
+                    user_id: bid.freelancer_id,
+                    contact_name: ownerUser?.full_name || project.client_name || 'Client',
+                    company_name: ownerUser?.company_name || '',
+                    email: ownerUser?.email || '',
+                    phone: '',
+                    address: '',
+                    notes: `Imported from marketplace project ${project._id}`
+                });
+            }
+
+            // Create a Project record for the freelancer (so it appears in their Projects list)
+            if (createdClient) {
+                const existsForFreelancer = await Project.findOne({
+                    user_id: bid.freelancer_id,
+                    title: project.title,
+                    client_name: createdClient.contact_name,
+                    status: { $in: ['in_progress', 'active'] }
+                });
+
+                if (!existsForFreelancer) {
+                    await Project.create({
+                        user_id: bid.freelancer_id,
+                        client_id: createdClient._id,
+                        client_name: createdClient.contact_name,
+                        title: project.title,
+                        description: project.description,
+                        budget: bid.bid_amount,
+                        due_date: project.deadline || null,
+                        project_type: 'marketplace',
+                        status: 'in_progress',
+                        selected_freelancer_id: bid.freelancer_id,
+                        selected_freelancer_name: freelancer.full_name
+                    });
+                }
+            }
+
+            // Also create a Project record for the client owner so it appears in their Projects list
+            try {
+                const existsForClient = await Project.findOne({
+                    user_id: project.client_id,
+                    title: project.title,
+                    selected_freelancer_id: bid.freelancer_id
+                });
+
+                if (!existsForClient) {
+                    await Project.create({
+                        user_id: project.client_id,
+                        client_name: project.client_name || ownerUser?.full_name || '',
+                        title: project.title,
+                        description: project.description,
+                        budget: bid.bid_amount,
+                        due_date: project.deadline || null,
+                        project_type: 'marketplace',
+                        status: 'in_progress',
+                        selected_freelancer_id: bid.freelancer_id,
+                        selected_freelancer_name: freelancer.full_name
+                    });
+                }
+            } catch (err) {
+                console.error('Error creating project for client owner:', err);
+            }
+        } catch (err) {
+            console.error('Error syncing client/project records after bid accept:', err);
+        }
 
         // ========== NOTIFICATION: Bid Accepted for Freelancer ==========
         await NotificationHelper.createNotification({

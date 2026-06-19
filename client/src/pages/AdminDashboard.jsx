@@ -1,3 +1,5 @@
+// client/src/pages/AdminDashboard.jsx
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -5,360 +7,567 @@ import {
   Users, DollarSign, TrendingUp, Crown, 
   Download, Edit, Trash2, CheckCircle, 
   XCircle, LogOut, Shield, Eye, Search,
-  Calendar
+  Calendar, Package, CreditCard, Briefcase,
+  RefreshCw, AlertCircle
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalRevenue: 0,
+    connectsRevenue: 0,
+    subscriptionRevenue: 0,
+    projectRevenue: 0,
     activeSubscriptions: 0,
+    totalConnectsSold: 0,
     monthlyRevenue: []
   });
-  const [revenue, setRevenue] = useState({ totalEarnings: 0, monthlyRevenue: [] });
+  const [revenue, setRevenue] = useState({ 
+    totalEarnings: 0, 
+    monthlyRevenue: [],
+    connectsRevenue: 0,
+    subscriptionRevenue: 0,
+    projectRevenue: 0,
+    totalConnectsSold: 0
+  });
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
-  const [showUserDetail, setShowUserDetail] = useState(false);
-  const [userDetail, setUserDetail] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editData, setEditData] = useState({ plan: 'free', status: 'active' });
+  const [editData, setEditData] = useState({ plan: 'free', status: 'active', amount: 0 });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPlan, setFilterPlan] = useState('all');
+  const [showUserDetail, setShowUserDetail] = useState(false);
+  const [userDetail, setUserDetail] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const isAdmin = localStorage.getItem('isAdmin');
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    if (!token || isAdmin !== 'true' || user.role !== 'admin') {
-      navigate('/admin-login');
+    if (!token) {
+      navigate('/login');
       return;
     }
-    
     fetchAdminData();
   }, []);
 
   const fetchAdminData = async () => {
     try {
       setLoading(true);
+      setRefreshing(true);
+      setError('');
+      
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Please login first');
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      console.log('🔍 Fetching admin data...');
+      
+      const headers = { headers: { Authorization: `Bearer ${token}` } };
       
       const [usersRes, statsRes, revenueRes] = await Promise.all([
-        axios.get('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/admin/revenue', { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`${API_URL}/admin/users`, headers),
+        axios.get(`${API_URL}/admin/stats`, headers),
+        axios.get(`${API_URL}/admin/revenue`, headers)
       ]);
       
-      console.log('Users data:', usersRes.data.users);
+      console.log('📦 Users:', usersRes.data.users?.length || 0);
+      console.log('📊 Stats:', statsRes.data);
+      console.log('💰 Revenue:', revenueRes.data);
+      
       setUsers(usersRes.data.users || []);
-      setStats(statsRes.data);
-      setRevenue(revenueRes.data);
+      setStats(statsRes.data || {
+        totalUsers: 0,
+        totalRevenue: 0,
+        connectsRevenue: 0,
+        subscriptionRevenue: 0,
+        projectRevenue: 0,
+        activeSubscriptions: 0,
+        totalConnectsSold: 0
+      });
+      setRevenue(revenueRes.data || {
+        totalEarnings: 0,
+        monthlyRevenue: [],
+        connectsRevenue: 0,
+        subscriptionRevenue: 0,
+        projectRevenue: 0,
+        totalConnectsSold: 0
+      });
     } catch (err) {
-      console.error('Failed to fetch admin data:', err);
+      console.error('❌ Failed to fetch admin data:', err);
+      console.error('❌ Error response:', err.response?.data);
+      if (err.response?.status === 403) {
+        setError('Admin access required. Please login with admin account.');
+      } else if (err.response?.status === 401) {
+        setError('Please login to access admin panel');
+      } else {
+        setError('Failed to load admin data. Please try again.');
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   const fetchUserDetail = async (userId) => {
     try {
-      if (!userId) {
-        alert('User ID is required');
-        return;
-      }
-      
       const token = localStorage.getItem('token');
-      console.log('Fetching user details for ID:', userId);
-      const response = await axios.get(`/api/admin/users/${userId}`, {
+      console.log('🔍 Fetching user details for:', userId);
+      
+      const response = await axios.get(`${API_URL}/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      console.log('User details response:', response.data);
+      
+      console.log('📦 User details:', response.data);
       setUserDetail(response.data);
       setShowUserDetail(true);
     } catch (err) {
-      console.error('Failed to fetch user details:', err);
-      alert('Failed to load user details. Error: ' + (err.response?.data?.error || err.message));
+      console.error('❌ Failed to fetch user details:', err);
+      alert('Failed to load user details');
     }
   };
 
   const updateSubscription = async (userId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`/api/admin/users/${userId}/subscription`, editData, {
+      await axios.put(`${API_URL}/admin/users/${userId}/subscription`, editData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowEditModal(false);
       fetchAdminData();
-      alert('Subscription updated successfully!');
+      alert('✅ Subscription updated successfully!');
     } catch (err) {
-      console.error('Failed to update subscription:', err);
-      alert('Failed to update subscription');
+      console.error('❌ Failed to update subscription:', err);
+      alert('❌ Failed to update subscription');
     }
   };
 
   const deleteUser = async (userId, userName) => {
-    if (window.confirm(`Are you sure you want to delete ${userName}?`)) {
+    if (window.confirm(`⚠️ Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`/api/admin/users/${userId}`, {
+        await axios.delete(`${API_URL}/admin/users/${userId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         fetchAdminData();
-        alert('User deleted successfully');
+        alert('✅ User deleted successfully');
       } catch (err) {
-        console.error('Failed to delete user:', err);
-        alert('Failed to delete user');
+        console.error('❌ Failed to delete user:', err);
+        alert('❌ Failed to delete user');
       }
     }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('isAdmin');
-    navigate('/admin-login');
+    navigate('/login');
   };
 
   const exportReport = () => {
-    const csvData = [
-      ['Admin Revenue Report - FreelanceFlow'],
-      ['Generated:', new Date().toLocaleString()],
-      [''],
-      ['SUMMARY STATISTICS'],
-      ['Total Earnings', `$${revenue.totalEarnings.toFixed(2)}`],
-      ['Total Customers', stats.totalUsers],
-      ['Active Subscriptions', stats.activeSubscriptions],
-      [''],
-      ['MONTHLY REVENUE'],
-      ['Month', 'Revenue', 'New Subscribers'],
-      ...revenue.monthlyRevenue.map(m => [m.month, `$${m.revenue}`, m.new_subscribers]),
-      [''],
-      ['ALL CUSTOMERS'],
-      ['Name', 'Email', 'Plan', 'Clients', 'Projects', 'Revenue', 'Status'],
-      ...users.map(u => [
-        u.full_name || u.email,
-        u.email,
-        u.plan || 'free',
-        u.client_count || 0,
-        u.project_count || 0,
-        `$${u.subscription_revenue || 0}`,
-        u.status || 'active'
-      ])
-    ];
-    
-    const csv = csvData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `freelanceflow_revenue_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      const csvData = [
+        ['Admin Revenue Report - FreelanceFlow'],
+        ['Generated:', new Date().toLocaleString()],
+        [''],
+        ['SUMMARY STATISTICS'],
+        ['Total Earnings', `₹${revenue.totalEarnings?.toFixed(2) || '0.00'}`],
+        ['Connects Revenue', `₹${revenue.connectsRevenue?.toFixed(2) || '0.00'}`],
+        ['Subscription Revenue', `₹${revenue.subscriptionRevenue?.toFixed(2) || '0.00'}`],
+        ['Project Revenue', `₹${revenue.projectRevenue?.toFixed(2) || '0.00'}`],
+        ['Total Connects Sold', revenue.totalConnectsSold || 0],
+        ['Total Users', stats.totalUsers || 0],
+        ['Active Subscriptions', stats.activeSubscriptions || 0],
+        [''],
+        ['MONTHLY REVENUE BREAKDOWN'],
+        ['Month', 'Revenue', 'New Subscribers'],
+        ...(revenue.monthlyRevenue || []).map(m => [
+          m.month || 'Unknown',
+          `₹${m.revenue?.toFixed(2) || '0.00'}`,
+          m.new_subscribers || 0
+        ]),
+        [''],
+        ['ALL USERS'],
+        ['Name', 'Email', 'Plan', 'Clients', 'Projects', 'Revenue', 'Connects Revenue', 'Status'],
+        ...users.map(u => [
+          u.full_name || 'N/A',
+          u.email || 'N/A',
+          u.plan || 'free',
+          u.client_count || 0,
+          u.project_count || 0,
+          `₹${u.total_revenue || 0}`,
+          `₹${u.connects_revenue || 0}`,
+          u.status || 'inactive'
+        ])
+      ];
+      
+      const csv = csvData.map(row => row.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `freelanceflow_admin_report_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('❌ Failed to export report:', err);
+      alert('Failed to export report. Please try again.');
+    }
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+    return new Intl.NumberFormat('en-IN', { 
+      style: 'currency', 
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount || 0);
   };
 
-  const getPlanBadge = (plan) => {
-    // Handle null, undefined, or empty
-    if (!plan) {
-      return <span style={{ padding: '0.25rem 0.75rem', borderRadius: '20px', background: '#f3f4f6', color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>Free</span>;
-    }
-    
-    const planName = plan.toString().toLowerCase();
-    
-    if (planName === 'pro') {
-      return <span style={{ padding: '0.25rem 0.75rem', borderRadius: '20px', background: '#fef3c7', color: '#f59e0b', fontSize: '0.75rem', fontWeight: '500' }}>Pro</span>;
-    }
-    if (planName === 'business') {
-      return <span style={{ padding: '0.25rem 0.75rem', borderRadius: '20px', background: '#e0e7ff', color: '#8b5cf6', fontSize: '0.75rem', fontWeight: '500' }}>Business</span>;
-    }
-    return <span style={{ padding: '0.25rem 0.75rem', borderRadius: '20px', background: '#f3f4f6', color: '#6b7280', fontSize: '0.75rem', fontWeight: '500' }}>Free</span>;
+  const getPlanColor = (plan) => {
+    const colors = {
+      free: '#fef3c7',
+      pro: '#dbeafe',
+      business: '#d1fae5'
+    };
+    return colors[plan] || '#e5e7eb';
   };
 
   const getStatusBadge = (status) => {
     if (status === 'active') {
-      return <CheckCircle size={18} color="#10b981" />;
+      return <span style={{ color: '#10b981' }}><CheckCircle size={18} /></span>;
     }
-    return <XCircle size={18} color="#ef4444" />;
+    return <span style={{ color: '#ef4444' }}><XCircle size={18} /></span>;
   };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = (user.full_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPlan = filterPlan === 'all' || user.plan === filterPlan;
+    const matchesPlan = filterPlan === 'all' || (user.plan || 'free').toLowerCase() === filterPlan;
     return matchesSearch && matchesPlan;
   });
 
-  // Prepare chart data
-  const chartData = revenue.monthlyRevenue.map(item => ({
+  // Chart data
+  const chartData = (revenue.monthlyRevenue || []).map(item => ({
     month: item.month,
-    revenue: item.revenue,
-    subscribers: item.new_subscribers
-  })).reverse();
+    revenue: item.revenue || 0,
+    subscribers: item.new_subscribers || 0
+  }));
+
+  const pieData = [
+    { name: 'Connects', value: revenue.connectsRevenue || 0 },
+    { name: 'Subscriptions', value: revenue.subscriptionRevenue || 0 },
+    { name: 'Projects', value: revenue.projectRevenue || 0 }
+  ].filter(item => item.value > 0);
+
+  const COLORS = ['#f59e0b', '#8b5cf6', '#10b981'];
 
   if (loading) {
-    return <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>Loading admin dashboard...</div>;
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <div style={{ fontSize: '2rem' }}>🔐</div>
+        <p style={{ color: '#6b7280' }}>Loading admin dashboard...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="admin-dashboard">
+    <div style={{ minHeight: '100vh', background: '#f3f4f6' }}>
       {/* Admin Navbar */}
-      <nav className="admin-nav">
-        <div className="admin-nav-left">
+      <nav style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        padding: '1rem 2rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        color: 'white',
+        flexWrap: 'wrap',
+        gap: '1rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Shield size={28} />
           <div>
-            <h1 className="admin-brand">FreelanceFlow Admin</h1>
-            <p className="admin-sub">Platform Management Dashboard</p>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>FreelanceFlow Admin</h1>
+            <p style={{ fontSize: '0.75rem', opacity: 0.9 }}>Platform Management Dashboard</p>
           </div>
         </div>
-        <button onClick={handleLogout} className="btn btn-ghost admin-logout">
-          <LogOut size={18} />
-          <span style={{ marginLeft: 8 }}>Logout</span>
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={fetchAdminData}
+            disabled={refreshing}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer',
+              opacity: refreshing ? 0.5 : 1,
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          >
+            <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
+            Refresh
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
       </nav>
 
-      <div className="admin-container">
+      <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="admin-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h1 className="page-title">Admin Dashboard</h1>
-            <p className="muted">Manage all customers and track platform revenue</p>
+            <h1 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Admin Dashboard</h1>
+            <p style={{ color: '#6b7280' }}>Manage all customers and track platform revenue</p>
           </div>
-          <button onClick={exportReport} className="btn btn-success">
+          <button
+            onClick={exportReport}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.75rem 1.5rem',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '500',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+          >
             <Download size={18} />
-            <span style={{ marginLeft: 8 }}>Export Report</span>
+            Export Report
           </button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="stats-grid">
-          <div className="card stat-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ background: '#3b82f620', padding: '0.5rem', borderRadius: '12px' }}>
-                <Users size={24} color="#3b82f6" />
-              </div>
-              <span style={{ fontSize: '0.875rem', color: '#3b82f6' }}>Total Customers</span>
-            </div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.totalUsers}</p>
+        {error && (
+          <div style={{
+            background: '#fee2e2',
+            color: '#991b1b',
+            padding: '0.75rem 1rem',
+            borderRadius: '8px',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            border: '1px solid #fecaca'
+          }}>
+            <AlertCircle size={18} />
+            {error}
           </div>
-          <div className="card stat-card stat-card--accent">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ background: 'rgba(255,255,255,0.12)', padding: '0.5rem', borderRadius: '12px' }}>
-                <DollarSign size={24} />
+        )}
+
+        {/* Stats Cards */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '1rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <div style={{ background: '#3b82f620', padding: '0.4rem', borderRadius: '10px' }}>
+                <Users size={20} color="#3b82f6" />
               </div>
-              <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Revenue</span>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total Customers</span>
             </div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatCurrency(revenue.totalEarnings)}</p>
+            <p style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.totalUsers || 0}</p>
           </div>
 
-          <div className="card stat-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ background: '#f59e0b20', padding: '0.5rem', borderRadius: '12px' }}>
-                <Crown size={24} color="#f59e0b" />
+          <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <div style={{ background: '#f59e0b20', padding: '0.4rem', borderRadius: '10px' }}>
+                <Package size={20} color="#f59e0b" />
               </div>
-              <span style={{ fontSize: '0.875rem', color: '#f59e0b' }}>Active Subscriptions</span>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Sold</span>
             </div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.activeSubscriptions}</p>
+            <p style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.totalConnectsSold || 0}</p>
           </div>
-          <div className="card stat-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ background: '#10b98120', padding: '0.5rem', borderRadius: '12px' }}>
-                <TrendingUp size={24} color="#10b981" />
+
+          <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <div style={{ background: '#8b5cf620', padding: '0.4rem', borderRadius: '10px' }}>
+                <Crown size={20} color="#8b5cf6" />
               </div>
-              <span style={{ fontSize: '0.875rem', color: '#10b981' }}>Monthly Revenue</span>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Active Subs</span>
             </div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-              {formatCurrency(revenue.monthlyRevenue[0]?.revenue || 0)}
-            </p>
+            <p style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.activeSubscriptions || 0}</p>
+          </div>
+
+          <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '16px', padding: '1.25rem', color: 'white' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.4rem', borderRadius: '10px' }}>
+                <DollarSign size={20} />
+              </div>
+              <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>Total Revenue</span>
+            </div>
+            <p style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{formatCurrency(stats.totalRevenue)}</p>
           </div>
         </div>
 
-        {/* Revenue Chart */}
-        <div className="card chart-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Monthly Revenue</h3>
-            <span style={{ fontSize: '0.75rem', color: '#6b7280', padding: '0.25rem 0.5rem', background: '#f3f4f6', borderRadius: '4px' }}>
-              <Calendar size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
-              Last 6 months
-            </span>
-          </div>
-          
-          {chartData.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-              <p>No revenue data available yet</p>
-              <p style={{ fontSize: '0.875rem' }}>Revenue will appear when users purchase subscriptions</p>
+        {/* Revenue Breakdown */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Revenue Breakdown</h3>
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: '#f9fafb', borderRadius: '8px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Package size={16} color="#f59e0b" /> Connects
+                </span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(stats.connectsRevenue)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: '#f9fafb', borderRadius: '8px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Crown size={16} color="#8b5cf6" /> Subscriptions
+                </span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(stats.subscriptionRevenue)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: '#f9fafb', borderRadius: '8px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Briefcase size={16} color="#10b981" /> Projects
+                </span>
+                <span style={{ fontWeight: '600' }}>{formatCurrency(stats.projectRevenue)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: '#e5e7eb', borderRadius: '8px', fontWeight: 'bold' }}>
+                <span>Total</span>
+                <span>{formatCurrency(stats.totalRevenue)}</span>
+              </div>
             </div>
-          ) : (
-            <div style={{ height: '300px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(value) => `$${value}`} />
-                  <Tooltip 
-                    formatter={(value) => [`$${value}`, 'Revenue']}
-                    labelFormatter={(label) => `Month: ${label}`}
-                  />
-                  <Bar dataKey="revenue" fill="#667eea" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          </div>
+
+          {pieData.length > 0 && (
+            <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Revenue Distribution</h3>
+              <div style={{ height: '200px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Plan Distribution */}
-        {users.length > 0 && (
-          <div className="card plan-distribution">
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>Plan Distribution</h3>
-            <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-              {['free', 'pro', 'business'].map(plan => {
-                const count = users.filter(u => (u.plan || 'free').toLowerCase() === plan).length;
-                const percentage = users.length > 0 ? (count / users.length * 100) : 0;
-                const colors = { free: '#6b7280', pro: '#f59e0b', business: '#8b5cf6' };
-                return (
-                  <div key={plan} style={{ flex: 1, minWidth: '150px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '500', color: colors[plan] }}>
-                        {plan.charAt(0).toUpperCase() + plan.slice(1)}
-                      </span>
-                      <span style={{ fontSize: '0.875rem', fontWeight: '600' }}>{count} ({percentage.toFixed(1)}%)</span>
-                    </div>
-                    <div style={{ background: '#e5e7eb', borderRadius: '10px', overflow: 'hidden', height: '8px' }}>
-                      <div style={{
-                        width: `${percentage}%`,
-                        height: '100%',
-                        background: colors[plan],
-                        borderRadius: '10px'
-                      }} />
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Monthly Revenue Chart */}
+        {chartData.length > 0 && (
+          <div style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600' }}>
+                <Calendar size={16} style={{ marginRight: '0.5rem' }} />
+                Monthly Revenue
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Last 6 months</span>
+            </div>
+            <div style={{ height: '250px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" />
+                  <YAxis tickFormatter={(value) => `₹${value}`} />
+                  <Tooltip formatter={(value) => formatCurrency(value)} />
+                  <Bar dataKey="revenue" fill="#667eea" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}
 
         {/* Search & Filter */}
-        <div className="search-filter">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, background: 'white', padding: '0.25rem 1rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <Search size={18} color="#6b7280" />
             <input
               type="text"
               placeholder="Search customers by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ flex: 1, padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.875rem' }}
+              style={{ 
+                flex: 1, 
+                padding: '0.5rem 0', 
+                border: 'none', 
+                outline: 'none',
+                fontSize: '0.875rem',
+                background: 'transparent'
+              }}
             />
           </div>
           <select
             value={filterPlan}
             onChange={(e) => setFilterPlan(e.target.value)}
-            style={{ padding: '0.5rem 1rem', border: '1px solid #d1d5db', borderRadius: '8px' }}
+            style={{ 
+              padding: '0.5rem 1rem', 
+              border: '1px solid #d1d5db', 
+              borderRadius: '8px',
+              background: 'white',
+              fontSize: '0.875rem'
+            }}
           >
             <option value="all">All Plans</option>
             <option value="free">Free</option>
@@ -367,8 +576,8 @@ const AdminDashboard = () => {
           </select>
         </div>
 
-        {/* Customers Table */}
-        <div className="card customers-table" style={{ overflow: 'hidden' }}>
+        {/* Users Table */}
+        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
             <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>All Customers</h3>
             <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Manage subscriptions and track revenue</p>
@@ -380,6 +589,7 @@ const AdminDashboard = () => {
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Customer</th>
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Email</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Connects</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Clients</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Projects</th>
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Revenue</th>
@@ -388,214 +598,387 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map(user => (
-                  <tr key={user.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '1rem' }}>
-                      <div>
-                        <p style={{ fontWeight: '500' }}>{user.full_name || user.email?.split('@')[0]}</p>
-                        <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.company_name || 'Individual'}</p>
-                      </div>
-                    </td>
-                    <td style={{ padding: '1rem', color: '#6b7280' }}>{user.email}</td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {getPlanBadge(user.plan)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>{user.client_count || 0}</td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>{user.project_count || 0}</td>
-                    <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>
-                      {formatCurrency(user.subscription_revenue || 0)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      {getStatusBadge(user.status)}
-                    </td>
-                    <td style={{ padding: '1rem', textAlign: 'center' }}>
-                      <button
-                        onClick={() => {
-                          if (user.id) {
-                            fetchUserDetail(user.id);
-                          } else {
-                            alert('User ID not found');
-                          }
-                        }}
-                        style={{
-                          padding: '0.35rem 0.75rem',
-                          background: '#8b5cf6',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          marginRight: '0.5rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem'
-                        }}
-                      >
-                        <Eye size={14} /> History
-                      </button>
-                      <button
-                        onClick={() => { 
-                          setSelectedUser(user);
-                          setEditData({
-                            plan: user.plan || 'free',
-                            status: user.status || 'active'
-                          });
-                          setShowEditModal(true);
-                        }}
-                        className="btn btn-primary btn-sm"
-                      >
-                        <Edit size={14} />
-                      </button>
-                      <button
-                        onClick={() => deleteUser(user.id, user.full_name)}
-                        className="btn btn-danger btn-sm"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                      No customers found
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredUsers.map(user => (
+                    <tr key={user._id || user.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '1rem' }}>
+                        <div>
+                          <p style={{ fontWeight: '500' }}>{user.full_name || 'User'}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.company_name || 'Individual'}</p>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>{user.email}</td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          background: getPlanColor(user.plan || 'free'),
+                          color: user.plan === 'free' ? '#92400e' : '#065f46'
+                        }}>
+                          {user.plan === 'free' ? 'Free' : user.plan?.charAt(0).toUpperCase() + user.plan?.slice(1)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
+                        {user.connects_balance || 0}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
+                        {user.client_count || 0}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
+                        {user.project_count || 0}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>
+                        {formatCurrency(user.total_revenue || 0)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        {getStatusBadge(user.status || 'active')}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <button
+                          onClick={() => {
+                            const userId = user._id || user.id;
+                            if (userId) {
+                              fetchUserDetail(userId);
+                            } else {
+                              alert('User ID not found');
+                            }
+                          }}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            background: '#8b5cf6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            marginRight: '0.5rem',
+                            fontSize: '0.75rem',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#7c3aed'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#8b5cf6'}
+                        >
+                          <Eye size={14} style={{ marginRight: '0.25rem' }} />
+                          History
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setEditData({ 
+                              plan: user.plan || 'free', 
+                              status: user.status || 'active', 
+                              amount: user.subscription_amount || 19 
+                            });
+                            setShowEditModal(true);
+                          }}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            marginRight: '0.5rem',
+                            fontSize: '0.75rem',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
+                        >
+                          <Edit size={14} style={{ marginRight: '0.25rem' }} />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteUser(user._id || user.id, user.full_name)}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            transition: 'background 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+                        >
+                          <Trash2 size={14} style={{ marginRight: '0.25rem' }} />
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+          <div style={{
+            padding: '1rem',
+            background: '#f9fafb',
+            borderTop: '1px solid #e5e7eb',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.875rem',
+            color: '#6b7280'
+          }}>
+            <span>Showing {filteredUsers.length} user(s)</span>
+            <button
+              onClick={fetchAdminData}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#3b82f6',
+                cursor: 'pointer',
+                fontSize: '0.875rem'
+              }}
+            >
+              Refresh
+            </button>
           </div>
         </div>
 
         {/* User Detail Modal */}
         {showUserDetail && userDetail && (
-          <div className="modal-overlay">
-            <div className="modal modal-lg">
-              <div className="modal-header">
+          <div style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'rgba(0,0,0,0.5)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            zIndex: 1000, 
+            overflow: 'auto', 
+            padding: '2rem' 
+          }}>
+            <div style={{ 
+              background: 'white', 
+              borderRadius: '16px', 
+              padding: '2rem', 
+              maxWidth: '1000px', 
+              width: '95%', 
+              maxHeight: '90vh', 
+              overflow: 'auto' 
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
                 <div>
-                  <h2 style={{ fontSize: '1.5rem' }}>{userDetail.user?.name || 'User'}</h2>
+                  <h2 style={{ fontSize: '1.5rem' }}>{userDetail.user?.name || userDetail.user?.full_name || 'User'}</h2>
                   <p style={{ color: '#6b7280' }}>{userDetail.user?.email}</p>
                   <p style={{ color: '#6b7280' }}>Plan: <strong>{userDetail.user?.subscription_tier || 'Free'}</strong></p>
                   <p style={{ color: '#6b7280' }}>Connects: <strong>{userDetail.user?.connects_balance || 0}</strong></p>
                 </div>
-                <button onClick={() => setShowUserDetail(false)} className="btn btn-danger">
+                <button 
+                  onClick={() => setShowUserDetail(false)} 
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    background: '#ef4444', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+                >
                   Close
                 </button>
               </div>
 
               {/* Stats Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                   <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total Revenue</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>{formatCurrency(userDetail.stats?.total_revenue || 0)}</p>
+                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>
+                    {formatCurrency(userDetail.stats?.total_revenue || 0)}
+                  </p>
                 </div>
                 <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Net Income</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3b82f6' }}>{formatCurrency(userDetail.stats?.net_income || 0)}</p>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Revenue</p>
+                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>
+                    {formatCurrency(userDetail.stats?.connects_revenue || 0)}
+                  </p>
                 </div>
                 <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                   <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Subscription Revenue</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#8b5cf6' }}>{formatCurrency(userDetail.stats?.subscription_revenue || 0)}</p>
+                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#8b5cf6' }}>
+                    {formatCurrency(userDetail.stats?.subscription_revenue || 0)}
+                  </p>
                 </div>
                 <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Active Contracts</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>{userDetail.stats?.active_contracts || 0}</p>
+                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Purchased</p>
+                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3b82f6' }}>
+                    {userDetail.stats?.total_connects_purchased || 0}
+                  </p>
                 </div>
+              </div>
+
+              {/* Payment History */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '0.75rem' }}>Payment History ({userDetail.payments?.length || 0})</h3>
+                {userDetail.payments?.length > 0 ? (
+                  <div style={{ overflowX: 'auto', maxHeight: '300px', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Date</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Description</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {userDetail.payments.map((payment, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                            <td style={{ padding: '0.5rem' }}>
+                              {new Date(payment.created_at || payment.paid_at).toLocaleDateString()}
+                            </td>
+                            <td style={{ padding: '0.5rem' }}>
+                              {payment.description || 
+                               (payment.package_id ? `${payment.connects_purchased || 0} Connects` : 'Payment')}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>
+                              {formatCurrency(payment.amount)}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                              <span style={{
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '12px',
+                                fontSize: '0.7rem',
+                                background: payment.status === 'completed' ? '#d1fae5' : '#fef3c7',
+                                color: payment.status === 'completed' ? '#065f46' : '#92400e'
+                              }}>
+                                {payment.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p style={{ color: '#6b7280' }}>No payment history</p>
+                )}
               </div>
 
               {/* Clients */}
               <div style={{ marginBottom: '1rem' }}>
                 <h3 style={{ marginBottom: '0.5rem' }}>Clients ({userDetail.clients?.length || 0})</h3>
                 {userDetail.clients?.length > 0 ? (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead><tr style={{ background: '#f9fafb' }}>
-                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
-                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Company</th>
-                        <th style={{ padding: '0.5rem', textAlign: 'right' }}>Revenue</th>
-                      </tr></thead>
+                      <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Company</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Revenue</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {userDetail.clients.map((client, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '0.5rem' }}>{client.name}</td>
-                            <td style={{ padding: '0.5rem' }}>{client.company || '-'}</td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(client.total_revenue)}</td>
+                            <td style={{ padding: '0.5rem' }}>{client.name || client.contact_name}</td>
+                            <td style={{ padding: '0.5rem' }}>{client.company || client.company_name || '-'}</td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                              {formatCurrency(client.total_revenue || 0)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                ) : <p style={{ color: '#6b7280' }}>No clients yet</p>}
+                ) : <p style={{ color: '#6b7280' }}>No clients</p>}
               </div>
 
               {/* Projects */}
-              <div style={{ marginBottom: '1rem' }}>
+              <div>
                 <h3 style={{ marginBottom: '0.5rem' }}>Projects ({userDetail.projects?.length || 0})</h3>
                 {userDetail.projects?.length > 0 ? (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead><tr style={{ background: '#f9fafb' }}>
-                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Title</th>
-                        <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
-                        <th style={{ padding: '0.5rem', textAlign: 'right' }}>Budget</th>
-                      </tr></thead>
+                      <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Title</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Budget</th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {userDetail.projects.map((project, idx) => (
                           <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
                             <td style={{ padding: '0.5rem' }}>{project.title}</td>
                             <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                              <span className={`badge ${project.status === 'completed' ? 'badge--active' : 'badge--inactive'}`}>
+                              <span style={{
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '12px',
+                                fontSize: '0.7rem',
+                                background: project.status === 'completed' ? '#d1fae5' : 
+                                          project.status === 'open' ? '#dbeafe' : '#fef3c7',
+                                color: project.status === 'completed' ? '#065f46' : 
+                                       project.status === 'open' ? '#1e40af' : '#92400e'
+                              }}>
                                 {project.status}
                               </span>
                             </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(project.budget)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : <p style={{ color: '#6b7280' }}>No projects yet</p>}
-              </div>
-
-              {/* Invoices */}
-              {userDetail.invoices && userDetail.invoices.length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <h3 style={{ marginBottom: '0.5rem' }}>Invoices ({userDetail.invoices.length})</h3>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead><tr style={{ background: '#f9fafb' }}>
-                        <th style={{ padding: '0.5rem', textAlign: 'left' }}>Number</th>
-                        <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
-                        <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
-                      </tr></thead>
-                      <tbody>
-                        {userDetail.invoices.map((invoice, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '0.5rem' }}>{invoice.number}</td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(invoice.amount)}</td>
-                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                              <span className={`badge ${invoice.status === 'paid' ? 'badge--active' : 'badge--inactive'}`}>
-                                {invoice.status}
-                              </span>
+                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                              {formatCurrency(project.budget_max || project.budget || 0)}
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
-              )}
+                ) : <p style={{ color: '#6b7280' }}>No projects</p>}
+              </div>
             </div>
           </div>
         )}
 
         {/* Edit Modal */}
         {showEditModal && selectedUser && (
-          <div className="modal-overlay">
-            <div className="modal modal-sm">
-              <h3>Update Subscription</h3>
-              <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Customer: <strong>{selectedUser.full_name}</strong></p>
+          <div style={{ 
+            position: 'fixed', 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            background: 'rgba(0,0,0,0.5)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            zIndex: 1000 
+          }}>
+            <div style={{ 
+              background: 'white', 
+              borderRadius: '16px', 
+              padding: '2rem', 
+              maxWidth: '500px', 
+              width: '90%' 
+            }}>
+              <h3 style={{ marginBottom: '0.5rem' }}>Update Subscription</h3>
+              <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+                Customer: <strong>{selectedUser.full_name}</strong>
+              </p>
               
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Plan</label>
                 <select
                   value={editData.plan}
                   onChange={(e) => setEditData({ ...editData, plan: e.target.value })}
-                  className="form-control"
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.875rem' }}
                 >
-                  <option value="free">Free</option>
+                  <option value="free">Free ($0/month)</option>
                   <option value="pro">Pro ($19/month)</option>
                   <option value="business">Business ($49/month)</option>
                 </select>
@@ -606,19 +989,63 @@ const AdminDashboard = () => {
                 <select
                   value={editData.status}
                   onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-                  className="form-control"
+                  style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.875rem' }}
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                   <option value="canceled">Canceled</option>
                 </select>
               </div>
+
+              {editData.plan !== 'free' && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Monthly Amount ($)</label>
+                  <input
+                    type="number"
+                    value={editData.amount}
+                    onChange={(e) => setEditData({ ...editData, amount: parseFloat(e.target.value) })}
+                    style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '0.875rem' }}
+                    min="0"
+                    step="1"
+                  />
+                </div>
+              )}
               
               <div style={{ display: 'flex', gap: '1rem' }}>
-                <button onClick={() => updateSubscription(selectedUser.id)} className="btn btn-success" style={{ flex: 1 }}>
+                <button 
+                  onClick={() => updateSubscription(selectedUser._id || selectedUser.id)} 
+                  style={{ 
+                    flex: 1, 
+                    padding: '0.75rem', 
+                    background: '#10b981', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer', 
+                    fontWeight: '500',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                >
                   Save Changes
                 </button>
-                <button onClick={() => setShowEditModal(false)} className="btn btn-secondary" style={{ flex: 1 }}>
+                <button 
+                  onClick={() => setShowEditModal(false)} 
+                  style={{ 
+                    flex: 1, 
+                    padding: '0.75rem', 
+                    background: '#6b7280', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer', 
+                    fontWeight: '500',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#4b5563'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#6b7280'}
+                >
                   Cancel
                 </button>
               </div>
@@ -626,6 +1053,16 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+
+      <style>{`
+        .spin {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
