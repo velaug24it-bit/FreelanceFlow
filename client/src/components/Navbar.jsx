@@ -87,8 +87,8 @@ const Navbar = () => {
       <div style={{
         maxWidth: '1440px',
         margin: '0 auto',
-        padding: '0 1.5rem',
-        height: '72px',
+        padding: '0 0.75rem',
+        height: '64px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
@@ -127,8 +127,8 @@ const Navbar = () => {
           </span>
         </Link>
 
-        {/* Navigation - Center */}
-        <div style={{
+        {/* Navigation - Center - Desktop Only */}
+        <div className="mobile-hidden" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.3rem',
@@ -177,11 +177,13 @@ const Navbar = () => {
           gap: '0.5rem',
           flexShrink: 0
         }}>
-          {/* Notification Bell */}
-          <NotificationBell />
+          {/* Notification Bell - Hidden on Mobile */}
+          <div className="mobile-hidden">
+            <NotificationBell />
+          </div>
 
-          {/* User Profile Dropdown - FIXED ALIGNMENT */}
-          <div ref={dropdownRef} style={{ position: 'relative' }}>
+          {/* User Profile Dropdown - FIXED ALIGNMENT - Hidden on Mobile */}
+          <div ref={dropdownRef} className="mobile-hidden" style={{ position: 'relative' }}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               style={{
@@ -391,12 +393,14 @@ const Navbar = () => {
           {/* Mobile Menu Toggle */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="mobile-only"
             style={{
-              display: 'none',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '0.5rem'
+              padding: '0.5rem 0 0.5rem 0.5rem',
+              marginRight: '-0.5rem',
+              color: '#1f2937'
             }}
           >
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -406,8 +410,8 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div style={{
-          display: 'none',
+        <div className="mobile-only" style={{
+          display: 'block',
           background: 'white',
           borderTop: '1px solid #e5e7eb',
           padding: '0.5rem 0',
@@ -471,3 +475,28 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
+// Add responsive styles
+const style = document.createElement('style');
+style.textContent = `
+  @media (max-width: 768px) {
+    .mobile-hidden {
+      display: none !important;
+    }
+    .mobile-only {
+      display: block !important;
+    }
+  }
+  @media (min-width: 769px) {
+    .mobile-hidden {
+      display: flex !important;
+    }
+    .mobile-only {
+      display: none !important;
+    }
+  }
+`;
+if (!document.querySelector('style[data-navbar-responsive]')) {
+  style.setAttribute('data-navbar-responsive', 'true');
+  document.head.appendChild(style);
+}

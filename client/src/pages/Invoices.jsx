@@ -134,13 +134,13 @@ const Invoices = () => {
     }
 
     return (
-        <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ padding: 'clamp(1rem, 3vw, 2rem)', maxWidth: '1200px', margin: '0 auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Invoices</h1>
-                    <p style={{ color: '#6b7280' }}>Manage your invoices and track payments</p>
+                    <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', marginBottom: '0.5rem' }}>Invoices</h1>
+                    <p style={{ color: '#6b7280', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Manage your invoices and track payments</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
@@ -148,17 +148,18 @@ const Invoices = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            padding: '0.5rem 1rem',
+                            padding: 'clamp(0.4rem, 2vw, 0.5rem) clamp(0.75rem, 3vw, 1rem)',
                             background: '#6b7280',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
-                            opacity: refreshing ? 0.5 : 1
+                            opacity: refreshing ? 0.5 : 1,
+                            fontSize: 'clamp(0.8rem, 2vw, 0.9rem)'
                         }}
                     >
                         <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
-                        Refresh
+                        <span className="mobile-hidden">Refresh</span>
                     </button>
                     <button
                         onClick={() => navigate('/invoices/new')}
@@ -166,13 +167,14 @@ const Invoices = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            padding: '0.5rem 1.5rem',
+                            padding: 'clamp(0.4rem, 2vw, 0.5rem) clamp(1rem, 3vw, 1.5rem)',
                             background: '#3b82f6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
-                            transition: 'background 0.2s'
+                            transition: 'background 0.2s',
+                            fontSize: 'clamp(0.8rem, 2vw, 0.9rem)'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
                         onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
@@ -199,14 +201,14 @@ const Invoices = () => {
             {invoices.length === 0 ? (
                 <div style={{
                     textAlign: 'center',
-                    padding: '4rem 2rem',
+                    padding: 'clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)',
                     background: 'white',
                     borderRadius: '12px',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📄</div>
-                    <h3 style={{ fontSize: '1.25rem', color: '#1f2937', marginBottom: '0.5rem' }}>No invoices yet</h3>
-                    <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Create your first invoice to get started</p>
+                    <div style={{ fontSize: 'clamp(2.5rem, 8vw, 4rem)', marginBottom: '1rem' }}>📄</div>
+                    <h3 style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', color: '#1f2937', marginBottom: '0.5rem' }}>No invoices yet</h3>
+                    <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Create your first invoice to get started</p>
                     <button
                         onClick={() => navigate('/invoices/new')}
                         style={{
@@ -233,15 +235,15 @@ const Invoices = () => {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>
                             <thead>
                                 <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Invoice #</th>
-                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Client</th>
-                                    <th style={{ padding: '1rem', textAlign: 'right' }}>Amount</th>
-                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Due Date</th>
-                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Status</th>
-                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Actions</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'left' }}>Invoice #</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'left' }} className="mobile-hidden">Client</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'right' }}>Amount</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'left' }} className="mobile-hidden">Due Date</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>Status</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -254,19 +256,19 @@ const Invoices = () => {
 
                                     return (
                                         <tr key={invoice._id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                            <td style={{ padding: '1rem', fontWeight: '500' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', fontWeight: '500' }}>
                                                 {invoice.invoice_number || 'INV-001'}
                                             </td>
-                                            <td style={{ padding: '1rem' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)' }} className="mobile-hidden">
                                                 {clientName}
                                             </td>
-                                            <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'right', fontWeight: '600' }}>
                                                 {formatCurrency(invoice.total_amount || 0)}
                                             </td>
-                                            <td style={{ padding: '1rem' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)' }} className="mobile-hidden">
                                                 {formatDate(invoice.due_date)}
                                             </td>
-                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>
                                                 <span style={{
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
@@ -281,42 +283,43 @@ const Invoices = () => {
                                                     {statusBadge.label}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                {invoice.status !== 'paid' && (
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                                    {invoice.status !== 'paid' && (
+                                                        <button
+                                                            onClick={() => markAsPaid(invoice._id)}
+                                                            style={{
+                                                                padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                                background: '#10b981',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '6px',
+                                                                cursor: 'pointer',
+                                                                transition: 'background 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                                        >
+                                                            <CheckCircle size={14} />
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={() => markAsPaid(invoice._id)}
+                                                        onClick={() => deleteInvoice(invoice._id)}
                                                         style={{
-                                                            padding: '0.35rem 0.75rem',
-                                                            background: '#10b981',
+                                                            padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                            background: '#ef4444',
                                                             color: 'white',
                                                             border: 'none',
                                                             borderRadius: '6px',
                                                             cursor: 'pointer',
-                                                            marginRight: '0.5rem',
                                                             transition: 'background 0.2s'
                                                         }}
-                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
                                                     >
-                                                        <CheckCircle size={14} />
+                                                        <Trash2 size={14} />
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={() => deleteInvoice(invoice._id)}
-                                                    style={{
-                                                        padding: '0.35rem 0.75rem',
-                                                        background: '#ef4444',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '6px',
-                                                        cursor: 'pointer',
-                                                        transition: 'background 0.2s'
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );

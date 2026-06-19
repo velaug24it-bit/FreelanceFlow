@@ -33,17 +33,23 @@ const Login = () => {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#f3f4f6'
+      backgroundColor: '#f3f4f6',
+      padding: '1rem'
     }}>
       <div style={{
         backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        padding: 'clamp(1.5rem, 4vw, 2rem)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
         width: '100%',
         maxWidth: '400px'
       }}>
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>
+        <h2 style={{ 
+          textAlign: 'center', 
+          marginBottom: '1.5rem', 
+          color: '#1f2937',
+          fontSize: 'clamp(1.25rem, 4vw, 1.5rem)'
+        }}>
           Login to FreelanceFlow
         </h2>
         
@@ -61,7 +67,12 @@ const Login = () => {
         
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '0.5rem', 
+              fontWeight: '500',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+            }}>
               Email
             </label>
             <input
@@ -71,16 +82,24 @@ const Login = () => {
               required
               style={{
                 width: '100%',
-                padding: '0.5rem',
+                padding: 'clamp(0.6rem, 2vw, 0.75rem)',
                 border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '1rem'
+                borderRadius: '6px',
+                fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+                transition: 'border-color 0.2s'
               }}
+              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
             />
           </div>
           
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '0.5rem', 
+              fontWeight: '500',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+            }}>
               Password
             </label>
             <input
@@ -90,11 +109,14 @@ const Login = () => {
               required
               style={{
                 width: '100%',
-                padding: '0.5rem',
+                padding: 'clamp(0.6rem, 2vw, 0.75rem)',
                 border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '1rem'
+                borderRadius: '6px',
+                fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+                transition: 'border-color 0.2s'
               }}
+              onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+              onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
             />
           </div>
           
@@ -103,22 +125,31 @@ const Login = () => {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '0.75rem',
+              padding: 'clamp(0.75rem, 2vw, 0.875rem)',
               backgroundColor: '#3b82f6',
               color: 'white',
               border: 'none',
-              borderRadius: '4px',
-              fontSize: '1rem',
+              borderRadius: '8px',
+              fontSize: 'clamp(0.9rem, 2vw, 1rem)',
+              fontWeight: '600',
               cursor: 'pointer',
-              opacity: loading ? 0.5 : 1
+              opacity: loading ? 0.5 : 1,
+              transition: 'background-color 0.2s'
             }}
+            onMouseEnter={(e) => !loading && (e.target.style.backgroundColor = '#2563eb')}
+            onMouseLeave={(e) => !loading && (e.target.style.backgroundColor = '#3b82f6')}
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
         
-        <p style={{ textAlign: 'center', marginTop: '1rem', color: '#6b7280' }}>
-          Don't have an account? <Link to="/register" style={{ color: '#3b82f6' }}>Register</Link>
+        <p style={{ 
+          textAlign: 'center', 
+          marginTop: '1rem', 
+          color: '#6b7280',
+          fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+        }}>
+          Don't have an account? <Link to="/register" style={{ color: '#3b82f6', fontWeight: '600', textDecoration: 'none' }}>Register</Link>
         </p>
         
         {/* Admin Login Link */}
@@ -136,7 +167,8 @@ const Login = () => {
               gap: '0.5rem',
               color: '#8b5cf6',
               textDecoration: 'none',
-              fontSize: '0.875rem'
+              fontSize: 'clamp(0.8rem, 2vw, 0.875rem)',
+              fontWeight: '500'
             }}
           >
             <Shield size={16} />

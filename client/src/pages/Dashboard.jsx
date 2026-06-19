@@ -52,41 +52,57 @@ const Dashboard = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
+    <div style={{ padding: '1rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', marginBottom: '0.5rem' }}>
         Welcome back, {user?.full_name}!
       </h1>
-      <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
+      <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
         Here's what's happening with your freelance business
       </p>
 
       {/* Stats Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '2rem'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))',
+        gap: '1rem',
+        marginBottom: '1.5rem'
       }}>
-        <div className="card" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-          <h3 style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Clients</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem' }}>{stats.totalClients}</p>
+        <div className="card" style={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+          color: 'white',
+          padding: 'clamp(1rem, 3vw, 1.5rem)'
+        }}>
+          <h3 style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', opacity: 0.9 }}>Total Clients</h3>
+          <p style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', marginTop: '0.5rem' }}>{stats.totalClients}</p>
         </div>
 
-        <div className="card" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
-          <h3 style={{ fontSize: '0.875rem', opacity: 0.9 }}>Active Projects</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem' }}>{stats.activeProjects}</p>
+        <div className="card" style={{ 
+          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', 
+          color: 'white',
+          padding: 'clamp(1rem, 3vw, 1.5rem)'
+        }}>
+          <h3 style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', opacity: 0.9 }}>Active Projects</h3>
+          <p style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', marginTop: '0.5rem' }}>{stats.activeProjects}</p>
         </div>
 
-        <div className="card" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
-          <h3 style={{ fontSize: '0.875rem', opacity: 0.9 }}>Total Invoices</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold', marginTop: '0.5rem' }}>{stats.totalInvoices}</p>
+        <div className="card" style={{ 
+          background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', 
+          color: 'white',
+          padding: 'clamp(1rem, 3vw, 1.5rem)'
+        }}>
+          <h3 style={{ fontSize: 'clamp(0.75rem, 2vw, 0.875rem)', opacity: 0.9 }}>Total Invoices</h3>
+          <p style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 'bold', marginTop: '0.5rem' }}>{stats.totalInvoices}</p>
         </div>
       </div>
 
       {/* Quick Actions */}
       <div className="card">
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Quick Actions</h2>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <h2 style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', marginBottom: '1rem' }}>Quick Actions</h2>
+        <div style={{ 
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))',
+          gap: '0.75rem'
+        }}>
           <button className="btn btn-primary" onClick={() => window.location.href = '/clients/new'}>
             Add New Client
           </button>
@@ -102,7 +118,7 @@ const Dashboard = () => {
       {/* Recent Clients */}
       {stats.recentClients.length > 0 && (
         <div className="card" style={{ marginTop: '1.5rem' }}>
-          <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Recent Clients</h2>
+          <h2 style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', marginBottom: '1rem' }}>Recent Clients</h2>
           <div className="table-container">
             <table>
               <thead>
@@ -143,13 +159,15 @@ const Dashboard = () => {
         <div style={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             borderRadius: '12px',
-            padding: '1rem',
+            padding: 'clamp(0.75rem, 3vw, 1rem)',
             marginTop: '1.5rem',
             color: 'white'
         }}>
-            <p>You're on the Free plan. <a href="/subscription" style={{color: 'white', fontWeight: 'bold'}}>
+            <p style={{ fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>
+              You're on the Free plan. <a href="/subscription" style={{color: 'white', fontWeight: 'bold', textDecoration: 'underline'}}>
                 Upgrade to Pro → 
-            </a> for unlimited clients, invoices, and advanced features.</p>
+              </a> for unlimited clients, invoices, and advanced features.
+            </p>
         </div>
       )}
     </div>

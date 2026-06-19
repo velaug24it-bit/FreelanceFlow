@@ -104,11 +104,13 @@ body {
 /* Table Styles */
 .table-container {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
 }
 
 th,
@@ -165,11 +167,139 @@ tr:hover {
   grid-template-columns: repeat(4, 1fr);
 }
 
-@media (max-width: 768px) {
+/* Mobile Responsive Utilities */
+.mobile-hidden {
+  display: block;
+}
 
+.mobile-only {
+  display: none;
+}
+
+/* Responsive Breakpoints */
+@media (max-width: 1024px) {
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  /* Grid adjustments */
   .grid-2,
   .grid-3,
   .grid-4 {
     grid-template-columns: 1fr;
   }
+
+  /* Form container */
+  .form-container {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+
+  /* Card adjustments */
+  .card {
+    padding: 1rem;
+    border-radius: 6px;
+  }
+
+  /* Table responsive */
+  table {
+    min-width: 500px;
+  }
+
+  th,
+  td {
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  /* Button adjustments */
+  .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Mobile utilities */
+  .mobile-hidden {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Extra small screens */
+  .form-container {
+    margin: 0.5rem;
+    padding: 1rem;
+  }
+
+  .card {
+    padding: 0.75rem;
+  }
+
+  table {
+    min-width: 400px;
+  }
+
+  th,
+  td {
+    padding: 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Touch-friendly tap targets */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Loading spinner */
+.spinner {
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Improved focus states for accessibility */
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }

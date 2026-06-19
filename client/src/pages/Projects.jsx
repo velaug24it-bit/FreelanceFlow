@@ -200,14 +200,14 @@ const Projects = () => {
     }
 
     return (
-        <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ padding: 'clamp(1rem, 3vw, 2rem)', maxWidth: '1200px', margin: '0 auto' }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Projects</h1>
-                    <p style={{ color: '#6b7280' }}>Manage your projects</p>
+                    <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', marginBottom: '0.5rem' }}>Projects</h1>
+                    <p style={{ color: '#6b7280', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Manage your projects</p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', width: '100%', maxWidth: '100%' }}>
                     {selectedProjects.length > 0 && (
                         <button
                             onClick={() => setShowBulkDelete(true)}
@@ -215,16 +215,20 @@ const Projects = () => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '0.5rem',
-                                padding: '0.5rem 1rem',
+                                padding: 'clamp(0.4rem, 2vw, 0.5rem) clamp(0.75rem, 3vw, 1rem)',
                                 background: '#ef4444',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '8px',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
+                                flex: '1 1 auto',
+                                minWidth: 'fit-content'
                             }}
                         >
                             <Trash2 size={16} />
-                            Delete Selected ({selectedProjects.length})
+                            <span className="mobile-hidden">Delete Selected ({selectedProjects.length})</span>
+                            <span className="mobile-only">Delete ({selectedProjects.length})</span>
                         </button>
                     )}
                     <button
@@ -234,17 +238,19 @@ const Projects = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            padding: '0.5rem 1rem',
+                            padding: 'clamp(0.4rem, 2vw, 0.5rem) clamp(0.75rem, 3vw, 1rem)',
                             background: '#6b7280',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
-                            opacity: refreshing ? 0.5 : 1
+                            opacity: refreshing ? 0.5 : 1,
+                            fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
+                            flex: '0 1 auto'
                         }}
                     >
                         <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
-                        Refresh
+                        <span className="mobile-hidden">Refresh</span>
                     </button>
                     <button
                         onClick={() => navigate('/projects/new')}
@@ -252,13 +258,15 @@ const Projects = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
-                            padding: '0.5rem 1.5rem',
+                            padding: 'clamp(0.4rem, 2vw, 0.5rem) clamp(1rem, 3vw, 1.5rem)',
                             background: '#3b82f6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
-                            transition: 'background 0.2s'
+                            transition: 'background 0.2s',
+                            fontSize: 'clamp(0.8rem, 2vw, 0.9rem)',
+                            flex: '1 1 auto'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
                         onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
@@ -285,14 +293,14 @@ const Projects = () => {
             {projects.length === 0 ? (
                 <div style={{
                     textAlign: 'center',
-                    padding: '4rem 2rem',
+                    padding: 'clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)',
                     background: 'white',
                     borderRadius: '12px',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>📋</div>
-                    <h3 style={{ fontSize: '1.25rem', color: '#1f2937', marginBottom: '0.5rem' }}>No projects yet</h3>
-                    <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Create your first project to get started</p>
+                    <div style={{ fontSize: 'clamp(2.5rem, 8vw, 4rem)', marginBottom: '1rem' }}>📋</div>
+                    <h3 style={{ fontSize: 'clamp(1rem, 3vw, 1.25rem)', color: '#1f2937', marginBottom: '0.5rem' }}>No projects yet</h3>
+                    <p style={{ color: '#6b7280', marginBottom: '1.5rem', fontSize: 'clamp(0.875rem, 2vw, 1rem)' }}>Create your first project to get started</p>
                     <button
                         onClick={() => navigate('/projects/new')}
                         style={{
@@ -319,10 +327,10 @@ const Projects = () => {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>
                             <thead>
                                 <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                                    <th style={{ padding: '0.75rem', textAlign: 'center', width: '40px' }}>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 0.75rem)', textAlign: 'center', width: '40px' }}>
                                         <input
                                             type="checkbox"
                                             checked={selectedProjects.length === projects.length && projects.length > 0}
@@ -330,12 +338,12 @@ const Projects = () => {
                                             style={{ cursor: 'pointer' }}
                                         />
                                     </th>
-                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Title</th>
-                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Client</th>
-                                    <th style={{ padding: '1rem', textAlign: 'right' }}>Budget</th>
-                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Due Date</th>
-                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Status</th>
-                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Actions</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'left' }}>Title</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'left' }} className="mobile-hidden">Client</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'right' }}>Budget</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'left' }} className="mobile-hidden">Due Date</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>Status</th>
+                                    <th style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -347,7 +355,7 @@ const Projects = () => {
 
                                     return (
                                         <tr key={project._id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 0.75rem)', textAlign: 'center' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedProjects.includes(project._id)}
@@ -355,19 +363,19 @@ const Projects = () => {
                                                     style={{ cursor: 'pointer' }}
                                                 />
                                             </td>
-                                            <td style={{ padding: '1rem', fontWeight: '500' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', fontWeight: '500' }}>
                                                 {project.title || 'Untitled'}
                                             </td>
-                                            <td style={{ padding: '1rem' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)' }} className="mobile-hidden">
                                                 {clientName}
                                             </td>
-                                            <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'right', fontWeight: '600' }}>
                                                 {formatCurrency(project.budget)}
                                             </td>
-                                            <td style={{ padding: '1rem' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)' }} className="mobile-hidden">
                                                 {formatDate(project.due_date)}
                                             </td>
-                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>
                                                 <span style={{
                                                     padding: '0.25rem 0.75rem',
                                                     borderRadius: '20px',
@@ -379,40 +387,41 @@ const Projects = () => {
                                                     {statusColors.label}
                                                 </span>
                                             </td>
-                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                                <button
-                                                    onClick={() => navigate(`/projects/${project._id}/edit`)}
-                                                    style={{
-                                                        padding: '0.35rem 0.75rem',
-                                                        background: '#3b82f6',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '6px',
-                                                        cursor: 'pointer',
-                                                        marginRight: '0.5rem',
-                                                        transition: 'background 0.2s'
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
-                                                >
-                                                    <Edit2 size={14} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(project)}
-                                                    style={{
-                                                        padding: '0.35rem 0.75rem',
-                                                        background: '#ef4444',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '6px',
-                                                        cursor: 'pointer',
-                                                        transition: 'background 0.2s'
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                                    <button
+                                                        onClick={() => navigate(`/projects/${project._id}/edit`)}
+                                                        style={{
+                                                            padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                            background: '#3b82f6',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
+                                                    >
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteClick(project)}
+                                                        style={{
+                                                            padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                            background: '#ef4444',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
