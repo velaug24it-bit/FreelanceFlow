@@ -257,16 +257,18 @@ router.get('/my-bids', verifyToken, async (req, res) => {
     }
 });
 
-// Accept a bid and create contract - WITH NOTIFICATION
+// ============================================
+// ACCEPT A BID - UPDATES FREELANCER'S CLIENTS & PROJECTS
+// ============================================
 router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
     try {
         const bid = await Bid.findById(req.params.bidId);
         if (!bid) return res.status(404).json({ error: 'Bid not found' });
 
-        const project = await ProjectPost.findById(bid.project_id);
-        if (!project) return res.status(404).json({ error: 'Project not found' });
+        const projectPost = await ProjectPost.findById(bid.project_id);
+        if (!projectPost) return res.status(404).json({ error: 'Project not found' });
 
-        if (project.client_id.toString() !== req.userId) {
+        if (projectPost.client_id.toString() !== req.userId) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -276,13 +278,65 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
         const clientTotal = bid.bid_amount + clientFee;
 
         const freelancer = await User.findById(bid.freelancer_id);
+        const client = await User.findById(projectPost.client_id);
 
+        if (!freelancer || !client) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log(`🔍 Accepting bid from ${freelancer.full_name} for project ${projectPost.title}`);
+
+        // ============================================
+        // 1. ADD CLIENT TO FREELANCER'S CLIENT LIST (User.my_clients)
+        // ============================================
+        freelancer.my_clients = freelancer.my_clients || [];
+        freelancer.my_clients.push({
+            client_id: client._id,
+            client_name: client.full_name,
+            client_email: client.email,
+            client_company: client.company_name || '',
+            project_id: projectPost._id,
+            project_title: projectPost.title,
+            project_description: projectPost.description,
+            budget: bid.bid_amount,
+            status: 'ongoing',
+            assigned_at: new Date()
+        });
+        freelancer.total_clients = (freelancer.total_clients || 0) + 1;
+
+        // ============================================
+        // 2. ADD PROJECT TO FREELANCER'S PROJECT LIST (User.my_projects)
+        // ============================================
+        freelancer.my_projects = freelancer.my_projects || [];
+        freelancer.my_projects.push({
+            project_id: projectPost._id,
+            project_title: projectPost.title,
+            project_description: projectPost.description,
+            client_id: client._id,
+            client_name: client.full_name,
+            client_email: client.email,
+            budget: bid.bid_amount,
+            status: 'ongoing',
+            assigned_at: new Date(),
+            deadline: projectPost.deadline
+        });
+        freelancer.total_projects_assigned = (freelancer.total_projects_assigned || 0) + 1;
+        await freelancer.save();
+
+        console.log(`✅ Updated freelancer: ${freelancer.full_name} - Clients: ${freelancer.total_clients}, Projects: ${freelancer.total_projects_assigned}`);
+
+        // ============================================
+        // 3. UPDATE BID STATUS
+        // ============================================
         await Bid.findByIdAndUpdate(req.params.bidId, { status: 'accepted' });
         await Bid.updateMany(
             { project_id: bid.project_id, _id: { $ne: req.params.bidId } },
             { status: 'rejected' }
         );
 
+        // ============================================
+        // 4. UPDATE PROJECT POST
+        // ============================================
         await ProjectPost.findByIdAndUpdate(bid.project_id, {
             status: 'in_progress',
             selected_freelancer_id: bid.freelancer_id,
@@ -294,14 +348,17 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
                     status: 'in_progress',
                     progress: 10,
                     updated_by: req.userId,
-                    updated_by_name: project.client_name
+                    updated_by_name: projectPost.client_name
                 }
             }
         });
 
+        // ============================================
+        // 5. CREATE CONTRACT
+        // ============================================
         const contract = await Contract.create({
             project_id: bid.project_id,
-            client_id: project.client_id,
+            client_id: projectPost.client_id,
             freelancer_id: bid.freelancer_id,
             agreed_amount: bid.bid_amount,
             client_fee: clientFee,
@@ -312,9 +369,12 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             status: 'active'
         });
 
+        // ============================================
+        // 6. CREATE TRANSACTION
+        // ============================================
         await Transaction.create({
-            project_id: project._id,
-            client_id: project.client_id,
+            project_id: projectPost._id,
+            client_id: projectPost.client_id,
             freelancer_id: bid.freelancer_id,
             amount: bid.bid_amount,
             client_fee: clientFee,
@@ -324,105 +384,273 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             transaction_id: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         });
 
-        // --- Sync client and project records for both freelancer and client users ---
+        // ============================================
+        // 7. CREATE PROJECT IN PROJECTS COLLECTION FOR FREELANCER
+        // ============================================
         try {
-            const ownerUser = await User.findById(project.client_id);
-
-            // Ensure freelancer has this client in their `clients` list
-            const existingClient = await Client.findOne({ user_id: bid.freelancer_id, email: ownerUser?.email });
+            // Get or create client for freelancer
+            let existingClient = await Client.findOne({ 
+                user_id: bid.freelancer_id, 
+                email: client.email 
+            });
+            
             let createdClient = existingClient;
             if (!existingClient) {
                 createdClient = await Client.create({
                     user_id: bid.freelancer_id,
-                    contact_name: ownerUser?.full_name || project.client_name || 'Client',
-                    company_name: ownerUser?.company_name || '',
-                    email: ownerUser?.email || '',
+                    contact_name: client.full_name,
+                    company_name: client.company_name || '',
+                    email: client.email,
                     phone: '',
                     address: '',
-                    notes: `Imported from marketplace project ${project._id}`
+                    notes: `Imported from marketplace project ${projectPost._id}`
                 });
+                console.log(`✅ Created client for freelancer: ${createdClient.contact_name}`);
             }
 
-            // Create a Project record for the freelancer (so it appears in their Projects list)
+            // Create project for freelancer
             if (createdClient) {
                 const existsForFreelancer = await Project.findOne({
                     user_id: bid.freelancer_id,
-                    title: project.title,
+                    title: projectPost.title,
                     client_name: createdClient.contact_name,
-                    status: { $in: ['in_progress', 'active'] }
+                    status: { $in: ['in_progress', 'active', 'draft'] }
                 });
 
                 if (!existsForFreelancer) {
-                    await Project.create({
+                    const newProject = await Project.create({
                         user_id: bid.freelancer_id,
                         client_id: createdClient._id,
                         client_name: createdClient.contact_name,
-                        title: project.title,
-                        description: project.description,
+                        client_email: client.email,
+                        client_company: client.company_name || '',
+                        title: projectPost.title,
+                        description: projectPost.description,
                         budget: bid.bid_amount,
-                        due_date: project.deadline || null,
+                        due_date: projectPost.deadline || null,
                         project_type: 'marketplace',
                         status: 'in_progress',
                         selected_freelancer_id: bid.freelancer_id,
-                        selected_freelancer_name: freelancer.full_name
+                        selected_freelancer_name: freelancer.full_name,
+                        freelancer_email: freelancer.email,
+                        freelancer_company: freelancer.company_name || ''
                     });
+                    console.log(`✅ Project created for freelancer: ${newProject.title} (${newProject._id})`);
+                } else {
+                    console.log(`ℹ️ Project already exists for freelancer: ${projectPost.title}`);
                 }
             }
 
-            // Also create a Project record for the client owner so it appears in their Projects list
-            try {
-                const existsForClient = await Project.findOne({
-                    user_id: project.client_id,
-                    title: project.title,
-                    selected_freelancer_id: bid.freelancer_id
+            // ============================================
+            // 8. CREATE PROJECT IN PROJECTS COLLECTION FOR CLIENT
+            // ============================================
+            const existsForClient = await Project.findOne({
+                user_id: projectPost.client_id,
+                title: projectPost.title,
+                selected_freelancer_id: bid.freelancer_id
+            });
+
+            if (!existsForClient) {
+                const clientProject = await Project.create({
+                    user_id: projectPost.client_id,
+                    client_name: projectPost.client_name || client.full_name,
+                    client_email: client.email,
+                    client_company: client.company_name || '',
+                    title: projectPost.title,
+                    description: projectPost.description,
+                    budget: bid.bid_amount,
+                    due_date: projectPost.deadline || null,
+                    project_type: 'marketplace',
+                    status: 'in_progress',
+                    selected_freelancer_id: bid.freelancer_id,
+                    selected_freelancer_name: freelancer.full_name,
+                    freelancer_email: freelancer.email,
+                    freelancer_company: freelancer.company_name || ''
                 });
-
-                if (!existsForClient) {
-                    await Project.create({
-                        user_id: project.client_id,
-                        client_name: project.client_name || ownerUser?.full_name || '',
-                        title: project.title,
-                        description: project.description,
-                        budget: bid.bid_amount,
-                        due_date: project.deadline || null,
-                        project_type: 'marketplace',
-                        status: 'in_progress',
-                        selected_freelancer_id: bid.freelancer_id,
-                        selected_freelancer_name: freelancer.full_name
-                    });
-                }
-            } catch (err) {
-                console.error('Error creating project for client owner:', err);
+                console.log(`✅ Project created for client: ${clientProject.title} (${clientProject._id})`);
+            } else {
+                console.log(`ℹ️ Project already exists for client: ${projectPost.title}`);
             }
+
         } catch (err) {
             console.error('Error syncing client/project records after bid accept:', err);
         }
 
-        // ========== NOTIFICATION: Bid Accepted for Freelancer ==========
+        // ============================================
+        // 9. CREATE NOTIFICATIONS
+        // ============================================
         await NotificationHelper.createNotification({
             userId: bid.freelancer_id,
             type: 'bid_accepted',
             title: '🎉 Bid Accepted!',
-            message: `Your bid of $${bid.bid_amount} for "${project.title}" has been accepted!`,
-            referenceId: project._id,
+            message: `Your bid of $${bid.bid_amount} for "${projectPost.title}" has been accepted! You now have a new client: ${client.full_name}`,
+            referenceId: projectPost._id,
             referenceType: 'project',
-            actionUrl: `/marketplace/projects/${project._id}`
+            actionUrl: `/projects`
         });
 
-        // ========== NOTIFICATION: Contract Created for Both Parties ==========
         await NotificationHelper.createBulkNotifications({
-            userIds: [project.client_id, bid.freelancer_id],
+            userIds: [projectPost.client_id, bid.freelancer_id],
             type: 'contract_created',
             title: '📝 Contract Created',
-            message: `Contract created for project "${project.title}" with amount $${bid.bid_amount}`,
+            message: `Contract created for project "${projectPost.title}" with amount $${bid.bid_amount}`,
             referenceId: contract._id,
             referenceType: 'contract',
             actionUrl: `/contracts/${contract._id}`
         });
 
-        res.json({ success: true, contract });
+        console.log(`✅ Successfully accepted bid! Freelancer: ${freelancer.full_name}, Project: ${projectPost.title}`);
+
+        res.json({ 
+            success: true, 
+            contract,
+            message: 'Bid accepted successfully. Freelancer has been updated with client and project details.'
+        });
+
     } catch (err) {
         console.error('Error accepting bid:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET FREELANCER'S CLIENTS
+// ============================================
+router.get('/freelancer/my-clients', verifyToken, async (req, res) => {
+    try {
+        const freelancer = await User.findById(req.userId)
+            .populate('my_clients.client_id', 'full_name email company_name');
+        
+        if (!freelancer) {
+            return res.status(404).json({ error: 'Freelancer not found' });
+        }
+
+        res.json({
+            clients: freelancer.my_clients || [],
+            totalClients: freelancer.total_clients || 0
+        });
+    } catch (err) {
+        console.error('Error fetching freelancer clients:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET FREELANCER'S PROJECTS
+// ============================================
+router.get('/freelancer/my-projects', verifyToken, async (req, res) => {
+    try {
+        const freelancer = await User.findById(req.userId)
+            .populate('my_projects.project_id', 'title description')
+            .populate('my_projects.client_id', 'full_name email company_name');
+        
+        if (!freelancer) {
+            return res.status(404).json({ error: 'Freelancer not found' });
+        }
+
+        res.json({
+            projects: freelancer.my_projects || [],
+            totalProjects: freelancer.total_projects_assigned || 0
+        });
+    } catch (err) {
+        console.error('Error fetching freelancer projects:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET FREELANCER DASHBOARD STATS
+// ============================================
+router.get('/freelancer/stats', verifyToken, async (req, res) => {
+    try {
+        const freelancer = await User.findById(req.userId);
+        if (!freelancer) {
+            return res.status(404).json({ error: 'Freelancer not found' });
+        }
+
+        const totalEarnings = freelancer.my_projects
+            ?.filter(p => p.status === 'completed')
+            .reduce((sum, p) => sum + (p.budget || 0), 0) || 0;
+
+        res.json({
+            totalClients: freelancer.total_clients || 0,
+            totalProjects: freelancer.total_projects_assigned || 0,
+            completedProjects: freelancer.my_projects?.filter(p => p.status === 'completed').length || 0,
+            ongoingProjects: freelancer.my_projects?.filter(p => p.status === 'ongoing').length || 0,
+            totalEarnings: totalEarnings
+        });
+    } catch (err) {
+        console.error('Error fetching freelancer stats:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// MARK PROJECT AS COMPLETED (By Freelancer)
+// ============================================
+router.patch('/projects/:projectId/complete', verifyToken, async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const userId = req.userId;
+
+        const projectPost = await ProjectPost.findById(projectId);
+        if (!projectPost) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        if (projectPost.selected_freelancer_id.toString() !== userId) {
+            return res.status(403).json({ error: 'Only the assigned freelancer can mark as complete' });
+        }
+
+        projectPost.status = 'completed';
+        projectPost.completed_at = new Date();
+        await projectPost.save();
+
+        const freelancer = await User.findById(userId);
+        if (freelancer) {
+            // Update client list
+            const clientIndex = freelancer.my_clients.findIndex(
+                c => c.project_id.toString() === projectId
+            );
+            if (clientIndex !== -1) {
+                freelancer.my_clients[clientIndex].status = 'completed';
+                freelancer.my_clients[clientIndex].completed_at = new Date();
+            }
+
+            // Update project list
+            const projectIndex = freelancer.my_projects.findIndex(
+                p => p.project_id.toString() === projectId
+            );
+            if (projectIndex !== -1) {
+                freelancer.my_projects[projectIndex].status = 'completed';
+                freelancer.my_projects[projectIndex].completed_at = new Date();
+                freelancer.total_earnings = (freelancer.total_earnings || 0) + freelancer.my_projects[projectIndex].budget;
+            }
+
+            await freelancer.save();
+        }
+
+        // Also update the project in Projects collection
+        await Project.findOneAndUpdate(
+            { 
+                title: projectPost.title,
+                selected_freelancer_id: userId
+            },
+            { 
+                status: 'completed',
+                completed_at: new Date(),
+                progress: 100
+            }
+        );
+
+        res.json({
+            success: true,
+            message: 'Project marked as completed',
+            project: projectPost
+        });
+
+    } catch (err) {
+        console.error('Error completing project:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -457,10 +685,8 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
 
         if (status === 'completed') {
             updateData.completed_at = new Date();
-            // When freelancer marks project completed, client must pay to finalize/release
             updateData.payment_status = 'unpaid';
         }
-
 
         const statusUpdate = {
             message: message || `Project status updated to ${status}`,
@@ -470,7 +696,6 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             updated_by_name: user.full_name
         };
 
-
         updateData.$push = { status_updates: statusUpdate };
 
         const updatedProject = await ProjectPost.findByIdAndUpdate(
@@ -479,7 +704,6 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             { returnDocument: 'after' }
         );
 
-        // ========== NOTIFICATION: Project Status Updated ==========
         const statusMessages = {
             'in_progress': 'started working on',
             'review': 'sent for review',
@@ -489,7 +713,6 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
         const statusAction = statusMessages[status] || `updated status to ${status}`;
 
         if (isClient && project.selected_freelancer_id) {
-            // Client updated status → Notify freelancer
             await NotificationHelper.createNotification({
                 userId: project.selected_freelancer_id,
                 type: 'project_status_updated',
@@ -500,7 +723,6 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
                 actionUrl: `/marketplace/projects/${project._id}`
             });
         } else if (isFreelancer) {
-            // Freelancer updated status → Notify client
             await NotificationHelper.createNotification({
                 userId: project.client_id,
                 type: 'project_status_updated',
@@ -589,7 +811,6 @@ router.post('/projects', verifyToken, async (req, res) => {
 
         console.log('📝 Creating marketplace project:', { title, budget_min, budget_max });
 
-        // Validate required fields
         if (!title) {
             return res.status(400).json({ error: 'Project title is required' });
         }
@@ -603,11 +824,9 @@ router.post('/projects', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'Duration is required' });
         }
 
-        // Get client name
         const user = await User.findById(req.userId);
         const clientName = user?.full_name || 'Unknown Client';
 
-        // Create marketplace project
         const projectData = {
             user_id: req.userId,
             client_id: req.userId,

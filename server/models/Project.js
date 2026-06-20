@@ -9,9 +9,15 @@ const projectSchema = new mongoose.Schema({
   },
   client_id: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Client'
+    ref: 'User'
   },
   client_name: {
+    type: String
+  },
+  client_email: {
+    type: String
+  },
+  client_company: {
     type: String
   },
   title: {
@@ -23,12 +29,12 @@ const projectSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'completed', 'on_hold', 'cancelled', 'open', 'in_progress', 'review'],
+    enum: ['active', 'completed', 'on_hold', 'cancelled', 'open', 'in_progress', 'review', 'draft'],
     default: 'active'
   },
   project_type: {
     type: String,
-    enum: ['web_development', 'mobile_app', 'design', 'consulting', 'marketing', 'other'],
+    enum: ['web_development', 'mobile_app', 'design', 'consulting', 'marketing', 'marketplace', 'other'],
     default: 'web_development'
   },
 
@@ -75,6 +81,21 @@ const projectSchema = new mongoose.Schema({
     type: Date
   },
 
+  // Freelancer details
+  selected_freelancer_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  selected_freelancer_name: {
+    type: String
+  },
+  freelancer_email: {
+    type: String
+  },
+  freelancer_company: {
+    type: String
+  },
+
   // Common tracking fields
   progress: {
     type: Number,
@@ -89,13 +110,6 @@ const projectSchema = new mongoose.Schema({
   },
   completed_at: {
     type: Date
-  },
-  selected_freelancer_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  selected_freelancer_name: {
-    type: String
   },
   bids_count: {
     type: Number,
@@ -134,9 +148,10 @@ const projectSchema = new mongoose.Schema({
   collection: 'projectposts'
 });
 
-// Indexes
+// Indexes for better performance
 projectSchema.index({ user_id: 1 });
 projectSchema.index({ client_id: 1 });
 projectSchema.index({ status: 1 });
+projectSchema.index({ selected_freelancer_id: 1 });
 
 module.exports = mongoose.model('Project', projectSchema);

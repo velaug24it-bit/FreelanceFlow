@@ -1,6 +1,6 @@
-// client/src/components/ProjectPayment.js
+// client/src/components/ProjectPayment.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle, Clock, AlertCircle, Loader, XCircle, RefreshCw } from 'lucide-react';
@@ -10,23 +10,121 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const { user } = useAuth();
   const [payment, setPayment] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [isResetting, setIsResetting] = useState(false);
+  const [bidAmount, setBidAmount] = useState(0);
+  const [platformFee, setPlatformFee] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
     loadRazorpayScript();
   }, []);
 
+  // ============================================
+  // FETCH ALL DATA IN PARALLEL
+  // ============================================
+  const fetchAllData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      if (!token || !project?._id) {
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔍 Fetching payment data for project:', project._id);
+
+      // Fetch both payment and accepted bid in parallel
+      const [paymentRes, bidsRes] = await Promise.all([
+        axios.get(`${API_URL}/payments/project/${project._id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: null })),
+        axios.get(`${API_URL}/marketplace/projects/${project._id}/bids`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(() => ({ data: { bids: [] } }))
+      ]);
+
+      // Process payment data
+      const paymentData = paymentRes?.data?.payment || null;
+      setPayment(paymentData);
+
+      if (paymentData) {
+        if (paymentData.status === 'completed') {
+          setPaymentStatus('completed');
+        } else if (paymentData.status === 'processing') {
+          setPaymentStatus('processing');
+        } else if (paymentData.status === 'pending') {
+          setPaymentStatus('pending');
+        }
+        if (paymentData.amount) {
+          const bidAmt = paymentData.bid_amount || paymentData.amount / 1.05;
+          const fee = paymentData.platform_fee || paymentData.fee || (bidAmt * 0.05);
+          setBidAmount(bidAmt);
+          setPlatformFee(fee);
+          setTotalAmount(paymentData.amount);
+          setDataLoaded(true);
+        }
+      }
+
+      // Process bids to find accepted one
+      const bids = bidsRes?.data?.bids || [];
+      const accepted = bids.find(b => b.status === 'accepted');
+      
+      if (accepted) {
+        // If payment doesn't have amount yet, use bid amount
+        if (!paymentData || !paymentData.amount) {
+          const bidAmt = accepted.bid_amount;
+          const fee = bidAmt * 0.05;
+          setBidAmount(bidAmt);
+          setPlatformFee(fee);
+          setTotalAmount(bidAmt + fee);
+        }
+        console.log('✅ Accepted bid found:', accepted.bid_amount);
+      } else {
+        console.log('ℹ️ No accepted bid found');
+        // Fallback to budget_max if no accepted bid
+        if (!paymentData || !paymentData.amount) {
+          const bidAmt = project?.budget_max || 0;
+          const fee = bidAmt * 0.05;
+          setBidAmount(bidAmt);
+          setPlatformFee(fee);
+          setTotalAmount(bidAmt + fee);
+        }
+      }
+
+      // Check if payment is stuck
+      if (project.release_requested && !paymentData) {
+        console.log('🔄 Payment stuck, attempting auto-reset...');
+        await autoResetPayment();
+      }
+
+      setDataLoaded(true);
+
+    } catch (err) {
+      console.error('❌ Error fetching data:', err);
+      // Fallback to budget_max
+      const bidAmt = project?.budget_max || 0;
+      const fee = bidAmt * 0.05;
+      setBidAmount(bidAmt);
+      setPlatformFee(fee);
+      setTotalAmount(bidAmt + fee);
+      setDataLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [project]);
+
   useEffect(() => {
     if (project?._id) {
-      fetchPaymentDetails();
+      fetchAllData();
     }
-  }, [project?._id]);
+  }, [project?._id, fetchAllData]);
 
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
@@ -50,78 +148,19 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
     });
   };
 
-  const fetchPaymentDetails = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token || !project?._id) {
-        setLoading(false);
-        return;
-      }
-
-      console.log('🔍 Fetching payment for project:', project._id);
-      console.log('📊 Project payment_status:', project.payment_status);
-      console.log('📊 Project release_requested:', project.release_requested);
-
-      try {
-        const response = await axios.get(`${API_URL}/payments/project/${project._id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        const paymentData = response.data.payment;
-        setPayment(paymentData);
-
-        // Check actual payment status from the payment record
-        if (paymentData) {
-          if (paymentData.status === 'completed') {
-            setPaymentStatus('completed');
-          } else if (paymentData.status === 'processing') {
-            setPaymentStatus('processing');
-          } else if (paymentData.status === 'pending') {
-            setPaymentStatus('pending');
-          }
-        }
-
-        console.log('📦 Payment record found:', paymentData);
-      } catch (err) {
-        if (err.response?.status === 404) {
-          console.log('ℹ️ No payment record found');
-          setPaymentStatus('pending');
-
-          // If project says release_requested but no payment record exists,
-          // automatically reset it
-          if (project.release_requested) {
-            console.log('🔄 Auto-resetting stuck payment status...');
-            await autoResetPayment();
-          }
-        } else {
-          console.error('Failed to fetch payment:', err);
-        }
-      }
-    } catch (err) {
-      console.error('Error in fetchPaymentDetails:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-reset function - called automatically when stuck
   const autoResetPayment = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(
+      await axios.post(
         `${API_URL}/payments/reset-payment/${project._id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log('✅ Auto-reset successful:', response.data);
+      console.log('✅ Auto-reset successful');
       setPaymentStatus('pending');
       setError('');
-      // Refresh the page data
-      window.location.reload();
     } catch (err) {
       console.error('❌ Auto-reset failed:', err);
-      // If auto-reset fails, show a manual reset button
       setError('Payment status is stuck. Click "Reset Payment" to try again.');
     }
   };
@@ -151,10 +190,10 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   };
 
   const handleReleasePayment = async () => {
-    const amount = project?.budget_max || 0;
+    const amount = totalAmount || bidAmount || project?.budget_max || 0;
 
     if (amount <= 0) {
-      setError('Invalid project budget. Cannot process payment.');
+      setError('Invalid payment amount. Cannot process payment.');
       return;
     }
 
@@ -195,6 +234,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
       }
 
       console.log('🔍 Requesting payment for project:', project._id);
+      console.log('💰 Payment amount (with fee):', amount);
 
       const { data } = await axios.post(
         `${API_URL}/payments/request-payment/${project._id}`,
@@ -212,12 +252,18 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
         throw new Error('Razorpay key not configured');
       }
 
+      if (data.bidAmount) {
+        setBidAmount(data.bidAmount);
+        setPlatformFee(data.platformFee || 0);
+        setTotalAmount(data.totalClientCharge || data.bidAmount);
+      }
+
       const options = {
         key: data.key,
         amount: data.amount,
         currency: data.currency || 'INR',
         name: 'FreelanceFlow',
-        description: `Payment for project: ${project.title}`,
+        description: `Payment for project: ${project.title} (Bid: ₹${data.bidAmount || bidAmount} + 5% fee)`,
         order_id: data.orderId,
         prefill: {
           name: user?.full_name || 'Client',
@@ -290,6 +336,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
     return badges[status] || badges.pending;
   };
 
+  // Don't render if project is not completed
   if (!project || project.status !== 'completed') {
     return null;
   }
@@ -304,8 +351,14 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const statusBadge = getStatusBadge();
   const isCompleted = paymentStatus === 'completed';
   const isStuck = project.release_requested && !payment && paymentStatus !== 'completed';
+  
+  // Use the calculated amounts
+  const displayBidAmount = bidAmount || project?.budget_max || 0;
+  const displayPlatformFee = platformFee || (displayBidAmount * 0.05);
+  const displayTotalAmount = totalAmount || displayBidAmount + displayPlatformFee;
 
-  if (loading) {
+  // Show loading state while data is being fetched
+  if (loading || !dataLoaded) {
     return (
       <div style={{
         marginTop: '1.5rem',
@@ -359,27 +412,29 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
         borderRadius: '8px'
       }}>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Client Pays</p>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Bid Amount</p>
           <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#1f2937' }}>
-            ₹{project?.budget_max || 0}
+            ₹{displayBidAmount.toLocaleString()}
           </p>
         </div>
-        {payment && (
-          <>
-            <div>
-              <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Platform Fee</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#6b7280' }}>
-                -₹{payment.fee || 0}
-              </p>
-            </div>
-            <div>
-              <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Freelancer Receives</p>
-              <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#10b981' }}>
-                ₹{payment.net_amount || project?.budget_max || 0}
-              </p>
-            </div>
-          </>
-        )}
+        <div>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Platform Fee (5%)</p>
+          <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#ef4444' }}>
+            +₹{displayPlatformFee.toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Client Pays</p>
+          <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#10b981' }}>
+            ₹{displayTotalAmount.toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Freelancer Receives</p>
+          <p style={{ fontSize: '1.25rem', fontWeight: '600', color: '#3b82f6' }}>
+            ₹{displayBidAmount.toLocaleString()}
+          </p>
+        </div>
       </div>
 
       {error && (
@@ -504,7 +559,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
               ) : (
                 <>
                   <CreditCard size={18} />
-                  Release Payment ₹{project?.budget_max || 0}
+                  Pay ₹{displayTotalAmount.toLocaleString()}
                 </>
               )}
             </button>

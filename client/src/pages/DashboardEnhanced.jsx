@@ -4,8 +4,11 @@ import axios from 'axios';
 import {
   DollarSign, Users, Briefcase, FileText,
   Plus, Bell, CreditCard, PieChart, Calendar,
-  TrendingUp, TrendingDown, Minus, Crown
+  TrendingUp, TrendingDown, Minus, Crown,
+  UserPlus, Clock, CheckCircle
 } from 'lucide-react';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const DashboardEnhanced = () => {
   const { user } = useAuth();
@@ -27,9 +30,27 @@ const DashboardEnhanced = () => {
   const [recentInvoices, setRecentInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  
+  // ========== FREELANCER SPECIFIC STATES ==========
+  const [myClients, setMyClients] = useState([]);
+  const [myProjects, setMyProjects] = useState([]);
+  const [freelancerStats, setFreelancerStats] = useState({
+    totalClients: 0,
+    totalProjects: 0,
+    completedProjects: 0,
+    ongoingProjects: 0,
+    totalEarnings: 0
+  });
+  const [showMyClients, setShowMyClients] = useState(true);
+  const [showMyProjects, setShowMyProjects] = useState(true);
+
+  const isFreelancer = user?.role === 'freelancer' || user?.is_freelancer === true;
 
   useEffect(() => {
     fetchRealData();
+    if (isFreelancer) {
+      fetchFreelancerData();
+    }
   }, []);
 
   const fetchRealData = async () => {
@@ -37,9 +58,9 @@ const DashboardEnhanced = () => {
       const token = localStorage.getItem('token');
 
       const [clientsRes, projectsRes, invoicesRes] = await Promise.all([
-        axios.get('/api/clients', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/invoices', { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`${API_URL}/clients`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_URL}/projects`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_URL}/invoices`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       const clients = clientsRes.data.clients || [];
@@ -83,6 +104,42 @@ const DashboardEnhanced = () => {
     }
   };
 
+  // ============================================
+  // FETCH FREELANCER DATA (Clients & Projects)
+  // ============================================
+  const fetchFreelancerData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      const [clientsRes, projectsRes, statsRes] = await Promise.all([
+        axios.get(`${API_URL}/marketplace/freelancer/my-clients`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_URL}/marketplace/freelancer/my-projects`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get(`${API_URL}/marketplace/freelancer/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+
+      setMyClients(clientsRes.data.clients || []);
+      setMyProjects(projectsRes.data.projects || []);
+      setFreelancerStats(statsRes.data);
+    } catch (err) {
+      console.error('Failed to fetch freelancer data:', err);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount || 0);
+  };
+
   const getPlanDisplay = () => {
     if (!user) return 'Free';
     const plan = user?.subscription_tier || user?.subscription_plan;
@@ -123,6 +180,15 @@ const DashboardEnhanced = () => {
         </span>
       );
     }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      ongoing: { bg: '#fef3c7', color: '#92400e', label: 'Ongoing' },
+      completed: { bg: '#d1fae5', color: '#065f46', label: 'Completed' },
+      cancelled: { bg: '#fee2e2', color: '#991b1b', label: 'Cancelled' }
+    };
+    return colors[status] || colors.ongoing;
   };
 
   const statCards = [
@@ -191,7 +257,7 @@ const DashboardEnhanced = () => {
             </p>
           </div>
 
-          {/* Plan Badge - FIXED with correct closing quote */}
+          {/* Plan Badge */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -204,11 +270,7 @@ const DashboardEnhanced = () => {
             <Crown size={20} color={getPlanColor()} />
             <div>
               <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>Current Plan</div>
-              <div style={{
-                fontSize: '1.1rem',
-                fontWeight: '700',
-                color: getPlanColor()
-              }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: '700', color: getPlanColor() }}>
                 {getPlanDisplay()}
               </div>
             </div>
@@ -342,6 +404,221 @@ const DashboardEnhanced = () => {
           </div>
         ))}
       </div>
+
+      {/* ============================================
+          FREELANCER SECTION - My Clients & Projects
+          ============================================ */}
+      {isFreelancer && (
+        <>
+          {/* Freelancer Stats Summary */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '1rem', color: 'white' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <UserPlus size={20} />
+                <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>My Clients</span>
+              </div>
+              <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{freelancerStats.totalClients}</p>
+            </div>
+            <div style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', borderRadius: '12px', padding: '1rem', color: 'white' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Briefcase size={20} />
+                <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>My Projects</span>
+              </div>
+              <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{freelancerStats.totalProjects}</p>
+            </div>
+            <div style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', borderRadius: '12px', padding: '1rem', color: 'white' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CheckCircle size={20} />
+                <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>Completed</span>
+              </div>
+              <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{freelancerStats.completedProjects}</p>
+            </div>
+            <div style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', borderRadius: '12px', padding: '1rem', color: 'white' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <DollarSign size={20} />
+                <span style={{ fontSize: '0.75rem', opacity: 0.9 }}>Total Earnings</span>
+              </div>
+              <p style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{formatCurrency(freelancerStats.totalEarnings)}</p>
+            </div>
+          </div>
+
+          {/* My Clients Section */}
+          <div style={{ marginBottom: '2rem' }}>
+            <div 
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '1rem',
+                cursor: 'pointer'
+              }}
+              onClick={() => setShowMyClients(!showMyClients)}
+            >
+              <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Users size={20} /> My Clients ({freelancerStats.totalClients})
+              </h2>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {showMyClients ? '▼' : '▶'}
+              </span>
+            </div>
+            
+            {showMyClients && (
+              myClients.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <Users size={40} style={{ color: '#9ca3af', marginBottom: '0.5rem' }} />
+                  <p style={{ color: '#6b7280' }}>You haven't been hired by any client yet</p>
+                  <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>Start bidding on projects to get hired!</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {myClients.map((client, index) => {
+                    const statusColors = getStatusColor(client.status);
+                    return (
+                      <div key={index} style={{
+                        background: 'white',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        borderLeft: `4px solid ${statusColors.color}`
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div>
+                            <h3 style={{ fontSize: '1.125rem' }}>{client.client_name}</h3>
+                            <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>{client.client_email}</p>
+                            {client.client_company && (
+                              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>🏢 {client.client_company}</p>
+                            )}
+                            <p style={{ marginTop: '0.25rem', fontWeight: '500' }}>
+                              Project: {client.project_title}
+                            </p>
+                            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                              Budget: {formatCurrency(client.budget)}
+                            </p>
+                          </div>
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            background: statusColors.bg,
+                            color: statusColors.color
+                          }}>
+                            {statusColors.label}
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+                          Assigned: {new Date(client.assigned_at).toLocaleDateString()}
+                          {client.completed_at && (
+                            <span> | Completed: {new Date(client.completed_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
+
+          {/* My Projects Section */}
+          <div style={{ marginBottom: '2rem' }}>
+            <div 
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                marginBottom: '1rem',
+                cursor: 'pointer'
+              }}
+              onClick={() => setShowMyProjects(!showMyProjects)}
+            >
+              <h2 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Briefcase size={20} /> My Projects ({freelancerStats.totalProjects})
+              </h2>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                {showMyProjects ? '▼' : '▶'}
+              </span>
+            </div>
+            
+            {showMyProjects && (
+              myProjects.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '2rem',
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <Briefcase size={40} style={{ color: '#9ca3af', marginBottom: '0.5rem' }} />
+                  <p style={{ color: '#6b7280' }}>You haven't been assigned any project yet</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {myProjects.map((project, index) => {
+                    const statusColors = getStatusColor(project.status);
+                    return (
+                      <div key={index} style={{
+                        background: 'white',
+                        padding: '1.5rem',
+                        borderRadius: '12px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        borderLeft: `4px solid ${statusColors.color}`
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div>
+                            <h3 style={{ fontSize: '1.125rem' }}>{project.project_title}</h3>
+                            <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                              Client: {project.client_name}
+                            </p>
+                            {project.project_description && (
+                              <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                                {project.project_description}
+                              </p>
+                            )}
+                            <p style={{ fontWeight: '500', marginTop: '0.25rem' }}>
+                              Budget: {formatCurrency(project.budget)}
+                            </p>
+                            {project.deadline && (
+                              <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                Deadline: {new Date(project.deadline).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <span style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            background: statusColors.bg,
+                            color: statusColors.color
+                          }}>
+                            {statusColors.label}
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#9ca3af' }}>
+                          Assigned: {new Date(project.assigned_at).toLocaleDateString()}
+                          {project.completed_at && (
+                            <span> | Completed: {new Date(project.completed_at).toLocaleDateString()}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+          </div>
+        </>
+      )}
 
       {/* Recent Invoices Section */}
       <div style={{

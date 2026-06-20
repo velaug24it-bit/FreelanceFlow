@@ -5,22 +5,87 @@ const userSchema = new mongoose.Schema({
     full_name: { type: String, required: true },
     password_hash: { type: String, required: true },
     company_name: String,
-    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    role: { type: String, enum: ['user', 'admin', 'freelancer'], default: 'user' },
     subscription_tier: { type: String, enum: ['free', 'pro', 'business'], default: 'free' },
     subscription_status: { type: String, default: 'active' },
     
     // ========== CONNECTS SYSTEM ==========
-    connects_balance: { type: Number, default: 20 }, // Free users get 20 connects/month
+    connects_balance: { type: Number, default: 20 },
     total_connects_used: { type: Number, default: 0 },
     total_connects_purchased: { type: Number, default: 0 },
     
     // ========== COMMISSION RATES ==========
-    commission_rate: { type: Number, default: 5 }, // 5% for free, 2% for pro, 1% for business
+    commission_rate: { type: Number, default: 5 },
     
     // ========== PAYMENT INFO ==========
     stripe_customer_id: String,
     subscription_amount: { type: Number, default: 0 },
     last_payment_date: Date,
+    
+    // ============================================
+    // FREELANCER'S CLIENTS (Clients who hired this freelancer)
+    // ============================================
+    my_clients: [{
+        client_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        client_name: String,
+        client_email: String,
+        client_company: String,
+        project_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'ProjectPost'
+        },
+        project_title: String,
+        project_description: String,
+        budget: Number,
+        status: {
+            type: String,
+            enum: ['ongoing', 'completed', 'cancelled'],
+            default: 'ongoing'
+        },
+        assigned_at: {
+            type: Date,
+            default: Date.now
+        },
+        completed_at: Date
+    }],
+
+    // ============================================
+    // FREELANCER'S PROJECTS (Projects assigned to freelancer)
+    // ============================================
+    my_projects: [{
+        project_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'ProjectPost'
+        },
+        project_title: String,
+        project_description: String,
+        client_id: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        client_name: String,
+        client_email: String,
+        budget: Number,
+        status: {
+            type: String,
+            enum: ['ongoing', 'completed', 'cancelled'],
+            default: 'ongoing'
+        },
+        assigned_at: {
+            type: Date,
+            default: Date.now
+        },
+        deadline: Date,
+        completed_at: Date
+    }],
+
+    // Stats for freelancer
+    total_clients: { type: Number, default: 0 },
+    total_projects_assigned: { type: Number, default: 0 },
+    total_earnings: { type: Number, default: 0 },
     
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }
