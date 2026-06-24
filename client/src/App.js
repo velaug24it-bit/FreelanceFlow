@@ -11,6 +11,7 @@ import DashboardEnhanced from './pages/DashboardEnhanced';
 import Clients from './pages/Clients';
 import ClientForm from './pages/ClientForm';
 import Projects from './pages/Projects';
+import ManageProject from './pages/ManageProject';
 import ProjectForm from './pages/ProjectForm';
 import Invoices from './pages/Invoices';
 import InvoiceForm from './pages/InvoiceForm';
@@ -18,6 +19,7 @@ import KanbanBoard from './pages/KanbanBoard';
 import Expenses from './pages/Expenses';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import NotificationSettings from './pages/NotificationSettings';
 import Pricing from './pages/Pricing';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Marketplace from './pages/Marketplace';
@@ -33,6 +35,7 @@ import AdminFreelancers from './pages/AdminFreelancers';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import EmailVerification from './pages/EmailVerification';
+import OAuthRedirect from './pages/OAuthRedirect';
 
 function App() {
   return (
@@ -46,6 +49,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/verify-email/:token" element={<EmailVerification />} />
+            <Route path="/oauth-redirect" element={<OAuthRedirect />} />
             
             {/* Admin Routes - NO NAVBAR */}
             <Route path="/admin-login" element={<AdminLogin />} />
@@ -152,6 +156,14 @@ function App() {
                 </>
               </ProtectedRoute>
             } />
+            <Route path="/projects/:id/manage" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <ManageProject />
+                </>
+              </ProtectedRoute>
+            } />
             
             <Route path="/projects/new" element={
               <ProtectedRoute>
@@ -212,6 +224,14 @@ function App() {
                 <>
                   <Navbar />
                   <Settings />
+                </>
+              </ProtectedRoute>
+            } />
+            <Route path="/settings/notifications" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <NotificationSettings />
                 </>
               </ProtectedRoute>
             } />

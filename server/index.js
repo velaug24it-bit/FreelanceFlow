@@ -11,6 +11,8 @@ const projectRoutes = require('./routes/projects');
 const invoiceRoutes = require('./routes/invoices');
 const expenseRoutes = require('./routes/expenses');
 const taskRoutes = require('./routes/tasks');
+const milestoneRoutes = require('./routes/milestones');
+const templateRoutes = require('./routes/templates');
 const reportRoutes = require('./routes/reports');
 const adminRoutes = require('./routes/admin');
 const subscriptionRoutes = require('./routes/subscriptions');
@@ -22,6 +24,15 @@ const checkoutRoutes = require('./routes/checkout');
 const paymentRoutes = require('./routes/payments');
 
 const app = express();
+
+// Passport (OAuth)
+const passport = require('passport');
+try {
+    require('./config/passport')();
+    app.use(passport.initialize());
+} catch (err) {
+    console.log('Passport setup skipped:', err.message || err);
+}
 
 // Connect to MongoDB
 connectDB();
@@ -132,6 +143,8 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/invoices', invoiceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/milestones', milestoneRoutes);
+app.use('/api/templates', templateRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);

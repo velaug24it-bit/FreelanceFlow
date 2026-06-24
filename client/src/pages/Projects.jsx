@@ -406,6 +406,22 @@ const Projects = () => {
                                                         <Edit2 size={14} />
                                                     </button>
                                                     <button
+                                                        onClick={() => navigate(`/projects/${project._id}/manage`)}
+                                                        style={{
+                                                            padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                            background: '#10b981',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                                                    >
+                                                        Manage
+                                                    </button>
+                                                    <button
                                                         onClick={() => handleDeleteClick(project)}
                                                         style={{
                                                             padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',

@@ -139,7 +139,21 @@ const projectSchema = new mongoose.Schema({
   },
   payment_released_at: {
     type: Date
+  },
+  // Visual / organizational
+  color: {
+    type: String,
+    default: '#3b82f6'
+  },
+  tags: {
+    type: [String],
+    default: []
   }
+  ,
+  // Project tasking, milestones and template reference
+  tasks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],
+  milestones: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Milestone' }],
+  template_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ProjectTemplate' }
 }, {
   timestamps: {
     createdAt: 'created_at',

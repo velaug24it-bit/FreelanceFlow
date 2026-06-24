@@ -1,4 +1,7 @@
 const Notification = require('../models/Notification');
+const User = require('../models/User');
+const sendEmail = require('./email');
+const { sendPush } = require('./push');
 
 class NotificationHelper {
     // Create a notification
@@ -18,6 +21,40 @@ class NotificationHelper {
             // Emit real-time via WebSocket if connected
             if (global.io) {
                 global.io.to(userId.toString()).emit('new_notification', notification);
+            }
+
+            // Send email / push depending on user preferences
+            try {
+                const user = await User.findById(userId);
+                if (user) {
+                    const prefs = user.notification_preferences || {};
+                    const emailPrefs = prefs.email || {};
+                    const pushPrefs = prefs.push || {};
+
+                    // Default to sending in-app always (we already created it)
+
+                    // Email
+                    if ((emailPrefs[type] === undefined ? true : emailPrefs[type]) && user.email) {
+                        await sendEmail({
+                            to: user.email,
+                            subject: title,
+                            text: message,
+                            html: `<div style="font-family: sans-serif; padding: 10px;"><h3>${title}</h3><p>${message}</p><p><a href="${(process.env.CLIENT_URL||'http://localhost:3000') + (actionUrl||'')}">View</a></p></div>`
+                        });
+                    }
+
+                    // Push
+                    if ((pushPrefs[type] === undefined ? true : pushPrefs[type]) && user.push_subscription) {
+                        await sendPush(user.push_subscription, {
+                            title,
+                            body: message,
+                            icon: '/logo192.png',
+                            url: (process.env.CLIENT_URL||'http://localhost:3000') + (actionUrl||'/')
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Error sending email/push for notification:', err);
             }
             
             return notification;

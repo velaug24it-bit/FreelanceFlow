@@ -100,6 +100,32 @@ const userSchema = new mongoose.Schema({
     two_factor_secret: String,
     two_factor_temp_secret: String,
     is_2fa_enabled: { type: Boolean, default: false },
+    // Notification preferences (email, in-app, push) for events
+    notification_preferences: {
+        type: {
+            email: {
+                invoice: { type: Boolean, default: true },
+                project: { type: Boolean, default: true },
+                message: { type: Boolean, default: true },
+                subscription: { type: Boolean, default: true }
+            },
+            in_app: {
+                invoice: { type: Boolean, default: true },
+                project: { type: Boolean, default: true },
+                message: { type: Boolean, default: true },
+                subscription: { type: Boolean, default: true }
+            },
+            push: {
+                invoice: { type: Boolean, default: true },
+                project: { type: Boolean, default: true },
+                message: { type: Boolean, default: true },
+                subscription: { type: Boolean, default: true }
+            }
+        },
+        default: {}
+    },
+    // Push subscription object (Web Push) saved per user
+    push_subscription: { type: Object, default: null },
     
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }

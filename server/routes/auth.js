@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const passport = require('passport');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -605,3 +606,33 @@ router.post('/dev-verify', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+
+// OAuth routes (Google & GitHub)
+// Redirect to provider
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+router.get('/github', passport.authenticate('github', { scope: ['user:email'], session: false }));
+
+// Callback handlers
+router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: (process.env.CLIENT_URL || 'http://localhost:3000') + '/login' }), async (req, res) => {
+    try {
+        const user = req.user;
+        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        return res.redirect(`${clientUrl}/oauth-redirect?token=${token}`);
+    } catch (err) {
+        console.error('Google callback error:', err);
+        return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login');
+    }
+});
+
+router.get('/github/callback', passport.authenticate('github', { session: false, failureRedirect: (process.env.CLIENT_URL || 'http://localhost:3000') + '/login' }), async (req, res) => {
+    try {
+        const user = req.user;
+        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        return res.redirect(`${clientUrl}/oauth-redirect?token=${token}`);
+    } catch (err) {
+        console.error('GitHub callback error:', err);
+        return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login');
+    }
+});

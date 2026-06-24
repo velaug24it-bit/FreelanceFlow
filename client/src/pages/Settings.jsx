@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { Crown, User, Bell, Shield, ArrowRight, CheckCircle, AlertCircle, Key, X } from 'lucide-react';
+import ProfileProgress from '../components/ProfileProgress';
 
 const Settings = () => {
   const { user, updateProfile, refreshUser } = useAuth();
@@ -189,6 +190,8 @@ const Settings = () => {
       <h1 style={{ fontSize: '2rem', marginBottom: '2rem', fontWeight: '800', color: '#1e293b' }}>Settings</h1>
       
       <div style={{ display: 'grid', gap: '1.5rem' }}>
+
+        <ProfileProgress user={user} />
         
         {/* ==================== PROFILE SECTION ==================== */}
         <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>

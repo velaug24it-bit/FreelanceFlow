@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -114,6 +115,59 @@ router.delete('/', verifyToken, async (req, res) => {
         res.json({ success: true, message: 'All notifications cleared' });
     } catch (err) {
         console.error('Error clearing notifications:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Get notification preferences for the user
+router.get('/preferences', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId).select('notification_preferences');
+        res.json({ notification_preferences: user.notification_preferences || {} });
+    } catch (err) {
+        console.error('Error fetching preferences:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Update notification preferences for the user
+router.put('/preferences', verifyToken, async (req, res) => {
+    try {
+        const updates = req.body.notification_preferences || req.body;
+        const user = await User.findById(req.userId);
+        user.notification_preferences = Object.assign({}, user.notification_preferences || {}, updates);
+        await user.save();
+        res.json({ success: true, notification_preferences: user.notification_preferences });
+    } catch (err) {
+        console.error('Error updating preferences:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Save web push subscription for the user
+router.post('/subscribe', verifyToken, async (req, res) => {
+    try {
+        const subscription = req.body.subscription;
+        if (!subscription) return res.status(400).json({ error: 'Subscription required' });
+        const user = await User.findById(req.userId);
+        user.push_subscription = subscription;
+        await user.save();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error saving subscription:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Remove web push subscription
+router.delete('/subscribe', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        user.push_subscription = null;
+        await user.save();
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error removing subscription:', err);
         res.status(500).json({ error: 'Server error' });
     }
 });

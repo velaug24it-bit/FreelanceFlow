@@ -12,6 +12,8 @@ const NotificationBell = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [filter, setFilter] = useState('all'); // all | unread
+    const [typeFilter, setTypeFilter] = useState('all');
     const [socket, setSocket] = useState(null);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
@@ -63,6 +65,72 @@ const NotificationBell = () => {
         }
     }, []);
 
+    // Web Push subscription helpers
+    const enablePushNotifications = async () => {
+        try {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                alert('Push notifications are not supported in this browser.');
+                return;
+            }
+
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') return alert('Permission denied for push notifications');
+
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            const existing = await registration.pushManager.getSubscription();
+            if (existing) {
+                // send existing to server
+                await axios.post(`${API_URL}/notifications/subscribe`, { subscription: existing }, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                return alert('Push notifications enabled');
+            }
+
+            const vapidKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
+            const sub = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: vapidKey ? urlBase64ToUint8Array(vapidKey) : undefined
+            });
+
+            await axios.post(`${API_URL}/notifications/subscribe`, { subscription: sub }, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            alert('Push notifications enabled');
+        } catch (err) {
+            console.error('Push enable error:', err);
+            alert('Failed to enable push notifications');
+        }
+    };
+
+    const disablePushNotifications = async () => {
+        try {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (registration) {
+                const sub = await registration.pushManager.getSubscription();
+                if (sub) await sub.unsubscribe();
+            }
+            await axios.delete(`${API_URL}/notifications/subscribe`, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            alert('Push notifications disabled');
+        } catch (err) {
+            console.error('Push disable error:', err);
+            alert('Failed to disable push notifications');
+        }
+    };
+
+    // Helper to convert VAPID key
+    const urlBase64ToUint8Array = (base64String) => {
+        const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    };
+
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -85,8 +153,14 @@ const NotificationBell = () => {
             const response = await axios.get(`${API_URL}/notifications`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setNotifications(response.data.notifications || []);
+            const all = response.data.notifications || [];
             setUnreadCount(response.data.unreadCount || 0);
+
+            // Client-side filtering
+            let filtered = all;
+            if (filter === 'unread') filtered = filtered.filter(n => !n.is_read);
+            if (typeFilter !== 'all') filtered = filtered.filter(n => n.type === typeFilter);
+            setNotifications(filtered);
         } catch (err) {
             console.error('Error fetching notifications:', err);
         } finally {
@@ -396,6 +470,20 @@ const NotificationBell = () => {
                             )}
                         </div>
                         <div style={{ display: 'flex', gap: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
+                                <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <option value="all">All</option>
+                                    <option value="unread">Unread</option>
+                                </select>
+
+                                <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <option value="all">All Types</option>
+                                    <option value="invoice_created">Invoice</option>
+                                    <option value="project_status_updated">Project</option>
+                                    <option value="payment_received">Payment</option>
+                                    <option value="bid_received">Bid</option>
+                                </select>
+                            </div>
                             {unreadCount > 0 && (
                                 <button
                                     onClick={markAllAsRead}
@@ -452,6 +540,47 @@ const NotificationBell = () => {
                                     Clear
                                 </button>
                             )}
+                            <button
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    navigate('/settings/notifications');
+                                }}
+                                title="Notification preferences"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    padding: '0.3rem 0.6rem',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: '#0f172a',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '500'
+                                }}
+                            >
+                                Preferences
+                            </button>
+                            <button
+                                onClick={() => enablePushNotifications()}
+                                title="Enable push notifications"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    padding: '0.3rem 0.6rem',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: '#0f172a',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '500'
+                                }}
+                            >
+                                Enable Push
+                            </button>
                         </div>
                     </div>
 

@@ -8,6 +8,7 @@ const Project = require('../models/Project');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Bid = require('../models/Bid');
+const NotificationHelper = require('../utils/notificationHelper');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -470,6 +471,37 @@ router.post('/webhook/payment-confirmed', express.raw({ type: 'application/json'
 
                 // Record platform revenue
                 console.log(`💰 Platform earned: $${payment.fee} from project ${payment.project_id}`);
+
+                // Send notifications
+                try {
+                    // Notify freelancer
+                    if (payment.freelancer_id) {
+                        await NotificationHelper.createNotification({
+                            userId: payment.freelancer_id,
+                            type: 'payment_received',
+                            title: '💳 Payment Received',
+                            message: `A payment of $${payment.net_amount || payment.amount} was released for project ${payment.project_id}`,
+                            referenceId: payment._id,
+                            referenceType: 'payment',
+                            actionUrl: `/projects/${payment.project_id}`
+                        });
+                    }
+
+                    // Notify client
+                    if (payment.client_id) {
+                        await NotificationHelper.createNotification({
+                            userId: payment.client_id,
+                            type: 'payment_released',
+                            title: '✅ Payment Completed',
+                            message: `Your payment of $${payment.amount} has been processed for project ${payment.project_id}`,
+                            referenceId: payment._id,
+                            referenceType: 'payment',
+                            actionUrl: `/projects/${payment.project_id}`
+                        });
+                    }
+                } catch (err) {
+                    console.error('Error sending payment notifications:', err);
+                }
 
                 console.log(`✅ Payment completed: ${paymentId}`);
             }
