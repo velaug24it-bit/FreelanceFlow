@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import {
@@ -11,7 +12,69 @@ import {
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const DashboardEnhanced = () => {
-  const { user } = useAuth();
+  const { user, resendVerification, refreshUser } = useAuth();
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [verifyingSimulated, setVerifyingSimulated] = useState(false);
+  const [emailPreviewUrl, setEmailPreviewUrl] = useState(null);   // Ethereal preview
+  const [directVerifyUrl, setDirectVerifyUrl] = useState(null);   // Direct /verify-email link
+
+  const calculateProfileCompletion = () => {
+    if (!user) return 0;
+    let score = 0;
+    if (user.full_name) score += 20;
+    if (user.email) score += 20;
+    if (user.bio && user.bio.trim() !== '') score += 20;
+    if (user.skills && user.skills.length > 0) score += 20;
+    if (user.hourly_rate && user.hourly_rate > 0) score += 20;
+    return score;
+  };
+
+  const getMissingProfileItems = () => {
+    if (!user) return [];
+    const missing = [];
+    if (!user.bio || user.bio.trim() === '') missing.push('Bio');
+    if (!user.skills || user.skills.length === 0) missing.push('Skills');
+    if (!user.hourly_rate || user.hourly_rate === 0) missing.push('Hourly Rate');
+    return missing;
+  };
+
+  const handleResendVerification = async () => {
+    setVerificationError('');
+    setVerificationSuccess('');
+    setEmailPreviewUrl(null);
+    setDirectVerifyUrl(null);
+    const result = await resendVerification();
+    if (result.success) {
+      setVerificationSuccess(result.message || 'Verification link sent!');
+      setVerificationSent(true);
+      if (result.previewUrl) setEmailPreviewUrl(result.previewUrl);
+      if (result.verifyUrl) setDirectVerifyUrl(result.verifyUrl);
+    } else {
+      setVerificationError(result.error);
+    }
+  };
+
+  const handleSimulateVerification = async () => {
+    setVerifyingSimulated(true);
+    setVerificationError('');
+    setVerificationSuccess('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_URL}/auth/dev-verify`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setVerificationSuccess('Dev Mode: Account verified instantly!');
+        await refreshUser();
+      }
+    } catch (err) {
+      setVerificationError(err.response?.data?.error || 'Simulated verification failed.');
+    } finally {
+      setVerifyingSimulated(false);
+    }
+  };
   const [stats, setStats] = useState({
     total_revenue: 0,
     previous_revenue: 0,
@@ -245,6 +308,133 @@ const DashboardEnhanced = () => {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      {/* Email Verification Alert */}
+      {user && !user.is_email_verified && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%)',
+          borderLeft: '4px solid #f59e0b',
+          borderRadius: '12px',
+          padding: '1.25rem 1.5rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div>
+            <h4 style={{ color: '#b45309', margin: 0, fontWeight: '700', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              ⚠️ Action Required: Verify Email
+            </h4>
+            <p style={{ color: '#78350f', margin: '0.25rem 0 0 0', fontSize: '0.875rem' }}>
+              Your email is not verified. Please verify it to access all features.
+            </p>
+            {verificationSuccess && <p style={{ color: '#16a34a', margin: '0.5rem 0 0 0', fontSize: '0.85rem', fontWeight: '600' }}>{verificationSuccess}</p>}
+            {verificationError && <p style={{ color: '#dc2626', margin: '0.5rem 0 0 0', fontSize: '0.85rem', fontWeight: '600' }}>{verificationError}</p>}
+            {/* Direct verification link (always shown after resend) */}
+            {directVerifyUrl && (
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem' }}>
+                👉 <a href={directVerifyUrl} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8', fontWeight: '700', wordBreak: 'break-all' }}>Click here to verify your email</a>
+              </p>
+            )}
+            {/* Ethereal email preview link (dev mode only) */}
+            {emailPreviewUrl && (
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#78350f' }}>
+                📬 Dev mode — <a href={emailPreviewUrl} target="_blank" rel="noreferrer" style={{ color: '#b45309', fontWeight: '600' }}>Open email preview</a> to see what was sent
+              </p>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={handleResendVerification}
+              disabled={verificationSent}
+              style={{
+                backgroundColor: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                opacity: verificationSent ? 0.6 : 1,
+                transition: 'background-color 0.2s'
+              }}
+            >
+              {verificationSent ? 'Link Sent' : 'Resend Verification'}
+            </button>
+            <button
+              onClick={handleSimulateVerification}
+              disabled={verifyingSimulated}
+              style={{
+                backgroundColor: '#1e293b',
+                color: 'white',
+                border: 'none',
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                opacity: verifyingSimulated ? 0.6 : 1,
+                transition: 'background-color 0.2s'
+              }}
+            >
+              {verifyingSimulated ? 'Verifying...' : 'Simulate Verification (Dev)'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Completion Card */}
+      {user && calculateProfileCompletion() < 100 && (
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          marginBottom: '2rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+          border: '1px solid #f1f5f9'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#1e293b', margin: 0 }}>
+                Complete Your Profile
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
+                Complete fields in settings to reach 100% completion: {getMissingProfileItems().join(', ')}
+              </p>
+            </div>
+            <span style={{ fontSize: '1.125rem', fontWeight: '800', color: '#3b82f6' }}>
+              {calculateProfileCompletion()}% Completed
+            </span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div style={{
+            width: '100%',
+            height: '10px',
+            backgroundColor: '#e2e8f0',
+            borderRadius: '999px',
+            overflow: 'hidden',
+            marginBottom: '0.75rem'
+          }}>
+            <div style={{
+              width: `${calculateProfileCompletion()}%`,
+              height: '100%',
+              background: 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)',
+              borderRadius: '999px',
+              transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}></div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <Link to="/settings" style={{ color: '#3b82f6', textDecoration: 'none', fontSize: '0.875rem', fontWeight: '600' }}>
+              Complete Profile →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Header with Plan Badge */}
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>

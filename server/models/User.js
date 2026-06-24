@@ -86,6 +86,20 @@ const userSchema = new mongoose.Schema({
     total_clients: { type: Number, default: 0 },
     total_projects_assigned: { type: Number, default: 0 },
     total_earnings: { type: Number, default: 0 },
+
+    // ========== PROFILE COMPLETION & AUTHENTICATION ENHANCEMENTS ==========
+    bio: { type: String, default: '' },
+    skills: { type: [String], default: [] },
+    hourly_rate: { type: Number, default: 0 },
+    avatar_url: { type: String, default: '' },
+    is_email_verified: { type: Boolean, default: false },
+    verification_token: String,
+    verification_token_expires: Date,
+    reset_password_token: String,
+    reset_password_expires: Date,
+    two_factor_secret: String,
+    two_factor_temp_secret: String,
+    is_2fa_enabled: { type: Boolean, default: false },
     
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }

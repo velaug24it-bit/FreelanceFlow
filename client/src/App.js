@@ -29,6 +29,11 @@ import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminFreelancers from './pages/AdminFreelancers';
 
+// Extra Authentication Pages
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import EmailVerification from './pages/EmailVerification';
+
 function App() {
   return (
     <AuthProvider>
@@ -38,6 +43,9 @@ function App() {
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route path="/verify-email/:token" element={<EmailVerification />} />
             
             {/* Admin Routes - NO NAVBAR */}
             <Route path="/admin-login" element={<AdminLogin />} />

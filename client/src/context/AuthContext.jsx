@@ -43,6 +43,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await axios.post('/api/auth/login', { email, password });
+      if (response.data.require2FA) {
+        return { success: true, require2FA: true, tempToken: response.data.tempToken, email: response.data.email };
+      }
       const { token, user } = response.data;
       localStorage.setItem('token', token);
       setToken(token);
@@ -50,6 +53,35 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user };
     } catch (err) {
       return { success: false, error: err.response?.data?.error || 'Login failed' };
+    }
+  };
+
+  const loginWith2FA = async (tempToken, code) => {
+    try {
+      const response = await axios.post('/api/auth/verify-2fa', { tempToken, code });
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      setToken(token);
+      setUser(user);
+      return { success: true, user };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || '2FA verification failed' };
+    }
+  };
+
+  const socialLogin = async (socialData) => {
+    try {
+      const response = await axios.post('/api/auth/social-login', socialData);
+      if (response.data.require2FA) {
+        return { success: true, require2FA: true, tempToken: response.data.tempToken, email: response.data.email };
+      }
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      setToken(token);
+      setUser(user);
+      return { success: true, user };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Social login failed' };
     }
   };
 
@@ -72,15 +104,53 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const resendVerification = async () => {
+    try {
+      const response = await axios.post('/api/auth/resend-verification', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return {
+        success: true,
+        message: response.data.message,
+        previewUrl: response.data.previewUrl || null,   // Ethereal preview link (dev mode)
+        verifyUrl: response.data.verifyUrl || null      // Direct app verification link
+      };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Resend verification failed' };
+    }
+  };
+
+  const updateProfile = async (profileData) => {
+    try {
+      const response = await axios.put('/api/auth/profile', profileData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser(response.data.user);
+      return { success: true, user: response.data.user };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.error || 'Profile update failed' };
+    }
+  };
+
+  const refreshUser = async () => {
+    if (token) {
+      await verifyToken();
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
+    loginWith2FA,
+    socialLogin,
     register,
     logout,
+    resendVerification,
+    updateProfile,
+    refreshUser,
     isAuthenticated: !!user
   };
-  
 
   return (
     <AuthContext.Provider value={value}>
