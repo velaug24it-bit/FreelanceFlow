@@ -43,15 +43,15 @@ const authenticateToken = async (req, res, next) => {
 router.post('/register', async (req, res) => {
     try {
         const { email, password, full_name, company_name } = req.body;
-        
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ error: 'User already exists' });
         }
-        
+
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
-        
+
         const verification_token = crypto.randomBytes(32).toString('hex');
         const verification_token_expires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
 
@@ -67,7 +67,7 @@ router.post('/register', async (req, res) => {
             verification_token,
             verification_token_expires
         });
-        
+
         const token = jwt.sign(
             { id: user._id, email: user.email },
             process.env.JWT_SECRET,
@@ -76,7 +76,7 @@ router.post('/register', async (req, res) => {
 
         // Send email
         const verifyUrl = `${CLIENT_URL}/verify-email/${verification_token}`;
-        
+
         const { previewUrl } = await sendEmail({
             to: user.email,
             subject: 'Verify Your Email - FreelanceFlow',
@@ -89,7 +89,7 @@ router.post('/register', async (req, res) => {
                      <p><a href="${verifyUrl}">${verifyUrl}</a></p>
                    </div>`
         });
-        
+
         res.status(201).json({
             success: true,
             token,
@@ -116,12 +116,12 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
+
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
-        
+
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -141,13 +141,13 @@ router.post('/login', async (req, res) => {
                 email: user.email
             });
         }
-        
+
         const token = jwt.sign(
             { id: user._id, email: user.email },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
-        
+
         res.json({
             success: true,
             token,
@@ -179,15 +179,15 @@ router.get('/verify', async (req, res) => {
         if (!token) {
             return res.status(401).json({ error: 'No token provided' });
         }
-        
+
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findById(decoded.id).select('-password_hash');
-        
+
         if (!user) {
             return res.status(401).json({ error: 'User not found' });
         }
-        
-        res.json({ 
+
+        res.json({
             user: {
                 id: user._id,
                 email: user.email,
@@ -214,34 +214,34 @@ router.get('/verify', async (req, res) => {
 router.post('/admin-login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        
+
         console.log('Admin login attempt:', email);
-        
+
         const user = await User.findOne({ email });
         if (!user) {
             console.log('User not found:', email);
             return res.status(401).json({ error: 'Invalid credentials' });
         }
-        
+
         if (user.role !== 'admin') {
             console.log('User is not admin:', user.role);
             return res.status(403).json({ error: 'Admin access required' });
         }
-        
+
         const validPassword = await bcrypt.compare(password, user.password_hash);
         if (!validPassword) {
             console.log('Invalid password');
             return res.status(401).json({ error: 'Invalid credentials' });
         }
-        
+
         const token = jwt.sign(
             { id: user._id, email: user.email, role: user.role },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
-        
+
         console.log('✅ Admin login successful:', email);
-        
+
         res.json({
             success: true,
             token,
@@ -417,10 +417,10 @@ router.get('/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.redirect(`${CLIENT_URL}/login?error=Google OAuth keys are not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server .env file.`);
     }
-    passport.authenticate('google', { 
-        scope: ['profile', 'email'], 
-        session: false, 
-        prompt: 'select_account' 
+    passport.authenticate('google', {
+        scope: ['profile', 'email'],
+        session: false,
+        prompt: 'select_account'
     })(req, res, next);
 });
 
@@ -428,9 +428,9 @@ router.get('/google/callback', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.redirect(`${CLIENT_URL}/login?error=Google OAuth keys are not configured on the server.`);
     }
-    passport.authenticate('google', { 
-        session: false, 
-        failureRedirect: `${CLIENT_URL}/login?error=Google authentication failed.` 
+    passport.authenticate('google', {
+        session: false,
+        failureRedirect: `${CLIENT_URL}/login?error=Google authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
             console.error('Google callback error:', err);
@@ -438,8 +438,8 @@ router.get('/google/callback', (req, res, next) => {
         }
         try {
             const token = jwt.sign(
-                { id: user._id, email: user.email }, 
-                process.env.JWT_SECRET, 
+                { id: user._id, email: user.email },
+                process.env.JWT_SECRET,
                 { expiresIn: '7d' }
             );
             return res.redirect(`${CLIENT_URL}/oauth-redirect?token=${token}`);
@@ -457,9 +457,9 @@ router.get('/github', (req, res, next) => {
     if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
         return res.redirect(`${CLIENT_URL}/login?error=GitHub OAuth keys are not configured on the server. Please add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to the server .env file.`);
     }
-    passport.authenticate('github', { 
-        scope: ['user:email'], 
-        session: false 
+    passport.authenticate('github', {
+        scope: ['user:email'],
+        session: false
     })(req, res, next);
 });
 
@@ -467,9 +467,9 @@ router.get('/github/callback', (req, res, next) => {
     if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
         return res.redirect(`${CLIENT_URL}/login?error=GitHub OAuth keys are not configured on the server.`);
     }
-    passport.authenticate('github', { 
-        session: false, 
-        failureRedirect: `${CLIENT_URL}/login?error=GitHub authentication failed.` 
+    passport.authenticate('github', {
+        session: false,
+        failureRedirect: `${CLIENT_URL}/login?error=GitHub authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
             console.error('GitHub callback error:', err);
@@ -477,8 +477,8 @@ router.get('/github/callback', (req, res, next) => {
         }
         try {
             const token = jwt.sign(
-                { id: user._id, email: user.email }, 
-                process.env.JWT_SECRET, 
+                { id: user._id, email: user.email },
+                process.env.JWT_SECRET,
                 { expiresIn: '7d' }
             );
             return res.redirect(`${CLIENT_URL}/oauth-redirect?token=${token}`);
