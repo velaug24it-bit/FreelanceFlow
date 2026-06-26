@@ -18,6 +18,9 @@ const NotificationBell = () => {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const [selectedNotification, setSelectedNotification] = useState(null);
+    const [pushEnabled, setPushEnabled] = useState(false);
+    const [pushLoading, setPushLoading] = useState(false);
+    const [pushMessage, setPushMessage] = useState(null); // { text, type: 'success'|'error' }
 
     useEffect(() => {
         fetchNotifications();
@@ -67,69 +70,97 @@ const NotificationBell = () => {
     }, []);
 
     // Web Push subscription helpers
-    const enablePushNotifications = async () => {
-        try {
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-                alert('Push notifications are not supported in this browser.');
-                return;
-            }
-
-            const permission = await Notification.requestPermission();
-            if (permission !== 'granted') return alert('Permission denied for push notifications');
-
-            const registration = await navigator.serviceWorker.register('/sw.js');
-            const existing = await registration.pushManager.getSubscription();
-            if (existing) {
-                // send existing to server
-                await axios.post(`${API_URL}/notifications/subscribe`, { subscription: existing }, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-                });
-                return alert('Push notifications enabled');
-            }
-
-            const vapidKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
-            const sub = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: vapidKey ? urlBase64ToUint8Array(vapidKey) : undefined
-            });
-
-            await axios.post(`${API_URL}/notifications/subscribe`, { subscription: sub }, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            alert('Push notifications enabled');
-        } catch (err) {
-            console.error('Push enable error:', err);
-            alert('Failed to enable push notifications');
-        }
-    };
-
-    const disablePushNotifications = async () => {
-        try {
-            const registration = await navigator.serviceWorker.getRegistration();
-            if (registration) {
-                const sub = await registration.pushManager.getSubscription();
-                if (sub) await sub.unsubscribe();
-            }
-            await axios.delete(`${API_URL}/notifications/subscribe`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-            });
-            alert('Push notifications disabled');
-        } catch (err) {
-            console.error('Push disable error:', err);
-            alert('Failed to disable push notifications');
-        }
-    };
-
-    // Helper to convert VAPID key
+    // Helper to convert VAPID base64 key to Uint8Array
     const urlBase64ToUint8Array = (base64String) => {
         const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
         const rawData = window.atob(base64);
         const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
+        for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
         return outputArray;
+    };
+
+    const showPushMessage = (text, type = 'success') => {
+        setPushMessage({ text, type });
+        setTimeout(() => setPushMessage(null), 3500);
+    };
+
+    // Check if push is already enabled on component mount
+    useEffect(() => {
+        const checkPushStatus = async () => {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+            try {
+                const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+                if (reg) {
+                    const sub = await reg.pushManager.getSubscription();
+                    setPushEnabled(!!sub);
+                }
+            } catch (e) { /* ignore */ }
+        };
+        checkPushStatus();
+    }, []);
+
+    const togglePushNotifications = async () => {
+        if (pushLoading) return;
+        setPushLoading(true);
+        try {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                showPushMessage('Push notifications are not supported in this browser.', 'error');
+                return;
+            }
+
+            if (pushEnabled) {
+                // --- DISABLE ---
+                const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+                if (reg) {
+                    const sub = await reg.pushManager.getSubscription();
+                    if (sub) await sub.unsubscribe();
+                }
+                try {
+                    await axios.delete(`${API_URL}/notifications/subscribe`, {
+                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                    });
+                } catch (e) { /* server might not have entry, that's fine */ }
+                setPushEnabled(false);
+                showPushMessage('Push notifications disabled.', 'success');
+            } else {
+                // --- ENABLE ---
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    showPushMessage('Permission denied. Please allow notifications in your browser settings.', 'error');
+                    return;
+                }
+
+                const reg = await navigator.serviceWorker.register('/sw.js');
+                await navigator.serviceWorker.ready;
+
+                const vapidKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
+                if (!vapidKey) {
+                    showPushMessage('Push configuration is missing. Contact support.', 'error');
+                    return;
+                }
+
+                // Unsubscribe any stale subscription first
+                const existing = await reg.pushManager.getSubscription();
+                if (existing) await existing.unsubscribe();
+
+                const sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(vapidKey)
+                });
+
+                await axios.post(`${API_URL}/notifications/subscribe`, { subscription: sub }, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                setPushEnabled(true);
+                showPushMessage('🔔 Push notifications enabled!', 'success');
+            }
+        } catch (err) {
+            console.error('Push toggle error:', err);
+            showPushMessage('Something went wrong. Please try again.', 'error');
+        } finally {
+            setPushLoading(false);
+        }
     };
 
     useEffect(() => {
@@ -673,25 +704,57 @@ const NotificationBell = () => {
                             </button>
                         ) : <div />}
 
+                        {/* Push message toast */}
+                        {pushMessage && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: '56px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                background: pushMessage.type === 'success' ? '#22c55e' : '#ef4444',
+                                color: 'white',
+                                padding: '0.4rem 0.9rem',
+                                borderRadius: '20px',
+                                fontSize: '0.72rem',
+                                fontWeight: '600',
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                zIndex: 10,
+                                animation: 'scaleIn 0.2s ease-out'
+                            }}>
+                                {pushMessage.text}
+                            </div>
+                        )}
+
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
-                                onClick={() => enablePushNotifications()}
-                                title="Enable push notifications"
+                                onClick={togglePushNotifications}
+                                disabled={pushLoading}
+                                title={pushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
                                 style={{
                                     padding: '0.35rem 0.6rem',
-                                    background: 'transparent',
-                                    border: 'none',
+                                    background: pushEnabled ? '#eff6ff' : 'transparent',
+                                    border: pushEnabled ? '1px solid #bfdbfe' : 'none',
                                     borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#475569',
+                                    cursor: pushLoading ? 'not-allowed' : 'pointer',
+                                    color: pushEnabled ? '#3b82f6' : '#475569',
                                     fontSize: '0.75rem',
                                     fontWeight: '600',
-                                    transition: 'background 0.15s'
+                                    transition: 'all 0.15s',
+                                    opacity: pushLoading ? 0.7 : 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
                                 }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                onMouseEnter={(e) => { if (!pushLoading) e.currentTarget.style.background = pushEnabled ? '#dbeafe' : '#f1f5f9'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.background = pushEnabled ? '#eff6ff' : 'transparent'; }}
                             >
-                                Enable Push
+                                {pushLoading ? (
+                                    <span style={{ display: 'inline-block', width: '10px', height: '10px', border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+                                ) : (
+                                    pushEnabled ? '🔔' : '🔕'
+                                )}
+                                {pushLoading ? 'Working…' : (pushEnabled ? 'Push On' : 'Enable Push')}
                             </button>
                             <button
                                 onClick={() => {
@@ -872,6 +935,9 @@ const NotificationBell = () => {
                 @keyframes scaleIn {
                     0% { transform: scale(0.95); opacity: 0; }
                     100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
                 }
             `}</style>
         </div>
