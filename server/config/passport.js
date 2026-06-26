@@ -6,12 +6,19 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 
 module.exports = function setupPassport() {
+  // Resolve the server base URL: check multiple common env var names
+  const SERVER_BASE =
+    process.env.BACKEND_URL ||
+    process.env.SERVER_URL ||
+    process.env.RENDER_EXTERNAL_URL ||  // Render auto-injects this
+    'http://localhost:5000';
+
   // Google
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: (process.env.BACKEND_URL || 'http://localhost:5000') + '/api/auth/google/callback'
+      callbackURL: SERVER_BASE + '/api/auth/google/callback'
     }, async (accessToken, refreshToken, profile, done) => {
       try {
         const email = profile.emails && profile.emails[0] && profile.emails[0].value;
@@ -40,7 +47,7 @@ module.exports = function setupPassport() {
     passport.use(new GitHubStrategy({
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: (process.env.BACKEND_URL || 'http://localhost:5000') + '/api/auth/github/callback',
+      callbackURL: SERVER_BASE + '/api/auth/github/callback',
       scope: ['user:email']
     }, async (accessToken, refreshToken, profile, done) => {
       try {

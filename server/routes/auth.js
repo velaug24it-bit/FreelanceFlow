@@ -16,6 +16,27 @@ const sendEmail = require('../utils/email');
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
+// Smart CLIENT_URL: if running in production (CLIENT_URL is localhost but request is from a real domain),
+// use the request origin so OAuth redirect lands on the correct deployed frontend.
+const getClientUrl = (req) => {
+    const origin = req.get('origin') || req.get('referer') || '';
+    // If CLIENT_URL is already a real production URL, use it
+    if (CLIENT_URL && !CLIENT_URL.includes('localhost')) {
+        return CLIENT_URL;
+    }
+    // Otherwise, if the request came from a real (non-localhost) origin, use that
+    if (origin && !origin.includes('localhost')) {
+        // Strip trailing slash and path from referer if needed
+        try {
+            const url = new URL(origin);
+            return `${url.protocol}//${url.host}`;
+        } catch (_) {
+            return origin.split('/').slice(0, 3).join('/');
+        }
+    }
+    return CLIENT_URL;
+};
+
 // ============================================
 // HELPER: AUTHENTICATE TOKEN
 // ============================================
@@ -415,26 +436,41 @@ router.post('/google/verify-token', async (req, res) => {
 // ============================================
 router.get('/google', (req, res, next) => {
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-        return res.redirect(`${CLIENT_URL}/login?error=Google OAuth keys are not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server .env file.`);
+        return res.redirect(`${getClientUrl(req)}/login?error=Google OAuth keys are not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server .env file.`);
     }
+    const clientUrl = getClientUrl(req);
+    const state = Buffer.from(clientUrl).toString('base64');
     passport.authenticate('google', {
         scope: ['profile', 'email'],
         session: false,
-        prompt: 'select_account'
+        prompt: 'select_account',
+        state: state
     })(req, res, next);
 });
 
 router.get('/google/callback', (req, res, next) => {
+    let clientBase = CLIENT_URL;
+    if (req.query.state) {
+        try {
+            const decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii');
+            if (decodedUrl && (decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://'))) {
+                clientBase = decodedUrl;
+            }
+        } catch (e) {
+            console.error('Error decoding Google OAuth state:', e);
+        }
+    }
+
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-        return res.redirect(`${CLIENT_URL}/login?error=Google OAuth keys are not configured on the server.`);
+        return res.redirect(`${clientBase}/login?error=Google OAuth keys are not configured on the server.`);
     }
     passport.authenticate('google', {
         session: false,
-        failureRedirect: `${CLIENT_URL}/login?error=Google authentication failed.`
+        failureRedirect: `${clientBase}/login?error=Google authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
             console.error('Google callback error:', err);
-            return res.redirect(`${CLIENT_URL}/login?error=Google authentication failed.`);
+            return res.redirect(`${clientBase}/login?error=Google authentication failed.`);
         }
         try {
             const token = jwt.sign(
@@ -442,10 +478,10 @@ router.get('/google/callback', (req, res, next) => {
                 process.env.JWT_SECRET,
                 { expiresIn: '7d' }
             );
-            return res.redirect(`${CLIENT_URL}/oauth-redirect?token=${token}`);
+            return res.redirect(`${clientBase}/oauth-redirect?token=${token}`);
         } catch (err) {
             console.error('Google token generation error:', err);
-            return res.redirect(`${CLIENT_URL}/login?error=Server error during token generation.`);
+            return res.redirect(`${clientBase}/login?error=Server error during token generation.`);
         }
     })(req, res, next);
 });
@@ -455,25 +491,40 @@ router.get('/google/callback', (req, res, next) => {
 // ============================================
 router.get('/github', (req, res, next) => {
     if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
-        return res.redirect(`${CLIENT_URL}/login?error=GitHub OAuth keys are not configured on the server. Please add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to the server .env file.`);
+        return res.redirect(`${getClientUrl(req)}/login?error=GitHub OAuth keys are not configured on the server. Please add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to the server .env file.`);
     }
+    const clientUrl = getClientUrl(req);
+    const state = Buffer.from(clientUrl).toString('base64');
     passport.authenticate('github', {
         scope: ['user:email'],
-        session: false
+        session: false,
+        state: state
     })(req, res, next);
 });
 
 router.get('/github/callback', (req, res, next) => {
+    let clientBase = CLIENT_URL;
+    if (req.query.state) {
+        try {
+            const decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii');
+            if (decodedUrl && (decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://'))) {
+                clientBase = decodedUrl;
+            }
+        } catch (e) {
+            console.error('Error decoding GitHub OAuth state:', e);
+        }
+    }
+
     if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
-        return res.redirect(`${CLIENT_URL}/login?error=GitHub OAuth keys are not configured on the server.`);
+        return res.redirect(`${clientBase}/login?error=GitHub OAuth keys are not configured on the server.`);
     }
     passport.authenticate('github', {
         session: false,
-        failureRedirect: `${CLIENT_URL}/login?error=GitHub authentication failed.`
+        failureRedirect: `${clientBase}/login?error=GitHub authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
             console.error('GitHub callback error:', err);
-            return res.redirect(`${CLIENT_URL}/login?error=GitHub authentication failed.`);
+            return res.redirect(`${clientBase}/login?error=GitHub authentication failed.`);
         }
         try {
             const token = jwt.sign(
@@ -481,10 +532,10 @@ router.get('/github/callback', (req, res, next) => {
                 process.env.JWT_SECRET,
                 { expiresIn: '7d' }
             );
-            return res.redirect(`${CLIENT_URL}/oauth-redirect?token=${token}`);
+            return res.redirect(`${clientBase}/oauth-redirect?token=${token}`);
         } catch (err) {
             console.error('GitHub token generation error:', err);
-            return res.redirect(`${CLIENT_URL}/login?error=Server error during token generation.`);
+            return res.redirect(`${clientBase}/login?error=Server error during token generation.`);
         }
     })(req, res, next);
 });
