@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { authenticator } = require('otplib');
 const qrcode = require('qrcode');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const sendEmail = require('../utils/email');
 
@@ -605,34 +606,140 @@ router.post('/dev-verify', authenticateToken, async (req, res) => {
     }
 });
 
-module.exports = router;
-
-// OAuth routes (Google & GitHub)
-// Redirect to provider
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
-router.get('/github', passport.authenticate('github', { scope: ['user:email'], session: false }));
-
-// Callback handlers
-router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: (process.env.CLIENT_URL || 'http://localhost:3000') + '/login' }), async (req, res) => {
+// ============================================================
+// Google Identity Services - Verify ID Token (popup flow)
+// ============================================================
+router.post('/google/verify-token', async (req, res) => {
     try {
-        const user = req.user;
-        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-        return res.redirect(`${clientUrl}/oauth-redirect?token=${token}`);
+        const { credential } = req.body;
+        if (!credential) {
+            return res.status(400).json({ error: 'No credential provided' });
+        }
+
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        if (!clientId) {
+            return res.status(500).json({ error: 'Google Client ID not configured on server' });
+        }
+
+        const client = new OAuth2Client(clientId);
+        const ticket = await client.verifyIdToken({
+            idToken: credential,
+            audience: clientId
+        });
+
+        const payload = ticket.getPayload();
+        const { email, name, picture, sub: googleId } = payload;
+
+        if (!email) {
+            return res.status(400).json({ error: 'No email from Google account' });
+        }
+
+        // Find or create user
+        let user = await User.findOne({ email });
+        if (!user) {
+            const randomPassword = crypto.randomBytes(16).toString('hex');
+            const salt = await bcrypt.genSalt(10);
+            const password_hash = await bcrypt.hash(randomPassword, salt);
+            user = await User.create({
+                email,
+                full_name: name || 'Google User',
+                password_hash,
+                is_email_verified: true,
+                avatar_url: picture || null,
+                provider: 'google',
+                provider_id: googleId
+            });
+        } else {
+            // Update avatar if not set
+            if (!user.avatar_url && picture) {
+                user.avatar_url = picture;
+                await user.save();
+            }
+        }
+
+        const token = jwt.sign(
+            { id: user._id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: user._id,
+                email: user.email,
+                full_name: user.full_name,
+                company_name: user.company_name,
+                subscription_tier: user.subscription_tier,
+                role: user.role,
+                is_email_verified: user.is_email_verified,
+                avatar_url: user.avatar_url
+            }
+        });
     } catch (err) {
-        console.error('Google callback error:', err);
-        return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login');
+        console.error('Google token verification error:', err);
+        res.status(401).json({ error: 'Invalid Google credential' });
     }
 });
 
-router.get('/github/callback', passport.authenticate('github', { session: false, failureRedirect: (process.env.CLIENT_URL || 'http://localhost:3000') + '/login' }), async (req, res) => {
-    try {
-        const user = req.user;
-        const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+module.exports = router;
+
+// OAuth redirect routes
+router.get('/google', (req, res, next) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-        return res.redirect(`${clientUrl}/oauth-redirect?token=${token}`);
-    } catch (err) {
-        console.error('GitHub callback error:', err);
-        return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login');
+        return res.redirect(`${clientUrl}/login?error=Google OAuth keys are not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server .env file.`);
     }
+    passport.authenticate('google', { scope: ['profile', 'email'], session: false, prompt: 'select_account' })(req, res, next);
+});
+
+router.get('/github', (req, res, next) => {
+    if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        return res.redirect(`${clientUrl}/login?error=GitHub OAuth keys are not configured on the server. Please add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to the server .env file.`);
+    }
+    passport.authenticate('github', { scope: ['user:email'], session: false })(req, res, next);
+});
+
+router.get('/google/callback', (req, res, next) => {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        return res.redirect(`${clientUrl}/login?error=Google OAuth keys are not configured on the server.`);
+    }
+    passport.authenticate('google', { session: false, failureRedirect: (process.env.CLIENT_URL || 'http://localhost:3000') + '/login' }, async (err, user) => {
+        if (err || !user) {
+            console.error('Google callback error/auth failed:', err);
+            return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login?error=Google authentication failed.');
+        }
+        try {
+            const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+            return res.redirect(`${clientUrl}/oauth-redirect?token=${token}`);
+        } catch (err) {
+            console.error('Google token generation error:', err);
+            return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login?error=Server error during token generation.');
+        }
+    })(req, res, next);
+});
+
+router.get('/github/callback', (req, res, next) => {
+    if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+        return res.redirect(`${clientUrl}/login?error=GitHub OAuth keys are not configured on the server.`);
+    }
+    passport.authenticate('github', { session: false, failureRedirect: (process.env.CLIENT_URL || 'http://localhost:3000') + '/login' }, async (err, user) => {
+        if (err || !user) {
+            console.error('GitHub callback error/auth failed:', err);
+            return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login?error=GitHub authentication failed.');
+        }
+        try {
+            const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+            return res.redirect(`${clientUrl}/oauth-redirect?token=${token}`);
+        } catch (err) {
+            console.error('GitHub token generation error:', err);
+            return res.redirect((process.env.CLIENT_URL || 'http://localhost:3000') + '/login?error=Server error during token generation.');
+        }
+    })(req, res, next);
 });

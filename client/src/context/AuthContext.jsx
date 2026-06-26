@@ -138,6 +138,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const handleOAuthSuccess = (newToken) => {
+    localStorage.setItem('token', newToken);
+    setToken(newToken);
+  };
+
   const value = {
     user,
     loading,
@@ -149,6 +154,7 @@ export const AuthProvider = ({ children }) => {
     resendVerification,
     updateProfile,
     refreshUser,
+    handleOAuthSuccess,
     isAuthenticated: !!user
   };
 

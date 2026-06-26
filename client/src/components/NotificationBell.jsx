@@ -17,6 +17,7 @@ const NotificationBell = () => {
     const [socket, setSocket] = useState(null);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+    const [selectedNotification, setSelectedNotification] = useState(null);
 
     useEffect(() => {
         fetchNotifications();
@@ -141,6 +142,12 @@ const NotificationBell = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        if (isOpen) {
+            fetchNotifications();
+        }
+    }, [filter, typeFilter, isOpen]);
+
     const fetchNotifications = async () => {
         try {
             setLoading(true);
@@ -254,74 +261,9 @@ const NotificationBell = () => {
             }
         }
 
-        // Close dropdown
+        // Close dropdown and show detail modal
         setIsOpen(false);
-
-        // Navigate based on action_url or reference_type
-        if (notification.action_url) {
-            try {
-                const url = new URL(notification.action_url, window.location.origin);
-                if (url.origin !== window.location.origin) {
-                    window.open(notification.action_url, '_blank');
-                    return;
-                }
-            } catch (e) {
-                // invalid URL -> fallback to navigate
-            }
-            navigate(notification.action_url);
-            return;
-        }
-
-        // Handle different notification types
-        const type = notification.type;
-        const refId = notification.reference_id;
-        const refType = notification.reference_type;
-
-        console.log('🔍 Navigating notification:', { type, refId, refType });
-
-        // Navigate based on type
-        switch (type) {
-            case 'invoice_created':
-            case 'invoice_paid':
-            case 'payment_received':
-                if (refId) {
-                    navigate(`/invoices/${refId}`);
-                } else {
-                    navigate('/invoices');
-                }
-                break;
-
-            case 'project_completed':
-            case 'project_status_updated':
-            case 'bid_accepted':
-            case 'bid_received':
-            case 'bid_rejected':
-                if (refId) {
-                    navigate(`/projects/${refId}`);
-                } else {
-                    navigate('/projects');
-                }
-                break;
-
-            case 'subscription_expiring':
-            case 'subscription_expired':
-                navigate('/subscriptions');
-                break;
-
-            default:
-                // If no specific navigation, try to use reference_type
-                if (refType === 'project' && refId) {
-                    navigate(`/projects/${refId}`);
-                } else if (refType === 'invoice' && refId) {
-                    navigate(`/invoices/${refId}`);
-                } else if (refType === 'contract' && refId) {
-                    navigate(`/contracts/${refId}`);
-                } else {
-                    // Default: close the notification and stay on current page
-                    console.log('ℹ️ No navigation target for notification:', notification);
-                }
-                break;
-        }
+        setSelectedNotification(notification);
     };
 
     const getTypeIcon = (type) => {
@@ -427,9 +369,10 @@ const NotificationBell = () => {
                 <div style={{
                     position: 'absolute',
                     top: 'calc(100% + 8px)',
-                    right: '-60px',
-                    width: '380px',
-                    maxHeight: '480px',
+                    right: '0',
+                    width: '360px',
+                    maxWidth: 'calc(100vw - 24px)',
+                    maxHeight: '540px',
                     background: '#ffffff',
                     borderRadius: '16px',
                     boxShadow: '0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
@@ -449,7 +392,7 @@ const NotificationBell = () => {
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <h3 style={{
-                                fontSize: '1rem',
+                                fontSize: '1.05rem',
                                 fontWeight: '700',
                                 color: '#0f172a',
                                 margin: 0
@@ -469,118 +412,82 @@ const NotificationBell = () => {
                                 </span>
                             )}
                         </div>
-                        <div style={{ display: 'flex', gap: '0.25rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}>
-                                <select value={filter} onChange={(e) => setFilter(e.target.value)} style={{ padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <option value="all">All</option>
-                                    <option value="unread">Unread</option>
-                                </select>
+                        {notifications.length > 0 && (
+                            <button
+                                onClick={markAllAsRead}
+                                title="Mark all as read"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    padding: '0.35rem 0.75rem',
+                                    background: '#eff6ff',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    color: '#3b82f6',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    transition: 'all 0.15s',
+                                    opacity: unreadCount === 0 ? 0.5 : 1
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#dbeafe'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#eff6ff'}
+                            >
+                                <CheckCheck size={14} />
+                                Mark all read
+                            </button>
+                        )}
+                    </div>
 
-                                <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={{ padding: '6px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <option value="all">All Types</option>
-                                    <option value="invoice_created">Invoice</option>
-                                    <option value="project_status_updated">Project</option>
-                                    <option value="payment_received">Payment</option>
-                                    <option value="bid_received">Bid</option>
-                                </select>
-                            </div>
-                            {unreadCount > 0 && (
-                                <button
-                                    onClick={markAllAsRead}
-                                    title="Mark all as read"
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.25rem',
-                                        padding: '0.3rem 0.6rem',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        color: '#3b82f6',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '500',
-                                        transition: 'background 0.15s'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = '#eff6ff'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                >
-                                    <CheckCheck size={14} />
-                                    Read all
-                                </button>
-                            )}
-                            {notifications.length > 0 && (
-                                <button
-                                    onClick={clearAll}
-                                    title="Clear all"
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.25rem',
-                                        padding: '0.3rem 0.6rem',
-                                        background: 'transparent',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        color: '#94a3b8',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '500',
-                                        transition: 'background 0.15s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = '#fef2f2';
-                                        e.currentTarget.style.color = '#ef4444';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = 'transparent';
-                                        e.currentTarget.style.color = '#94a3b8';
-                                    }}
-                                >
-                                    <Trash2 size={14} />
-                                    Clear
-                                </button>
-                            )}
-                            <button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    navigate('/settings/notifications');
-                                }}
-                                title="Notification preferences"
+                    {/* Toolbar / Filters Row */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.625rem 1.25rem',
+                        borderBottom: '1px solid #f1f5f9',
+                        background: '#f8fafc',
+                        gap: '0.5rem'
+                    }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>Filters:</span>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <select
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
                                 style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    padding: '0.3rem 0.6rem',
-                                    background: 'transparent',
-                                    border: 'none',
+                                    padding: '4px 8px',
                                     borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#0f172a',
+                                    border: '1px solid #cbd5e1',
                                     fontSize: '0.75rem',
-                                    fontWeight: '500'
+                                    background: 'white',
+                                    color: '#334155',
+                                    cursor: 'pointer'
                                 }}
                             >
-                                Preferences
-                            </button>
-                            <button
-                                onClick={() => enablePushNotifications()}
-                                title="Enable push notifications"
+                                <option value="all">All</option>
+                                <option value="unread">Unread</option>
+                            </select>
+
+                            <select
+                                value={typeFilter}
+                                onChange={(e) => setTypeFilter(e.target.value)}
                                 style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.25rem',
-                                    padding: '0.3rem 0.6rem',
-                                    background: 'transparent',
-                                    border: 'none',
+                                    padding: '4px 8px',
                                     borderRadius: '6px',
-                                    cursor: 'pointer',
-                                    color: '#0f172a',
+                                    border: '1px solid #cbd5e1',
                                     fontSize: '0.75rem',
-                                    fontWeight: '500'
+                                    background: 'white',
+                                    color: '#334155',
+                                    cursor: 'pointer'
                                 }}
                             >
-                                Enable Push
-                            </button>
+                                <option value="all">All Types</option>
+                                <option value="invoice_created">Invoice</option>
+                                <option value="project_status_updated">Project</option>
+                                <option value="payment_received">Payment</option>
+                                <option value="bid_received">Bid</option>
+                            </select>
                         </div>
                     </div>
 
@@ -588,7 +495,7 @@ const NotificationBell = () => {
                     <div style={{
                         overflowY: 'auto',
                         flex: 1,
-                        maxHeight: '400px'
+                        maxHeight: '340px'
                     }}>
                         {loading && notifications.length === 0 ? (
                             <div style={{
@@ -690,7 +597,12 @@ const NotificationBell = () => {
                                             fontSize: '0.8rem',
                                             color: '#64748b',
                                             lineHeight: '1.4',
-                                            marginTop: '2px'
+                                            marginTop: '2px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical'
                                         }}>
                                             {notification.message}
                                         </div>
@@ -718,6 +630,235 @@ const NotificationBell = () => {
                             ))
                         )}
                     </div>
+
+                    {/* Footer */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.75rem 1.25rem',
+                        borderTop: '1px solid #f1f5f9',
+                        background: '#fafbfc',
+                        gap: '0.5rem'
+                    }}>
+                        {notifications.length > 0 ? (
+                            <button
+                                onClick={clearAll}
+                                title="Clear all notifications"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.25rem',
+                                    padding: '0.35rem 0.6rem',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: '#94a3b8',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#fef2f2';
+                                    e.currentTarget.style.color = '#ef4444';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#94a3b8';
+                                }}
+                            >
+                                <Trash2 size={14} />
+                                Clear all
+                            </button>
+                        ) : <div />}
+
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                onClick={() => enablePushNotifications()}
+                                title="Enable push notifications"
+                                style={{
+                                    padding: '0.35rem 0.6rem',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: '#475569',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                                Enable Push
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    navigate('/settings/notifications');
+                                }}
+                                title="Notification preferences"
+                                style={{
+                                    padding: '0.35rem 0.65rem',
+                                    background: '#f1f5f9',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    color: '#334155',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                    transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
+                            >
+                                Preferences
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Notification Detail Modal */}
+            {selectedNotification && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2000,
+                    padding: '1.5rem'
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        width: '100%',
+                        maxWidth: '420px',
+                        padding: '2rem',
+                        border: '1px solid #f1f5f9',
+                        animation: 'scaleIn 0.2s ease-out',
+                        position: 'relative',
+                        textAlign: 'left'
+                    }}>
+                        <button
+                            onClick={() => setSelectedNotification(null)}
+                            style={{
+                                position: 'absolute',
+                                top: '1rem',
+                                right: '1rem',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#64748b'
+                            }}
+                        >
+                            <X size={20} />
+                        </button>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                            <div style={{ fontSize: '1.75rem' }}>
+                                {getTypeIcon(selectedNotification.type)}
+                            </div>
+                            <h3 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>
+                                {selectedNotification.title}
+                            </h3>
+                        </div>
+
+                        <p style={{ color: '#475569', fontSize: '0.925rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>
+                            {selectedNotification.message}
+                        </p>
+
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
+                            Received: {new Date(selectedNotification.created_at).toLocaleString()}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setSelectedNotification(null)}
+                                style={{
+                                    padding: '0.625rem 1.25rem',
+                                    backgroundColor: 'transparent',
+                                    color: '#64748b',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    fontSize: '0.875rem',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                                Close
+                            </button>
+
+                            {/* View Target Button (if route exists) */}
+                            {(selectedNotification.action_url ||
+                                (selectedNotification.reference_type === 'project' && selectedNotification.reference_id) ||
+                                selectedNotification.reference_type === 'invoice' ||
+                                (selectedNotification.type.includes('invoice') || selectedNotification.type.includes('payment')) ||
+                                (selectedNotification.type.includes('project') || selectedNotification.type.includes('bid'))
+                            ) && (
+                                    <button
+                                        onClick={() => {
+                                            const notification = selectedNotification;
+                                            setSelectedNotification(null);
+
+                                            // Execute navigation logic
+                                            if (notification.action_url) {
+                                                try {
+                                                    const url = new URL(notification.action_url, window.location.origin);
+                                                    if (url.origin !== window.location.origin) {
+                                                        window.open(notification.action_url, '_blank');
+                                                        return;
+                                                    }
+                                                } catch (e) { }
+                                                navigate(notification.action_url);
+                                                return;
+                                            }
+
+                                            const type = notification.type;
+                                            const refId = notification.reference_id;
+                                            const refType = notification.reference_type;
+
+                                            if (type.includes('invoice') || type.includes('payment') || refType === 'invoice') {
+                                                navigate('/invoices');
+                                            } else if (type.includes('project') || type.includes('bid') || refType === 'project') {
+                                                if (refId) {
+                                                    navigate(`/projects/${refId}/manage`);
+                                                } else {
+                                                    navigate('/projects');
+                                                }
+                                            } else {
+                                                navigate('/projects');
+                                            }
+                                        }}
+                                        style={{
+                                            padding: '0.625rem 1.25rem',
+                                            backgroundColor: '#3b82f6',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: '600',
+                                            fontSize: '0.875rem',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+                                    >
+                                        {selectedNotification.reference_type === 'project' || selectedNotification.type.includes('project') || selectedNotification.type.includes('bid')
+                                            ? 'View Project'
+                                            : 'View Invoices'}
+                                    </button>
+                                )}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -727,6 +868,10 @@ const NotificationBell = () => {
                     0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
                     70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
                     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+                }
+                @keyframes scaleIn {
+                    0% { transform: scale(0.95); opacity: 0; }
+                    100% { transform: scale(1); opacity: 1; }
                 }
             `}</style>
         </div>
