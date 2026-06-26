@@ -4,6 +4,51 @@ import axios from 'axios';
 import { Crown, User, Bell, Shield, ArrowRight, CheckCircle, AlertCircle, Key, X } from 'lucide-react';
 import ProfileProgress from '../components/ProfileProgress';
 
+// Inject mobile-responsive styles for Settings page
+if (!document.querySelector('style[data-settings-responsive]')) {
+  const s = document.createElement('style');
+  s.setAttribute('data-settings-responsive', 'true');
+  s.textContent = `
+    @media (max-width: 640px) {
+      .settings-root {
+        padding: 1rem 0.75rem !important;
+      }
+      .settings-profile-header {
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+      }
+      .settings-profile-header h2 {
+        font-size: 1.05rem !important;
+      }
+      .settings-profile-header button {
+        align-self: flex-end;
+        margin-left: auto;
+      }
+      .settings-info-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .settings-info-grid .span-2 {
+        grid-column: span 1 !important;
+      }
+      .settings-2fa-inner {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+      }
+      .settings-form-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .settings-section {
+        padding: 1rem !important;
+      }
+      .settings-email {
+        word-break: break-all;
+        font-size: 0.875rem !important;
+      }
+    }
+  `;
+  document.head.appendChild(s);
+}
+
 const Settings = () => {
   const { user, updateProfile, refreshUser } = useAuth();
   const [subscription, setSubscription] = useState(null);
@@ -186,7 +231,7 @@ const Settings = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="settings-root" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
       <h1 style={{ fontSize: '2rem', marginBottom: '2rem', fontWeight: '800', color: '#1e293b' }}>Settings</h1>
       
       <div style={{ display: 'grid', gap: '1.5rem' }}>
@@ -194,8 +239,8 @@ const Settings = () => {
         <ProfileProgress user={user} />
         
         {/* ==================== PROFILE SECTION ==================== */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div className="settings-profile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <User size={24} color="#3b82f6" />
               <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Profile Information</h2>
@@ -210,7 +255,8 @@ const Settings = () => {
                   border: 'none',
                   borderRadius: '8px',
                   fontWeight: '600',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  flexShrink: 0
                 }}
               >
                 Edit Profile
@@ -242,7 +288,7 @@ const Settings = () => {
 
           {isEditingProfile ? (
             <form onSubmit={handleSaveProfile}>
-              <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+              <div className="settings-form-grid" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
                 <div className="form-group">
                   <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Full Name</label>
                   <input
@@ -317,14 +363,14 @@ const Settings = () => {
               </div>
             </form>
           ) : (
-            <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            <div className="settings-info-grid" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Full Name</label>
                 <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user?.full_name || 'Not set'}</p>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Email</label>
-                <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user?.email || 'Not set'}</p>
+                <p className="settings-email" style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b', wordBreak: 'break-all' }}>{user?.email || 'Not set'}</p>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Company</label>
@@ -334,13 +380,13 @@ const Settings = () => {
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Hourly Rate</label>
                 <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user?.hourly_rate ? `$${user.hourly_rate}/hr` : 'Not set'}</p>
               </div>
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="span-2" style={{ gridColumn: 'span 2' }}>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Skills</label>
                 <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>
                   {user?.skills && user.skills.length > 0 ? user.skills.join(', ') : 'No skills added'}
                 </p>
               </div>
-              <div style={{ gridColumn: 'span 2' }}>
+              <div className="span-2" style={{ gridColumn: 'span 2' }}>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Bio</label>
                 <p style={{ fontSize: '0.95rem', color: '#334155', lineHeight: '1.5' }}>{user?.bio || 'No bio added yet.'}</p>
               </div>
@@ -349,7 +395,7 @@ const Settings = () => {
         </div>
 
         {/* ==================== SUBSCRIPTION SECTION ==================== */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Crown size={24} color="#f59e0b" />
             <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Subscription Plan</h2>
@@ -419,7 +465,7 @@ const Settings = () => {
         </div>
 
         {/* ==================== 2FA SECURITY SECTION ==================== */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Key size={24} color="#10b981" />
             <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Two-Factor Authentication (2FA)</h2>
@@ -509,7 +555,7 @@ const Settings = () => {
                     </button>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="settings-2fa-inner" style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{
                       backgroundColor: 'white', padding: '0.5rem', borderRadius: '8px',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #cbd5e1'
@@ -583,7 +629,7 @@ const Settings = () => {
         </div>
 
         {/* ==================== NOTIFICATIONS SECTION ==================== */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Bell size={24} color="#8b5cf6" />
             <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Notifications</h2>
@@ -592,7 +638,7 @@ const Settings = () => {
         </div>
 
         {/* ==================== SECURITY / DELETE ACCOUNT SECTION ==================== */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <Shield size={24} color="#ef4444" />
             <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Danger Zone</h2>

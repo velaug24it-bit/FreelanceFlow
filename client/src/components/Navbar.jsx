@@ -177,10 +177,8 @@ const Navbar = () => {
           gap: '0.5rem',
           flexShrink: 0
         }}>
-          {/* Notification Bell - Hidden on Mobile */}
-          <div className="mobile-hidden">
-            <NotificationBell />
-          </div>
+          {/* Notification Bell - always visible */}
+          <NotificationBell />
 
           {/* User Profile Dropdown - FIXED ALIGNMENT - Hidden on Mobile */}
           <div ref={dropdownRef} className="mobile-hidden" style={{ position: 'relative' }}>
