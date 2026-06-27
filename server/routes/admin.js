@@ -54,7 +54,7 @@ router.get('/users', verifyAdmin, async (req, res) => {
             },
             {
                 $lookup: {
-                    from: 'projects',
+                    from: 'projectposts',
                     localField: '_id',
                     foreignField: 'user_id',
                     as: 'projects'
