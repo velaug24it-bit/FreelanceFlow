@@ -71,8 +71,20 @@ router.get('/users', verifyAdmin, async (req, res) => {
             {
                 $lookup: {
                     from: 'payments',
-                    localField: '_id',
-                    foreignField: 'user_id',
+                    let: { userId: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $or: [
+                                        { $eq: ['$user_id', '$$userId'] },
+                                        { $eq: ['$client_id', '$$userId'] },
+                                        { $eq: ['$freelancer_id', '$$userId'] }
+                                    ]
+                                }
+                            }
+                        }
+                    ],
                     as: 'payments'
                 }
             },
@@ -85,21 +97,46 @@ router.get('/users', verifyAdmin, async (req, res) => {
                     client_count: { $size: '$clients' },
                     project_count: { $size: '$projects' },
                     invoice_count: { $size: '$invoices' },
-                    // PRESERVED: Total revenue from invoices
+                    // PRESERVED: Total revenue from invoices + completed project payments
                     total_revenue: {
-                        $sum: {
-                            $map: {
-                                input: {
-                                    $filter: {
-                                        input: '$invoices',
+                        $add: [
+                            {
+                                $sum: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: '$invoices',
+                                                as: 'inv',
+                                                cond: { $eq: ['$$inv.status', 'paid'] }
+                                            }
+                                        },
                                         as: 'inv',
-                                        cond: { $eq: ['$$inv.status', 'paid'] }
+                                        in: { $toDouble: '$$inv.total_amount' }
                                     }
-                                },
-                                as: 'inv',
-                                in: { $toDouble: '$$inv.total_amount' }
+                                }
+                            },
+                            {
+                                $sum: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: '$payments',
+                                                as: 'p',
+                                                cond: {
+                                                    $and: [
+                                                        { $eq: ['$$p.status', 'completed'] },
+                                                        { $eq: ['$$p.freelancer_id', '$_id'] },
+                                                        { $ne: [{ $ifNull: ['$$p.project_id', null] }, null] }
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        as: 'p',
+                                        in: { $toDouble: '$$p.amount' }
+                                    }
+                                }
                             }
-                        }
+                        ]
                     },
                     // NEW: Subscription revenue from payments
                     subscription_revenue: {
@@ -112,7 +149,8 @@ router.get('/users', verifyAdmin, async (req, res) => {
                                         cond: {
                                             $and: [
                                                 { $eq: ['$$p.status', 'completed'] },
-                                                { $ne: ['$$p.package_id', null] }
+                                                { $eq: [{ $ifNull: ['$$p.package_id', null] }, null] },
+                                                { $regexMatch: { input: { $ifNull: ['$$p.description', ''] }, regex: /plan|subscription/i } }
                                             ]
                                         }
                                     }
@@ -133,7 +171,12 @@ router.get('/users', verifyAdmin, async (req, res) => {
                                         cond: {
                                             $and: [
                                                 { $eq: ['$$p.status', 'completed'] },
-                                                { $ne: ['$$p.package_id', null] }
+                                                {
+                                                    $or: [
+                                                        { $ne: [{ $ifNull: ['$$p.package_id', null] }, null] },
+                                                        { $regexMatch: { input: { $ifNull: ['$$p.description', ''] }, regex: /connects/i } }
+                                                    ]
+                                                }
                                             ]
                                         }
                                     }
@@ -154,7 +197,12 @@ router.get('/users', verifyAdmin, async (req, res) => {
                                         cond: {
                                             $and: [
                                                 { $eq: ['$$p.status', 'completed'] },
-                                                { $ne: ['$$p.package_id', null] }
+                                                {
+                                                    $or: [
+                                                        { $ne: [{ $ifNull: ['$$p.package_id', null] }, null] },
+                                                        { $regexMatch: { input: { $ifNull: ['$$p.description', ''] }, regex: /connects/i } }
+                                                    ]
+                                                }
                                             ]
                                         }
                                     }
@@ -209,7 +257,15 @@ router.get('/stats', verifyAdmin, async (req, res) => {
 
         // NEW: Connects revenue
         const connectsRevenue = await Payment.aggregate([
-            { $match: { status: 'completed', package_id: { $ne: null } } },
+            {
+                $match: {
+                    status: 'completed',
+                    $or: [
+                        { package_id: { $ne: null, $exists: true } },
+                        { description: { $regex: /connects/i } }
+                    ]
+                }
+            },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
@@ -218,7 +274,8 @@ router.get('/stats', verifyAdmin, async (req, res) => {
             {
                 $match: {
                     status: 'completed',
-                    description: { $regex: /Plan/i }
+                    package_id: { $eq: null },
+                    description: { $regex: /plan|subscription/i }
                 }
             },
             { $group: { _id: null, total: { $sum: '$amount' } } }
@@ -240,7 +297,10 @@ router.get('/stats', verifyAdmin, async (req, res) => {
             {
                 $match: {
                     status: 'completed',
-                    package_id: { $ne: null }
+                    $or: [
+                        { package_id: { $ne: null, $exists: true } },
+                        { description: { $regex: /connects/i } }
+                    ]
                 }
             },
             {
@@ -323,7 +383,15 @@ router.get('/revenue', verifyAdmin, async (req, res) => {
 
         // NEW: Revenue breakdown by type
         const connectsRevenue = await Payment.aggregate([
-            { $match: { status: 'completed', package_id: { $ne: null } } },
+            {
+                $match: {
+                    status: 'completed',
+                    $or: [
+                        { package_id: { $ne: null, $exists: true } },
+                        { description: { $regex: /connects/i } }
+                    ]
+                }
+            },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
@@ -331,7 +399,8 @@ router.get('/revenue', verifyAdmin, async (req, res) => {
             {
                 $match: {
                     status: 'completed',
-                    description: { $regex: /Plan/i }
+                    package_id: { $eq: null },
+                    description: { $regex: /plan|subscription/i }
                 }
             },
             { $group: { _id: null, total: { $sum: '$amount' } } }
@@ -351,7 +420,10 @@ router.get('/revenue', verifyAdmin, async (req, res) => {
             {
                 $match: {
                     status: 'completed',
-                    package_id: { $ne: null }
+                    $or: [
+                        { package_id: { $ne: null, $exists: true } },
+                        { description: { $regex: /connects/i } }
+                    ]
                 }
             },
             {
@@ -402,8 +474,8 @@ router.get('/users/:id', verifyAdmin, async (req, res) => {
         // Get all data
         const [clients, projects, invoices, expenses, payments, projectPosts, bids] = await Promise.all([
             Client.find({ user_id: user._id }),
-            Project.find({ user_id: user._id }),
-            Invoice.find({ user_id: user._id }),
+            Project.find({ user_id: user._id }).populate({ path: 'client_id', model: 'Client' }),
+            Invoice.find({ user_id: user._id }).populate('client_id'),
             Expense.find({ user_id: user._id }),
             Payment.find({
                 $or: [
@@ -417,24 +489,41 @@ router.get('/users/:id', verifyAdmin, async (req, res) => {
         ]);
 
         // Calculate stats
-        const totalRevenue = invoices
-            .filter(inv => inv.status === 'paid')
-            .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-
-        const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-
-        // NEW: Connects revenue
-        const connectsPayments = payments.filter(p => p.package_id && p.status === 'completed');
+        // Project revenue from payments where user is freelancer
+        const connectsPayments = payments.filter(p => (p.package_id || p.description?.toLowerCase().includes('connects')) && p.status === 'completed');
         const connectsRevenue = connectsPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const totalConnectsPurchased = connectsPayments.reduce((sum, p) => sum + (p.connects_purchased || 0), 0);
 
-        // NEW: Subscription revenue
-        const subscriptionPayments = payments.filter(p => p.description?.includes('Plan') && p.status === 'completed');
+        const subscriptionPayments = payments.filter(p => !p.package_id && (p.description?.toLowerCase().includes('plan') || p.description?.toLowerCase().includes('subscription')) && p.status === 'completed');
         const subscriptionRevenue = subscriptionPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
-        // NEW: Project payments
-        const projectPayments = payments.filter(p => p.project_id && p.status === 'completed');
+        const projectPayments = payments.filter(p => p.project_id && p.status === 'completed' && p.freelancer_id?.toString() === user._id.toString());
         const projectRevenue = projectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        const invoiceRevenue = invoices
+            .filter(inv => inv.status === 'paid')
+            .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+        const totalRevenue = invoiceRevenue + projectRevenue;
+        const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+
+        // Calculate client revenue: Paid invoices + Completed project payments for that client
+        const clientsWithRevenue = clients.map(c => {
+            const clientInvoices = invoices.filter(inv => inv.client_id?._id?.toString() === c._id.toString() && inv.status === 'paid');
+            const invoiceSum = clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+            const clientProjectIds = projects.filter(p => p.client_id?._id?.toString() === c._id.toString()).map(p => p._id.toString());
+            const clientProjectPayments = payments.filter(p => p.status === 'completed' && p.project_id && clientProjectIds.includes(p.project_id.toString()));
+            const projectSum = clientProjectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+            return {
+                id: c._id,
+                name: c.contact_name,
+                company: c.company_name,
+                email: c.email,
+                total_revenue: invoiceSum + projectSum
+            };
+        });
 
         // NEW: Payment history with details
         const paymentHistory = payments.map(p => ({
@@ -473,7 +562,7 @@ router.get('/users/:id', verifyAdmin, async (req, res) => {
                 total_expenses_amount: totalExpenses,
                 net_income: totalRevenue - totalExpenses,
                 subscription_revenue: subscriptionRevenue,
-                active_contracts: 0,
+                active_contracts: projects.filter(p => p.status === 'active' || p.status === 'in_progress').length,
                 // NEW
                 connects_revenue: connectsRevenue,
                 project_revenue: projectRevenue,
@@ -481,24 +570,21 @@ router.get('/users/:id', verifyAdmin, async (req, res) => {
                 total_payments: payments.length
             },
             // PRESERVED
-            clients: clients.map(c => ({
-                id: c._id,
-                name: c.contact_name,
-                company: c.company_name,
-                email: c.email,
-                total_revenue: c.total_revenue || 0
-            })),
+            clients: clientsWithRevenue,
             projects: projects.map(p => ({
                 id: p._id,
                 title: p.title,
                 status: p.status,
-                budget: p.budget
+                budget: p.budget || p.budget_max || 0,
+                client_name: p.client_name || p.client_id?.contact_name || p.client_id?.full_name || 'No Client'
             })),
             invoices: invoices.map(i => ({
                 id: i._id,
                 number: i.invoice_number,
                 amount: i.total_amount,
-                status: i.status
+                status: i.status,
+                client_name: i.client_id?.contact_name || 'Unknown',
+                client_company: i.client_id?.company_name || '-'
             })),
             expenses: expenses.map(e => ({
                 id: e._id,
@@ -525,6 +611,157 @@ router.get('/users/:id', verifyAdmin, async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Error fetching user details:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET ALL FREELANCERS WITH STATS (NEW)
+// ============================================
+router.get('/freelancers', verifyAdmin, async (req, res) => {
+    try {
+        const users = await User.find({ role: { $ne: 'admin' } });
+        const freelancers = await Promise.all(users.map(async (user) => {
+            const [clientsCount, projects, invoices, expenses, payments, bids] = await Promise.all([
+                Client.countDocuments({ user_id: user._id }),
+                Project.find({ user_id: user._id }),
+                Invoice.find({ user_id: user._id, status: 'paid' }),
+                Expense.find({ user_id: user._id }),
+                Payment.find({
+                    $or: [
+                        { user_id: user._id },
+                        { client_id: user._id },
+                        { freelancer_id: user._id }
+                    ]
+                }),
+                Bid.find({ freelancer_id: user._id })
+            ]);
+
+            const invoiceRevenue = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+            const projectPayments = payments.filter(p => p.project_id && p.status === 'completed' && p.freelancer_id?.toString() === user._id.toString());
+            const projectRevenue = projectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+            const totalRevenue = invoiceRevenue + projectRevenue;
+
+            const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+            const bidsPlaced = bids.length;
+            const bidsWon = bids.filter(b => b.status === 'accepted').length;
+
+            return {
+                freelancer: {
+                    id: user._id,
+                    name: user.full_name,
+                    email: user.email,
+                    subscription_tier: user.subscription_tier || 'free',
+                    company_name: user.company_name,
+                    joined_date: user.created_at
+                },
+                stats: {
+                    total_clients: clientsCount,
+                    total_projects: projects.length,
+                    total_revenue: totalRevenue,
+                    net_income: totalRevenue - totalExpenses,
+                    bids_placed: bidsPlaced,
+                    bids_won: bidsWon
+                }
+            };
+        }));
+
+        res.json({ freelancers });
+    } catch (err) {
+        console.error('❌ Error fetching freelancers:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET SINGLE FREELANCER HISTORY DETAILS (NEW)
+// ============================================
+router.get('/freelancers/:id', verifyAdmin, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ error: 'Freelancer not found' });
+        }
+
+        const [clients, projects, invoices, expenses, payments, bids] = await Promise.all([
+            Client.find({ user_id: user._id }),
+            Project.find({ user_id: user._id }).populate({ path: 'client_id', model: 'Client' }),
+            Invoice.find({ user_id: user._id }).populate('client_id'),
+            Expense.find({ user_id: user._id }),
+            Payment.find({
+                $or: [
+                    { user_id: user._id },
+                    { client_id: user._id },
+                    { freelancer_id: user._id }
+                ]
+            }),
+            Bid.find({ freelancer_id: user._id })
+        ]);
+
+        const invoiceRevenue = invoices
+            .filter(inv => inv.status === 'paid')
+            .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+        const projectPayments = payments.filter(p => p.project_id && p.status === 'completed' && p.freelancer_id?.toString() === user._id.toString());
+        const projectRevenue = projectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const totalRevenue = invoiceRevenue + projectRevenue;
+
+        const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const bidsPlaced = bids.length;
+        const bidsWon = bids.filter(b => b.status === 'accepted').length;
+        const conversionRate = bidsPlaced > 0 ? Math.round((bidsWon / bidsPlaced) * 100) : 0;
+
+        const clientsWithRevenue = clients.map(c => {
+            const clientInvoices = invoices.filter(inv => inv.client_id?._id?.toString() === c._id.toString() && inv.status === 'paid');
+            const invoiceSum = clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+            const clientProjectIds = projects.filter(p => p.client_id?._id?.toString() === c._id.toString()).map(p => p._id.toString());
+            const clientProjectPayments = payments.filter(p => p.status === 'completed' && p.project_id && clientProjectIds.includes(p.project_id.toString()));
+            const projectSum = clientProjectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+            return {
+                id: c._id,
+                name: c.contact_name,
+                company: c.company_name,
+                email: c.email,
+                total_revenue: invoiceSum + projectSum
+            };
+        });
+
+        res.json({
+            freelancer: {
+                id: user._id,
+                name: user.full_name,
+                email: user.email,
+                subscription_tier: user.subscription_tier || 'free',
+                company_name: user.company_name,
+                joined_date: user.created_at
+            },
+            stats: {
+                total_revenue: totalRevenue,
+                net_income: totalRevenue - totalExpenses,
+                conversion_rate: conversionRate,
+                active_contracts: projects.filter(p => p.status === 'active' || p.status === 'in_progress').length
+            },
+            clients: clientsWithRevenue,
+            projects: projects.map(p => ({
+                id: p._id,
+                title: p.title,
+                status: p.status,
+                budget: p.budget || p.budget_max || 0,
+                client_name: p.client_name || p.client_id?.contact_name || p.client_id?.full_name || 'No Client'
+            })),
+            invoices: invoices.map(i => ({
+                id: i._id,
+                number: i.invoice_number,
+                amount: i.total_amount,
+                status: i.status,
+                client_name: i.client_id?.contact_name || 'Unknown',
+                client_company: i.client_id?.company_name || '-'
+            }))
+        });
+    } catch (err) {
+        console.error('❌ Error fetching freelancer details:', err);
         res.status(500).json({ error: err.message });
     }
 });

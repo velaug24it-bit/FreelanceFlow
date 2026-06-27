@@ -11,6 +11,7 @@ import {
 const AdminFreelancers = () => {
     const [freelancers, setFreelancers] = useState([]);
     const [selectedFreelancer, setSelectedFreelancer] = useState(null);
+    const [detailsLoading, setDetailsLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterPlan, setFilterPlan] = useState('all');
@@ -53,6 +54,8 @@ const AdminFreelancers = () => {
 
     const fetchFreelancerDetails = async (id) => {
         try {
+            setDetailsLoading(true);
+            setSelectedFreelancer(true);
             const token = localStorage.getItem('token');
             const response = await axios.get(`/api/admin/freelancers/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -60,6 +63,9 @@ const AdminFreelancers = () => {
             setSelectedFreelancer(response.data);
         } catch (err) {
             console.error('Failed to fetch freelancer details:', err);
+            setSelectedFreelancer(null);
+        } finally {
+            setDetailsLoading(false);
         }
     };
 
@@ -321,127 +327,185 @@ const AdminFreelancers = () => {
                             maxHeight: '90vh',
                             overflow: 'auto'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
-                                <div>
-                                    <h2 style={{ fontSize: '1.5rem' }}>{selectedFreelancer.freelancer.name}</h2>
-                                    <p style={{ color: '#6b7280' }}>{selectedFreelancer.freelancer.email}</p>
-                                    <p style={{ color: '#6b7280' }}>Joined: {formatDate(selectedFreelancer.freelancer.joined_date)}</p>
+                            {detailsLoading ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '1rem' }}>
+                                    <div className="spin" style={{ width: '36px', height: '36px', border: '4px solid #f3f3f3', borderTop: '4px solid #8b5cf6', borderRadius: '50%' }}></div>
+                                    <p style={{ color: '#6b7280' }}>Fetching freelancer details...</p>
                                 </div>
-                                <button
-                                    onClick={() => setSelectedFreelancer(null)}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        background: '#ef4444',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    Close
-                                </button>
-                            </div>
-
-                            {/* Stats Cards */}
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                                gap: '1rem',
-                                marginBottom: '1.5rem'
-                            }}>
-                                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Total Revenue</p>
-                                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>
-                                        {formatCurrency(selectedFreelancer.stats.total_revenue)}
-                                    </p>
-                                </div>
-                                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Net Income</p>
-                                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3b82f6' }}>
-                                        {formatCurrency(selectedFreelancer.stats.net_income)}
-                                    </p>
-                                </div>
-                                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Conversion Rate</p>
-                                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#8b5cf6' }}>
-                                        {selectedFreelancer.stats.conversion_rate || 0}%
-                                    </p>
-                                </div>
-                                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Active Contracts</p>
-                                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f59e0b' }}>
-                                        {selectedFreelancer.stats.active_contracts || 0}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Clients List */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                <h3 style={{ marginBottom: '0.5rem' }}>Clients ({selectedFreelancer.clients?.length || 0})</h3>
-                                {selectedFreelancer.clients?.length > 0 ? (
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr style={{ background: '#f9fafb' }}>
-                                                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
-                                                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>Company</th>
-                                                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Revenue</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedFreelancer.clients.map((client, idx) => (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                                        <td style={{ padding: '0.5rem' }}>{client.name}</td>
-                                                        <td style={{ padding: '0.5rem' }}>{client.company || '-'}</td>
-                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(client.total_revenue)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                            ) : selectedFreelancer.freelancer ? (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
+                                        <div>
+                                            <h2 style={{ fontSize: '1.5rem' }}>{selectedFreelancer.freelancer.name}</h2>
+                                            <p style={{ color: '#6b7280' }}>{selectedFreelancer.freelancer.email}</p>
+                                            <p style={{ color: '#6b7280' }}>Joined: {formatDate(selectedFreelancer.freelancer.joined_date)}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => setSelectedFreelancer(null)}
+                                            style={{
+                                                padding: '0.5rem 1rem',
+                                                background: '#ef4444',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Close
+                                        </button>
                                     </div>
-                                ) : (
-                                    <p style={{ color: '#6b7280' }}>No clients yet</p>
-                                )}
-                            </div>
 
-                            {/* Projects List */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                <h3 style={{ marginBottom: '0.5rem' }}>Projects ({selectedFreelancer.projects?.length || 0})</h3>
-                                {selectedFreelancer.projects?.length > 0 ? (
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                            <thead>
-                                                <tr style={{ background: '#f9fafb' }}>
-                                                    <th style={{ padding: '0.5rem', textAlign: 'left' }}>Title</th>
-                                                    <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
-                                                    <th style={{ padding: '0.5rem', textAlign: 'right' }}>Budget</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedFreelancer.projects.map((project, idx) => (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                                        <td style={{ padding: '0.5rem' }}>{project.title}</td>
-                                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                                            <span style={{
-                                                                padding: '0.25rem 0.5rem',
-                                                                borderRadius: '12px',
-                                                                fontSize: '0.7rem',
-                                                                background: project.status === 'completed' ? '#d1fae5' : '#fef3c7',
-                                                                color: project.status === 'completed' ? '#065f46' : '#92400e'
-                                                            }}>
-                                                                {project.status}
-                                                            </span>
-                                                        </td>
-                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(project.budget)}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                    {/* Stats Cards */}
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                                        gap: '1rem',
+                                        marginBottom: '1.5rem'
+                                    }}>
+                                        <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Total Revenue</p>
+                                            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>
+                                                {formatCurrency(selectedFreelancer.stats.total_revenue)}
+                                            </p>
+                                        </div>
+                                        <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Net Income</p>
+                                            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#3b82f6' }}>
+                                                {formatCurrency(selectedFreelancer.stats.net_income)}
+                                            </p>
+                                        </div>
+                                        <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Conversion Rate</p>
+                                            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#8b5cf6' }}>
+                                                {selectedFreelancer.stats.conversion_rate || 0}%
+                                            </p>
+                                        </div>
+                                        <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                                            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Active Contracts</p>
+                                            <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#f59e0b' }}>
+                                                {selectedFreelancer.stats.active_contracts || 0}
+                                            </p>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <p style={{ color: '#6b7280' }}>No projects yet</p>
-                                )}
-                            </div>
+
+                                    {/* Clients List */}
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <h3 style={{ marginBottom: '0.5rem' }}>Clients ({selectedFreelancer.clients?.length || 0})</h3>
+                                        {selectedFreelancer.clients?.length > 0 ? (
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead>
+                                                        <tr style={{ background: '#f9fafb' }}>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Company</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Revenue</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedFreelancer.clients.map((client, idx) => (
+                                                            <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                                                <td style={{ padding: '0.5rem' }}>{client.name}</td>
+                                                                <td style={{ padding: '0.5rem' }}>{client.company || '-'}</td>
+                                                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>{formatCurrency(client.total_revenue)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <p style={{ color: '#6b7280' }}>No clients yet</p>
+                                        )}
+                                    </div>
+
+                                    {/* Invoices List */}
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <h3 style={{ marginBottom: '0.5rem' }}>Invoices ({selectedFreelancer.invoices?.length || 0})</h3>
+                                        {selectedFreelancer.invoices?.length > 0 ? (
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead>
+                                                        <tr style={{ background: '#f9fafb' }}>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Invoice #</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Client (For Whom)</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedFreelancer.invoices.map((invoice, idx) => (
+                                                            <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                                                <td style={{ padding: '0.5rem' }}>{invoice.number}</td>
+                                                                <td style={{ padding: '0.5rem' }}>
+                                                                    {invoice.client_name} {invoice.client_company ? `(${invoice.client_company})` : ''}
+                                                                </td>
+                                                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>
+                                                                    {formatCurrency(invoice.amount)}
+                                                                </td>
+                                                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                    <span style={{
+                                                                        padding: '0.25rem 0.5rem',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '0.7rem',
+                                                                        background: invoice.status === 'paid' ? '#d1fae5' : 
+                                                                                    invoice.status === 'pending' ? '#fef3c7' : '#fee2e2',
+                                                                        color: invoice.status === 'paid' ? '#065f46' : 
+                                                                               invoice.status === 'pending' ? '#92400e' : '#991b1b'
+                                                                    }}>
+                                                                        {invoice.status}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <p style={{ color: '#6b7280' }}>No invoices yet</p>
+                                        )}
+                                    </div>
+
+                                    {/* Projects List */}
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <h3 style={{ marginBottom: '0.5rem' }}>Projects ({selectedFreelancer.projects?.length || 0})</h3>
+                                        {selectedFreelancer.projects?.length > 0 ? (
+                                            <div style={{ overflowX: 'auto' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead>
+                                                        <tr style={{ background: '#f9fafb' }}>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Title</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'left' }}>Client</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                                                            <th style={{ padding: '0.5rem', textAlign: 'right' }}>Budget</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedFreelancer.projects.map((project, idx) => (
+                                                            <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                                                <td style={{ padding: '0.5rem' }}>{project.title}</td>
+                                                                <td style={{ padding: '0.5rem', color: '#6b7280' }}>{project.client_name}</td>
+                                                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                                    <span style={{
+                                                                        padding: '0.25rem 0.5rem',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '0.7rem',
+                                                                        background: project.status === 'completed' ? '#d1fae5' : '#fef3c7',
+                                                                        color: project.status === 'completed' ? '#065f46' : '#92400e'
+                                                                    }}>
+                                                                        {project.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(project.budget)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <p style={{ color: '#6b7280' }}>No projects yet</p>
+                                        )}
+                                    </div>
+                                </>
+                            ) : null}
                         </div>
                     </div>
                 )}

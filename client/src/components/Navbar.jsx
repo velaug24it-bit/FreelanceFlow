@@ -47,8 +47,8 @@ const Navbar = () => {
   ];
 
   const adminNavItems = [
-    { name: 'Admin', path: '/admin', icon: Shield },
-    { name: 'Freelancers', path: '/admin/freelancers', icon: Users },
+    { name: 'Admin', path: '/admin-dashboard', icon: Shield },
+    { name: 'Freelancers', path: '/admin-freelancers', icon: Users },
   ];
 
   const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;

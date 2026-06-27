@@ -44,6 +44,7 @@ const AdminDashboard = () => {
   const [filterPlan, setFilterPlan] = useState('all');
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -119,6 +120,8 @@ const AdminDashboard = () => {
 
   const fetchUserDetail = async (userId) => {
     try {
+      setUserDetailLoading(true);
+      setShowUserDetail(true);
       const token = localStorage.getItem('token');
       console.log('🔍 Fetching user details for:', userId);
       
@@ -128,10 +131,12 @@ const AdminDashboard = () => {
       
       console.log('📦 User details:', response.data);
       setUserDetail(response.data);
-      setShowUserDetail(true);
     } catch (err) {
       console.error('❌ Failed to fetch user details:', err);
       alert('Failed to load user details');
+      setShowUserDetail(false);
+    } finally {
+      setUserDetailLoading(false);
     }
   };
 
@@ -306,6 +311,26 @@ const AdminDashboard = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/admin-freelancers')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          >
+            <Users size={16} />
+            Freelancers
+          </button>
           <button
             onClick={fetchAdminData}
             disabled={refreshing}
@@ -747,7 +772,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* User Detail Modal */}
-        {showUserDetail && userDetail && (
+        {showUserDetail && (
           <div style={{ 
             position: 'fixed', 
             top: 0, 
@@ -771,176 +796,235 @@ const AdminDashboard = () => {
               maxHeight: '90vh', 
               overflow: 'auto' 
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.5rem' }}>{userDetail.user?.name || userDetail.user?.full_name || 'User'}</h2>
-                  <p style={{ color: '#6b7280' }}>{userDetail.user?.email}</p>
-                  <p style={{ color: '#6b7280' }}>Plan: <strong>{userDetail.user?.subscription_tier || 'Free'}</strong></p>
-                  <p style={{ color: '#6b7280' }}>Connects: <strong>{userDetail.user?.connects_balance || 0}</strong></p>
+              {userDetailLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '1rem' }}>
+                  <RefreshCw size={36} className="spin" color="#8b5cf6" />
+                  <p style={{ color: '#6b7280' }}>Fetching user history details...</p>
                 </div>
-                <button 
-                  onClick={() => setShowUserDetail(false)} 
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    background: '#ef4444', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: '8px', 
-                    cursor: 'pointer',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
-                >
-                  Close
-                </button>
-              </div>
-
-              {/* Stats Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total Revenue</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>
-                    {formatCurrency(userDetail.stats?.total_revenue || 0)}
-                  </p>
-                </div>
-                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Revenue</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>
-                    {formatCurrency(userDetail.stats?.connects_revenue || 0)}
-                  </p>
-                </div>
-                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Subscription Revenue</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#8b5cf6' }}>
-                    {formatCurrency(userDetail.stats?.subscription_revenue || 0)}
-                  </p>
-                </div>
-                <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Purchased</p>
-                  <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3b82f6' }}>
-                    {userDetail.stats?.total_connects_purchased || 0}
-                  </p>
-                </div>
-              </div>
-
-              {/* Payment History */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '0.75rem' }}>Payment History ({userDetail.payments?.length || 0})</h3>
-                {userDetail.payments?.length > 0 ? (
-                  <div style={{ overflowX: 'auto', maxHeight: '300px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Date</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Description</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {userDetail.payments.map((payment, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '0.5rem' }}>
-                              {new Date(payment.created_at || payment.paid_at).toLocaleDateString()}
-                            </td>
-                            <td style={{ padding: '0.5rem' }}>
-                              {payment.description || 
-                               (payment.package_id ? `${payment.connects_purchased || 0} Connects` : 'Payment')}
-                            </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>
-                              {formatCurrency(payment.amount)}
-                            </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                              <span style={{
-                                padding: '0.15rem 0.5rem',
-                                borderRadius: '12px',
-                                fontSize: '0.7rem',
-                                background: payment.status === 'completed' ? '#d1fae5' : '#fef3c7',
-                                color: payment.status === 'completed' ? '#065f46' : '#92400e'
-                              }}>
-                                {payment.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              ) : userDetail ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h2 style={{ fontSize: '1.5rem' }}>{userDetail.user?.name || userDetail.user?.full_name || 'User'}</h2>
+                      <p style={{ color: '#6b7280' }}>{userDetail.user?.email}</p>
+                      <p style={{ color: '#6b7280' }}>Plan: <strong>{userDetail.user?.subscription_tier || 'Free'}</strong></p>
+                      <p style={{ color: '#6b7280' }}>Connects: <strong>{userDetail.user?.connects_balance || 0}</strong></p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setShowUserDetail(false);
+                        setUserDetail(null);
+                      }} 
+                      style={{ 
+                        padding: '0.5rem 1rem', 
+                        background: '#ef4444', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer',
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
+                    >
+                      Close
+                    </button>
                   </div>
-                ) : (
-                  <p style={{ color: '#6b7280' }}>No payment history</p>
-                )}
-              </div>
 
-              {/* Clients */}
-              <div style={{ marginBottom: '1rem' }}>
-                <h3 style={{ marginBottom: '0.5rem' }}>Clients ({userDetail.clients?.length || 0})</h3>
-                {userDetail.clients?.length > 0 ? (
-                  <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Company</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Revenue</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {userDetail.clients.map((client, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '0.5rem' }}>{client.name || client.contact_name}</td>
-                            <td style={{ padding: '0.5rem' }}>{client.company || client.company_name || '-'}</td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
-                              {formatCurrency(client.total_revenue || 0)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  {/* Stats Cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total Revenue</p>
+                      <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>
+                        {formatCurrency(userDetail.stats?.total_revenue || 0)}
+                      </p>
+                    </div>
+                    <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Revenue</p>
+                      <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>
+                        {formatCurrency(userDetail.stats?.connects_revenue || 0)}
+                      </p>
+                    </div>
+                    <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Subscription Revenue</p>
+                      <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#8b5cf6' }}>
+                        {formatCurrency(userDetail.stats?.subscription_revenue || 0)}
+                      </p>
+                    </div>
+                    <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Purchased</p>
+                      <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3b82f6' }}>
+                        {userDetail.stats?.total_connects_purchased || 0}
+                      </p>
+                    </div>
                   </div>
-                ) : <p style={{ color: '#6b7280' }}>No clients</p>}
-              </div>
 
-              {/* Projects */}
-              <div>
-                <h3 style={{ marginBottom: '0.5rem' }}>Projects ({userDetail.projects?.length || 0})</h3>
-                {userDetail.projects?.length > 0 ? (
-                  <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
-                        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Title</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
-                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Budget</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {userDetail.projects.map((project, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                            <td style={{ padding: '0.5rem' }}>{project.title}</td>
-                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                              <span style={{
-                                padding: '0.15rem 0.5rem',
-                                borderRadius: '12px',
-                                fontSize: '0.7rem',
-                                background: project.status === 'completed' ? '#d1fae5' : 
-                                          project.status === 'open' ? '#dbeafe' : '#fef3c7',
-                                color: project.status === 'completed' ? '#065f46' : 
-                                       project.status === 'open' ? '#1e40af' : '#92400e'
-                              }}>
-                                {project.status}
-                              </span>
-                            </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
-                              {formatCurrency(project.budget_max || project.budget || 0)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  {/* Payment History */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ marginBottom: '0.75rem' }}>Payment History ({userDetail.payments?.length || 0})</h3>
+                    {userDetail.payments?.length > 0 ? (
+                      <div style={{ overflowX: 'auto', maxHeight: '300px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                            <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Date</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Description</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userDetail.payments.map((payment, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '0.5rem' }}>
+                                  {new Date(payment.created_at || payment.paid_at).toLocaleDateString()}
+                                </td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  {payment.description || 
+                                   (payment.package_id ? `${payment.connects_purchased || 0} Connects` : 'Payment')}
+                                </td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>
+                                  {formatCurrency(payment.amount)}
+                                </td>
+                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '0.15rem 0.5rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.7rem',
+                                    background: payment.status === 'completed' ? '#d1fae5' : '#fef3c7',
+                                    color: payment.status === 'completed' ? '#065f46' : '#92400e'
+                                  }}>
+                                    {payment.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p style={{ color: '#6b7280' }}>No payment history</p>
+                    )}
                   </div>
-                ) : <p style={{ color: '#6b7280' }}>No projects</p>}
-              </div>
+
+                  {/* Clients */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Clients ({userDetail.clients?.length || 0})</h3>
+                    {userDetail.clients?.length > 0 ? (
+                      <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                            <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Name</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Company</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'right' }}>Revenue</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userDetail.clients.map((client, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '0.5rem' }}>{client.name || client.contact_name}</td>
+                                <td style={{ padding: '0.5rem' }}>{client.company || client.company_name || '-'}</td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>
+                                  {formatCurrency(client.total_revenue || 0)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p style={{ color: '#6b7280' }}>No clients</p>}
+                  </div>
+
+                  {/* Invoices */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Invoices ({userDetail.invoices?.length || 0})</h3>
+                    {userDetail.invoices?.length > 0 ? (
+                      <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                            <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Invoice #</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Client (For Whom)</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userDetail.invoices.map((invoice, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '0.5rem' }}>{invoice.number}</td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  {invoice.client_name} {invoice.client_company ? `(${invoice.client_company})` : ''}
+                                </td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>
+                                  {formatCurrency(invoice.amount)}
+                                </td>
+                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '0.15rem 0.5rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.7rem',
+                                    background: invoice.status === 'paid' ? '#d1fae5' : 
+                                                invoice.status === 'pending' ? '#fef3c7' : '#fee2e2',
+                                    color: invoice.status === 'paid' ? '#065f46' : 
+                                           invoice.status === 'pending' ? '#92400e' : '#991b1b'
+                                  }}>
+                                    {invoice.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p style={{ color: '#6b7280' }}>No invoices</p>}
+                  </div>
+
+                  {/* Projects */}
+                  <div>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Projects ({userDetail.projects?.length || 0})</h3>
+                    {userDetail.projects?.length > 0 ? (
+                      <div style={{ overflowX: 'auto', maxHeight: '200px', overflowY: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+                            <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Title</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'left' }}>Client</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'center' }}>Status</th>
+                              <th style={{ padding: '0.5rem', textAlign: 'right' }}>Budget</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {userDetail.projects.map((project, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                <td style={{ padding: '0.5rem' }}>{project.title}</td>
+                                <td style={{ padding: '0.5rem', color: '#6b7280' }}>{project.client_name}</td>
+                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    padding: '0.15rem 0.5rem',
+                                    borderRadius: '12px',
+                                    fontSize: '0.7rem',
+                                    background: project.status === 'completed' ? '#d1fae5' : 
+                                              project.status === 'open' ? '#dbeafe' : '#fef3c7',
+                                    color: project.status === 'completed' ? '#065f46' : 
+                                           project.status === 'open' ? '#1e40af' : '#92400e'
+                                  }}>
+                                    {project.status}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                  {formatCurrency(project.budget_max || project.budget || 0)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p style={{ color: '#6b7280' }}>No projects</p>}
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         )}
