@@ -60,9 +60,37 @@ const Reports = () => {
         return inv.status === 'pending' && inv.due_date && new Date(inv.due_date) < new Date();
       });
       
-      // Calculate project stats
-      const activeProjects = projects.filter(p => p.status === 'active');
-      const completedProjects = projects.filter(p => p.status === 'completed');
+      // Calculate project stats from invoices and paid amounts
+      const invoicesByProject = invoices.reduce((map, inv) => {
+        const projectId = inv.project_id?.toString();
+        if (!projectId) return map;
+        if (!map[projectId]) map[projectId] = [];
+        map[projectId].push(inv);
+        return map;
+      }, {});
+
+      let activeProjectCount = 0;
+      let completedProjectCount = 0;
+      
+      projects.forEach(project => {
+        const projectId = project._id?.toString();
+        const projectInvoices = projectId ? invoicesByProject[projectId] || [] : [];
+        const paidInvoiceTotal = projectInvoices
+          .filter(inv => inv.status === 'paid')
+          .reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
+
+        const isCompletedByPayment = project.budget > 0
+          ? paidInvoiceTotal >= project.budget
+          : projectInvoices.length > 0 && projectInvoices.every(inv => inv.status === 'paid');
+
+        if (project.status === 'completed' || isCompletedByPayment) {
+          completedProjectCount += 1;
+        } else {
+          activeProjectCount += 1;
+        }
+      });
+
+      const totalProjectCount = projects.length;
       
       // Generate monthly data for chart
       const monthlyData = generateMonthlyData(invoices, expenses);
@@ -72,9 +100,9 @@ const Reports = () => {
         totalExpenses,
         netProfit: totalRevenue - totalExpenses,
         totalClients: clients.length,
-        totalProjects: projects.length,
-        activeProjects: activeProjects.length,
-        completedProjects: completedProjects.length,
+        totalProjects: totalProjectCount,
+        activeProjects: activeProjectCount,
+        completedProjects: completedProjectCount,
         totalInvoices: invoices.length,
         paidInvoices: paidInvoices.length,
         pendingInvoices: pendingInvoices.length,

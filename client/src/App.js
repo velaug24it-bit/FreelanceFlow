@@ -15,6 +15,7 @@ import ManageProject from './pages/ManageProject';
 import ProjectForm from './pages/ProjectForm';
 import Invoices from './pages/Invoices';
 import InvoiceForm from './pages/InvoiceForm';
+import Contracts from './pages/Contracts';
 import KanbanBoard from './pages/KanbanBoard';
 import Expenses from './pages/Expenses';
 import Reports from './pages/Reports';
@@ -84,15 +85,24 @@ function App() {
               </ProtectedRoute>
             } />
 
+            <Route path="/marketplace/projects/:id" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <Marketplace />
+                </>
+              </ProtectedRoute>
+            } />
+
             // Add this route if you want a dedicated active projects page
-<Route path="/marketplace/active" element={
-    <ProtectedRoute>
-        <>
-            <Navbar />
-            <Marketplace tab="active" />
-        </>
-    </ProtectedRoute>
-} />
+            <Route path="/marketplace/active" element={
+                <ProtectedRoute>
+                    <>
+                        <Navbar />
+                        <Marketplace tab="active" />
+                    </>
+                </ProtectedRoute>
+            } />
             
             <Route path="/subscription" element={
               <ProtectedRoute>
@@ -156,6 +166,22 @@ function App() {
                 </>
               </ProtectedRoute>
             } />
+            <Route path="/projects/:id/edit" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <ProjectForm />
+                </>
+              </ProtectedRoute>
+            } />
+            <Route path="/projects/:id" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <ManageProject />
+                </>
+              </ProtectedRoute>
+            } />
             <Route path="/projects/:id/manage" element={
               <ProtectedRoute>
                 <>
@@ -182,12 +208,35 @@ function App() {
                 </>
               </ProtectedRoute>
             } />
-            
+            <Route path="/invoices/:id" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <Invoices />
+                </>
+              </ProtectedRoute>
+            } />
             <Route path="/invoices/new" element={
               <ProtectedRoute>
                 <>
                   <Navbar />
                   <InvoiceForm />
+                </>
+              </ProtectedRoute>
+            } />
+            <Route path="/contracts" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <Contracts />
+                </>
+              </ProtectedRoute>
+            } />
+            <Route path="/contracts/:id" element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <Contracts />
                 </>
               </ProtectedRoute>
             } />

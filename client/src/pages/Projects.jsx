@@ -327,7 +327,7 @@ const Projects = () => {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>
+                        <table className="projects-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(0.8rem, 2vw, 1rem)' }}>
                             <thead>
                                 <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
                                     <th style={{ padding: 'clamp(0.5rem, 2vw, 0.75rem)', textAlign: 'center', width: '40px' }}>
@@ -369,26 +369,27 @@ const Projects = () => {
                                             <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)' }} className="mobile-hidden">
                                                 {clientName}
                                             </td>
-                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'right', fontWeight: '600' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'right', fontWeight: '600', whiteSpace: 'nowrap' }}>
                                                 {formatCurrency(project.budget)}
                                             </td>
                                             <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)' }} className="mobile-hidden">
                                                 {formatDate(project.due_date)}
                                             </td>
-                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>
+                                            <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                                 <span style={{
                                                     padding: '0.25rem 0.75rem',
                                                     borderRadius: '20px',
                                                     fontSize: '0.75rem',
                                                     background: statusColors.bg,
                                                     color: statusColors.color,
-                                                    textTransform: 'capitalize'
+                                                    textTransform: 'capitalize',
+                                                    display: 'inline-block'
                                                 }}>
                                                     {statusColors.label}
                                                 </span>
                                             </td>
                                             <td style={{ padding: 'clamp(0.5rem, 2vw, 1rem)', textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                                <div className="project-action-group" style={{ display: 'flex', gap: '0.25rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                                                     <button
                                                         onClick={() => navigate(`/projects/${project._id}/edit`)}
                                                         style={{
@@ -398,7 +399,8 @@ const Projects = () => {
                                                             border: 'none',
                                                             borderRadius: '6px',
                                                             cursor: 'pointer',
-                                                            transition: 'background 0.2s'
+                                                            transition: 'background 0.2s',
+                                                            minWidth: '2.2rem'
                                                         }}
                                                         onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
                                                         onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
@@ -414,7 +416,8 @@ const Projects = () => {
                                                             border: 'none',
                                                             borderRadius: '6px',
                                                             cursor: 'pointer',
-                                                            transition: 'background 0.2s'
+                                                            transition: 'background 0.2s',
+                                                            minWidth: '4.5rem'
                                                         }}
                                                         onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
                                                         onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
@@ -430,7 +433,8 @@ const Projects = () => {
                                                             border: 'none',
                                                             borderRadius: '6px',
                                                             cursor: 'pointer',
-                                                            transition: 'background 0.2s'
+                                                            transition: 'background 0.2s',
+                                                            minWidth: '2.2rem'
                                                         }}
                                                         onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
                                                         onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
@@ -444,6 +448,54 @@ const Projects = () => {
                                 })}
                             </tbody>
                         </table>
+                        <div className="mobile-only project-mobile-list">
+                            {projects.map((project) => {
+                                const statusColors = getStatusColor(project.status);
+                                const clientName = project.client_id?.contact_name || project.client_name || 'No Client';
+                                return (
+                                    <div key={project._id} className="project-mobile-card">
+                                        <div className="project-mobile-row">
+                                            <div style={{ fontWeight: 700 }}>{project.title || 'Untitled'}</div>
+                                            <span className="project-mobile-status" style={{ background: statusColors.bg, color: statusColors.color }}>
+                                                {statusColors.label}
+                                            </span>
+                                        </div>
+                                        <div className="project-mobile-row">
+                                            <span style={{ color: '#64748b' }}>Budget</span>
+                                            <strong>{formatCurrency(project.budget)}</strong>
+                                        </div>
+                                        <div className="project-mobile-row">
+                                            <span style={{ color: '#64748b' }}>Client</span>
+                                            <span>{clientName}</span>
+                                        </div>
+                                        <div className="project-mobile-row">
+                                            <span style={{ color: '#64748b' }}>Due</span>
+                                            <span>{formatDate(project.due_date)}</span>
+                                        </div>
+                                        <div className="project-mobile-actions">
+                                            <button
+                                                onClick={() => navigate(`/projects/${project._id}/edit`)}
+                                                className="project-mobile-action-btn edit-btn"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() => navigate(`/projects/${project._id}/manage`)}
+                                                className="project-mobile-action-btn manage-btn"
+                                            >
+                                                Manage
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(project)}
+                                                className="project-mobile-action-btn delete-btn"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                     <div style={{
                         padding: '1rem',

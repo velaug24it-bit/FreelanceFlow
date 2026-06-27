@@ -257,6 +257,107 @@ tr:hover {
   }
 }
 
+/* Project page specific responsive fixes */
+@media (max-width: 768px) {
+  .projects-table {
+    display: none !important;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .projects-table th,
+  .projects-table td {
+    padding: 0.75rem !important;
+    white-space: normal !important;
+    word-break: break-word;
+  }
+
+  .project-action-group {
+    justify-content: center !important;
+    gap: 0.35rem !important;
+  }
+
+  .project-actions-cell {
+    min-width: 0 !important;
+  }
+
+  .project-mobile-list {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .project-mobile-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  }
+
+  .project-mobile-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  .project-mobile-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 5rem;
+    text-align: center;
+  }
+
+  .project-mobile-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .project-mobile-action-btn {
+    padding: 0.75rem 0.5rem;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    min-height: 42px;
+  }
+
+  .project-mobile-action-btn.edit-btn {
+    background: #3b82f6;
+  }
+
+  .project-mobile-action-btn.manage-btn {
+    background: #10b981;
+  }
+
+  .project-mobile-action-btn.delete-btn {
+    background: #ef4444;
+  }
+
+  .manage-project-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .manage-project-info-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .project-progress-row,
+  .project-workspace-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+}
+
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;

@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Briefcase, DollarSign, Clock, Users, Plus, Check, X } from 'lucide-react';
 import ProjectStatus from '../components/ProjectStatus';
 
 const Marketplace = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
+    const { id: routeProjectId } = useParams();
     const [activeTab, setActiveTab] = useState('browse');
     const [projects, setProjects] = useState([]);
     const [myProjects, setMyProjects] = useState([]);
     const [myBids, setMyBids] = useState([]);
     const [activeProjects, setActiveProjects] = useState([]);
+    const [routeProject, setRouteProject] = useState(null);
+    const [routeProjectLoading, setRouteProjectLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [showPostForm, setShowPostForm] = useState(false);
     const [showBidForm, setShowBidForm] = useState(null);
@@ -37,6 +42,31 @@ const Marketplace = () => {
     useEffect(() => {
         fetchData();
     }, [activeTab]);
+
+    useEffect(() => {
+        if (!routeProjectId) {
+            setRouteProject(null);
+            return;
+        }
+
+        const fetchRouteProject = async () => {
+            setRouteProjectLoading(true);
+            const token = localStorage.getItem('token');
+            try {
+                const res = await axios.get(`/api/marketplace/projects/${routeProjectId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setRouteProject(res.data.project || null);
+            } catch (err) {
+                console.error('Error fetching marketplace project by route id:', err);
+                setRouteProject(null);
+            } finally {
+                setRouteProjectLoading(false);
+            }
+        };
+
+        fetchRouteProject();
+    }, [routeProjectId]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -494,6 +524,43 @@ const Marketplace = () => {
             </div>
         );
     };
+
+    if (routeProjectId) {
+        const isOwner = routeProject?.client_id?.toString() === user?.id || routeProject?.client_id?.toString() === user?._id;
+        const isSelectedFreelancer = routeProject?.selected_freelancer_id?.toString() === user?.id || routeProject?.selected_freelancer_id?.toString() === user?._id;
+
+        return (
+            <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
+                    <button
+                        onClick={() => navigate('/marketplace')}
+                        style={{
+                            padding: '0.75rem 1rem',
+                            background: 'white',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            color: '#475569'
+                        }}
+                    >
+                        ← Back to Marketplace
+                    </button>
+                    <h1 style={{ fontSize: '2rem', margin: 0 }}>Marketplace Project</h1>
+                </div>
+
+                {routeProjectLoading ? (
+                    <div style={{ textAlign: 'center', padding: '2rem' }}>Loading project...</div>
+                ) : routeProject ? (
+                    renderProjectCard(routeProject, isOwner, isSelectedFreelancer)
+                ) : (
+                    <div style={{ textAlign: 'center', padding: '2rem', background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                        <p style={{ margin: 0, color: '#475569', fontSize: '1rem' }}>Project not found.</p>
+                        <p style={{ marginTop: '0.5rem', color: '#94a3b8' }}>It may have been removed or is not available for your account.</p>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>

@@ -881,6 +881,14 @@ const NotificationBell = () => {
                                                         return;
                                                     }
                                                 } catch (e) { }
+
+                                                // Rewrite common backend paths to existing client routes
+                                                if (notification.action_url.startsWith('/projects/') && !notification.action_url.includes('/manage')) {
+                                                    const projectId = notification.action_url.replace('/projects/', '');
+                                                    navigate(`/projects/${projectId}`);
+                                                    return;
+                                                }
+
                                                 navigate(notification.action_url);
                                                 return;
                                             }
@@ -889,13 +897,29 @@ const NotificationBell = () => {
                                             const refId = notification.reference_id;
                                             const refType = notification.reference_type;
 
-                                            if (type.includes('invoice') || type.includes('payment') || refType === 'invoice') {
-                                                navigate('/invoices');
-                                            } else if (type.includes('project') || type.includes('bid') || refType === 'project') {
+                                            if (refType === 'invoice' || type.includes('invoice')) {
                                                 if (refId) {
-                                                    navigate(`/projects/${refId}/manage`);
+                                                    navigate(`/invoices/${refId}`);
+                                                } else {
+                                                    navigate('/invoices');
+                                                }
+                                            } else if (refType === 'payment') {
+                                                if (refId) {
+                                                    navigate(`/projects/${refId}`);
                                                 } else {
                                                     navigate('/projects');
+                                                }
+                                            } else if (refType === 'project' || type.includes('project') || type.includes('bid')) {
+                                                if (refId) {
+                                                    navigate(`/projects/${refId}`);
+                                                } else {
+                                                    navigate('/projects');
+                                                }
+                                            } else if (refType === 'contract' || type.includes('contract')) {
+                                                if (refId) {
+                                                    navigate(`/contracts/${refId}`);
+                                                } else {
+                                                    navigate('/contracts');
                                                 }
                                             } else {
                                                 navigate('/projects');

@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const ProjectForm = () => {
     const navigate = useNavigate();
+    const { id } = useParams();
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [fetching, setFetching] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
     const [formData, setFormData] = useState({
         client_id: '',
         title: '',
@@ -21,7 +24,13 @@ const ProjectForm = () => {
 
     useEffect(() => {
         fetchClients();
-    }, []);
+        if (id) {
+            setIsEditMode(true);
+            fetchProject();
+        } else {
+            setIsEditMode(false);
+        }
+    }, [id]);
 
     const fetchClients = async () => {
         try {
@@ -64,6 +73,33 @@ const ProjectForm = () => {
         });
     };
 
+    const fetchProject = async () => {
+        setFetching(true);
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            const response = await axios.get(`${API_URL}/projects/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const project = response.data.project;
+            if (project) {
+                setFormData({
+                    client_id: project.client_id?._id || project.client_id || '',
+                    title: project.title || '',
+                    description: project.description || '',
+                    budget: project.budget || '',
+                    due_date: project.due_date ? project.due_date.split('T')[0] : '',
+                    project_type: project.project_type || 'web_development'
+                });
+            }
+        } catch (err) {
+            console.error('❌ Failed to load project for editing:', err);
+            setError('Failed to load project details.');
+        } finally {
+            setFetching(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -104,35 +140,42 @@ const ProjectForm = () => {
 
             console.log('📤 Sending project data:', projectData);
 
-            const response = await axios.post(`${API_URL}/projects`, projectData, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
+            const response = id
+                ? await axios.put(`${API_URL}/projects/${id}`, projectData, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                })
+                : await axios.post(`${API_URL}/projects`, projectData, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
 
             console.log('✅ Project created:', response.data);
 
             if (response.data.success || response.data.project) {
                 setSuccess(true);
-                alert('✅ Project created successfully!');
+                alert(id ? '✅ Project updated successfully!' : '✅ Project created successfully!');
 
-                // Reset form
-                setFormData({
-                    client_id: '',
-                    title: '',
-                    description: '',
-                    budget: '',
-                    due_date: '',
-                    project_type: 'web_development'
-                });
+                if (!id) {
+                    setFormData({
+                        client_id: '',
+                        title: '',
+                        description: '',
+                        budget: '',
+                        due_date: '',
+                        project_type: 'web_development'
+                    });
+                }
 
-                // Navigate to projects list after a short delay
                 setTimeout(() => {
-                    navigate('/projects');
-                }, 1500);
+                    navigate(id ? `/projects/${id}/manage` : '/projects');
+                }, 1200);
             } else {
-                setError('Failed to create project. Please try again.');
+                setError(id ? 'Failed to update project. Please try again.' : 'Failed to create project. Please try again.');
             }
         } catch (err) {
             console.error('❌ Failed to create project:', err);
@@ -155,7 +198,7 @@ const ProjectForm = () => {
     return (
         <div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem' }}>
             <h2 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>📋</span> Create New Project
+                <span>📋</span> {id ? 'Update Project' : 'Create New Project'}
             </h2>
 
             {error && (
