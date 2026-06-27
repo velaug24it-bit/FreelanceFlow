@@ -45,6 +45,7 @@ const AdminDashboard = () => {
   const [showUserDetail, setShowUserDetail] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
   const [userDetailLoading, setUserDetailLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,6 +55,13 @@ const AdminDashboard = () => {
       return;
     }
     fetchAdminData();
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const fetchAdminData = async () => {
@@ -295,13 +303,14 @@ const AdminDashboard = () => {
       {/* Admin Navbar */}
       <nav style={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        padding: '1rem 2rem',
+        padding: isMobile ? '1rem' : '1rem 2rem',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         color: 'white',
         flexWrap: 'wrap',
-        gap: '1rem'
+        gap: '1rem',
+        flexDirection: isMobile ? 'column' : 'row'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Shield size={28} />
@@ -310,7 +319,7 @@ const AdminDashboard = () => {
             <p style={{ fontSize: '0.75rem', opacity: 0.9 }}>Platform Management Dashboard</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'stretch' : 'flex-start' }}>
           <button
             onClick={() => navigate('/admin-freelancers')}
             style={{
@@ -376,9 +385,9 @@ const AdminDashboard = () => {
         </div>
       </nav>
 
-      <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ padding: isMobile ? '1rem' : '2rem', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem', flexDirection: isMobile ? 'column' : 'row' }}>
           <div>
             <h1 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Admin Dashboard</h1>
             <p style={{ color: '#6b7280' }}>Manage all customers and track platform revenue</p>
@@ -396,7 +405,9 @@ const AdminDashboard = () => {
               borderRadius: '8px',
               cursor: 'pointer',
               fontWeight: '500',
-              transition: 'background 0.2s'
+              transition: 'background 0.2s',
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: 'center'
             }}
             onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
             onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
@@ -426,7 +437,7 @@ const AdminDashboard = () => {
         {/* Stats Cards */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: '1rem',
           marginBottom: '2rem'
         }}>
@@ -474,7 +485,7 @@ const AdminDashboard = () => {
         {/* Revenue Breakdown */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
           gap: '1.5rem',
           marginBottom: '2rem'
         }}>
@@ -565,8 +576,8 @@ const AdminDashboard = () => {
         )}
 
         {/* Search & Filter */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, background: 'white', padding: '0.25rem 1rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', flexDirection: isMobile ? 'column' : 'row' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, background: 'white', padding: '0.25rem 1rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', width: isMobile ? '100%' : 'auto' }}>
             <Search size={18} color="#6b7280" />
             <input
               type="text"
@@ -591,7 +602,8 @@ const AdminDashboard = () => {
               border: '1px solid #d1d5db', 
               borderRadius: '8px',
               background: 'white',
-              fontSize: '0.875rem'
+              fontSize: '0.875rem',
+              width: isMobile ? '100%' : 'auto'
             }}
           >
             <option value="all">All Plans</option>
@@ -607,7 +619,7 @@ const AdminDashboard = () => {
             <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>All Customers</h3>
             <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Manage subscriptions and track revenue</p>
           </div>
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: isMobile ? 'none' : 'block', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -745,6 +757,39 @@ const AdminDashboard = () => {
               </tbody>
             </table>
           </div>
+          <div style={{ display: isMobile ? 'grid' : 'none', gap: '0.75rem', padding: '1rem' }}>
+            {filteredUsers.map(user => (
+              <div key={user._id || user.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div>
+                    <p style={{ fontWeight: '600' }}>{user.full_name || 'User'}</p>
+                    <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>{user.email}</p>
+                  </div>
+                  <span style={{
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: '500',
+                    background: getPlanColor(user.plan || 'free'),
+                    color: user.plan === 'free' ? '#92400e' : '#065f46'
+                  }}>
+                    {user.plan === 'free' ? 'Free' : user.plan?.charAt(0).toUpperCase() + user.plan?.slice(1)}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.75rem' }}>
+                  <div><strong>Connects:</strong> {user.connects_balance || 0}</div>
+                  <div><strong>Clients:</strong> {user.client_count || 0}</div>
+                  <div><strong>Projects:</strong> {user.project_count || 0}</div>
+                  <div><strong>Revenue:</strong> {formatCurrency(user.total_revenue || 0)}</div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <button onClick={() => { const userId = user._id || user.id; if (userId) { fetchUserDetail(userId); } else { alert('User ID not found'); } }} style={{ padding: '0.4rem 0.65rem', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>History</button>
+                  <button onClick={() => { setSelectedUser(user); setEditData({ plan: user.plan || 'free', status: user.status || 'active', amount: user.subscription_amount || 19 }); setShowEditModal(true); }} style={{ padding: '0.4rem 0.65rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Edit</button>
+                  <button onClick={() => deleteUser(user._id || user.id, user.full_name)} style={{ padding: '0.4rem 0.65rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
           <div style={{
             padding: '1rem',
             background: '#f9fafb',
@@ -753,7 +798,9 @@ const AdminDashboard = () => {
             justifyContent: 'space-between',
             alignItems: 'center',
             fontSize: '0.875rem',
-            color: '#6b7280'
+            color: '#6b7280',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? '0.5rem' : '0'
           }}>
             <span>Showing {filteredUsers.length} user(s)</span>
             <button
@@ -785,14 +832,14 @@ const AdminDashboard = () => {
             justifyContent: 'center', 
             zIndex: 1000, 
             overflow: 'auto', 
-            padding: '2rem' 
+            padding: isMobile ? '1rem' : '2rem' 
           }}>
             <div style={{ 
               background: 'white', 
               borderRadius: '16px', 
-              padding: '2rem', 
+              padding: isMobile ? '1rem' : '2rem', 
               maxWidth: '1000px', 
-              width: '95%', 
+              width: isMobile ? '100%' : '95%', 
               maxHeight: '90vh', 
               overflow: 'auto' 
             }}>

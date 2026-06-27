@@ -15,6 +15,7 @@ const AdminFreelancers = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterPlan, setFilterPlan] = useState('all');
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 768 : false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -28,6 +29,13 @@ const AdminFreelancers = () => {
         }
         
         fetchFreelancers();
+    }, []);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const handleLogout = () => {
@@ -114,11 +122,13 @@ const AdminFreelancers = () => {
             {/* Admin Navbar */}
             <nav style={{
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                padding: '1rem 2rem',
+                padding: isMobile ? '1rem' : '1rem 2rem',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                color: 'white'
+                color: 'white',
+                flexDirection: isMobile ? 'column' : 'row',
+                gap: '0.75rem'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <Shield size={28} />
@@ -127,7 +137,7 @@ const AdminFreelancers = () => {
                         <p style={{ fontSize: '0.75rem', opacity: 0.9 }}>Freelancer Management</p>
                     </div>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'stretch' : 'flex-start' }}>
                     <button
                         onClick={() => navigate('/admin-dashboard')}
                         style={{
@@ -158,13 +168,13 @@ const AdminFreelancers = () => {
                 </div>
             </nav>
 
-            <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ padding: isMobile ? '1rem' : '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '2rem', flexDirection: isMobile ? 'column' : 'row', gap: '1rem' }}>
                     <div>
                         <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Freelancer Management</h1>
                         <p style={{ color: '#6b7280' }}>View all freelancers and their complete history</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
                         <input
                             type="text"
                             placeholder="Search freelancers..."
@@ -174,7 +184,8 @@ const AdminFreelancers = () => {
                                 padding: '0.5rem 1rem',
                                 border: '1px solid #d1d5db',
                                 borderRadius: '8px',
-                                minWidth: '200px'
+                                minWidth: isMobile ? '100%' : '200px',
+                                width: '100%'
                             }}
                         />
                         <select
@@ -183,7 +194,8 @@ const AdminFreelancers = () => {
                             style={{
                                 padding: '0.5rem 1rem',
                                 border: '1px solid #d1d5db',
-                                borderRadius: '8px'
+                                borderRadius: '8px',
+                                width: '100%'
                             }}
                         >
                             <option value="all">All Plans</option>
@@ -197,7 +209,7 @@ const AdminFreelancers = () => {
                 {/* Stats Overview */}
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
                     gap: '1rem',
                     marginBottom: '2rem'
                 }}>
@@ -229,77 +241,105 @@ const AdminFreelancers = () => {
                 <div style={{
                     background: 'white',
                     borderRadius: '16px',
-                    overflow: 'auto',
+                    overflow: 'hidden',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                                <th style={{ padding: '1rem', textAlign: 'left' }}>Freelancer</th>
-                                <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
-                                <th style={{ padding: '1rem', textAlign: 'center' }}>Clients</th>
-                                <th style={{ padding: '1rem', textAlign: 'center' }}>Projects</th>
-                                <th style={{ padding: '1rem', textAlign: 'right' }}>Revenue</th>
-                                <th style={{ padding: '1rem', textAlign: 'center' }}>Bids</th>
-                                <th style={{ padding: '1rem', textAlign: 'center' }}>Won</th>
-                                <th style={{ padding: '1rem', textAlign: 'center' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredFreelancers.map((item) => {
-                                const f = item.freelancer;
-                                const stats = item.stats || {};
-                                return (
-                                    <tr key={f.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                                        <td style={{ padding: '1rem' }}>
-                                            <div>
-                                                <p style={{ fontWeight: '500' }}>{f.name}</p>
-                                                <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{f.email}</p>
-                                                {f.company_name && <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{f.company_name}</p>}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                            {getPlanBadge(f.subscription_tier)}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
-                                            {stats.total_clients || 0}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
-                                            {stats.total_projects || 0}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>
-                                            {formatCurrency(stats.total_revenue || 0)}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
-                                            {stats.bids_placed || 0}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500', color: '#10b981' }}>
-                                            {stats.bids_won || 0}
-                                        </td>
-                                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => fetchFreelancerDetails(f.id)}
-                                                style={{
-                                                    padding: '0.5rem 1rem',
-                                                    background: '#3b82f6',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.5rem'
-                                                }}
-                                            >
-                                                <Eye size={16} />
-                                                View History
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                    <div style={{ display: isMobile ? 'grid' : 'none', gap: '0.75rem', padding: '1rem' }}>
+                        {filteredFreelancers.map((item) => {
+                            const f = item.freelancer;
+                            const stats = item.stats || {};
+                            return (
+                                <div key={f.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                        <div>
+                                            <p style={{ fontWeight: '600' }}>{f.name}</p>
+                                            <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>{f.email}</p>
+                                        </div>
+                                        {getPlanBadge(f.subscription_tier)}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.75rem' }}>
+                                        <div><strong>Clients:</strong> {stats.total_clients || 0}</div>
+                                        <div><strong>Projects:</strong> {stats.total_projects || 0}</div>
+                                        <div><strong>Revenue:</strong> {formatCurrency(stats.total_revenue || 0)}</div>
+                                        <div><strong>Bids:</strong> {stats.bids_placed || 0}</div>
+                                    </div>
+                                    <button onClick={() => fetchFreelancerDetails(f.id)} style={{ padding: '0.5rem 0.75rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', width: '100%' }}>
+                                        <Eye size={16} style={{ marginRight: '0.35rem' }} /> View History
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div style={{ display: isMobile ? 'none' : 'block', overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                                    <th style={{ padding: '1rem', textAlign: 'left' }}>Freelancer</th>
+                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
+                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Clients</th>
+                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Projects</th>
+                                    <th style={{ padding: '1rem', textAlign: 'right' }}>Revenue</th>
+                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Bids</th>
+                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Won</th>
+                                    <th style={{ padding: '1rem', textAlign: 'center' }}>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredFreelancers.map((item) => {
+                                    const f = item.freelancer;
+                                    const stats = item.stats || {};
+                                    return (
+                                        <tr key={f.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                            <td style={{ padding: '1rem' }}>
+                                                <div>
+                                                    <p style={{ fontWeight: '500' }}>{f.name}</p>
+                                                    <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{f.email}</p>
+                                                    {f.company_name && <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{f.company_name}</p>}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                                {getPlanBadge(f.subscription_tier)}
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
+                                                {stats.total_clients || 0}
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
+                                                {stats.total_projects || 0}
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>
+                                                {formatCurrency(stats.total_revenue || 0)}
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
+                                                {stats.bids_placed || 0}
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500', color: '#10b981' }}>
+                                                {stats.bids_won || 0}
+                                            </td>
+                                            <td style={{ padding: '1rem', textAlign: 'center' }}>
+                                                <button
+                                                    onClick={() => fetchFreelancerDetails(f.id)}
+                                                    style={{
+                                                        padding: '0.5rem 1rem',
+                                                        background: '#3b82f6',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem'
+                                                    }}
+                                                >
+                                                    <Eye size={16} />
+                                                    View History
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 {/* Freelancer Details Modal */}
@@ -321,9 +361,9 @@ const AdminFreelancers = () => {
                         <div style={{
                             background: 'white',
                             borderRadius: '16px',
-                            padding: '2rem',
+                            padding: isMobile ? '1rem' : '2rem',
                             maxWidth: '1000px',
-                            width: '95%',
+                            width: isMobile ? '100%' : '95%',
                             maxHeight: '90vh',
                             overflow: 'auto'
                         }}>
