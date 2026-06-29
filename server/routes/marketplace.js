@@ -751,6 +751,23 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             { returnDocument: 'after' }
         );
 
+        await Project.updateMany(
+            {
+                title: project.title,
+                selected_freelancer_id: project.selected_freelancer_id,
+                project_type: 'marketplace'
+            },
+            {
+                $set: {
+                    status: updatedProject.status,
+                    progress: updatedProject.progress,
+                    current_phase: updatedProject.current_phase,
+                    completed_at: updatedProject.completed_at,
+                    payment_status: updatedProject.payment_status
+                }
+            }
+        );
+
         const statusMessages = {
             'in_progress': 'started working on',
             'review': 'sent for review',

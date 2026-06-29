@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const Project = require('../models/Project');
+const ProjectPost = require('../models/ProjectPost');
 const Client = require('../models/Client');
 const Invoice = require('../models/Invoice');
 const Task = require('../models/Task');
@@ -60,7 +61,38 @@ router.get('/', verifyToken, async (req, res) => {
         const projects = await Project.find({ user_id: req.userId })
             .populate('client_id', 'contact_name company_name email')
             .sort({ created_at: -1 });
-        res.json({ projects });
+
+        const hydratedProjects = await Promise.all(projects.map(async (project) => {
+            const projectObj = project.toObject();
+            const isMarketplaceProject = projectObj.project_type === 'marketplace' || projectObj.selected_freelancer_id;
+
+            if (!isMarketplaceProject) {
+                return projectObj;
+            }
+
+            const marketplaceProject = await ProjectPost.findOne({
+                user_id: { $exists: false },
+                title: projectObj.title,
+                selected_freelancer_id: projectObj.selected_freelancer_id,
+                status: { $in: ['in_progress', 'review', 'completed', 'cancelled'] }
+            }).sort({ updatedAt: -1, created_at: -1 });
+
+            if (!marketplaceProject) {
+                return projectObj;
+            }
+
+            return {
+                ...projectObj,
+                status: marketplaceProject.status,
+                progress: marketplaceProject.progress,
+                current_phase: marketplaceProject.current_phase,
+                payment_status: marketplaceProject.payment_status,
+                payment_released_at: marketplaceProject.payment_released_at,
+                marketplace_project_id: marketplaceProject._id
+            };
+        }));
+
+        res.json({ projects: hydratedProjects });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch projects' });
     }
