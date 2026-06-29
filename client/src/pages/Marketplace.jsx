@@ -5,6 +5,8 @@ import axios from 'axios';
 import { Briefcase, DollarSign, Clock, Users, Plus, Check, X } from 'lucide-react';
 import ProjectStatus from '../components/ProjectStatus';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const Marketplace = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -39,6 +41,18 @@ const Marketplace = () => {
         deadline: ''
     });
 
+    // Helper function to deduplicate projects by ID
+    const deduplicateProjects = (projectsArray) => {
+        if (!projectsArray || !Array.isArray(projectsArray)) return [];
+        const seenIds = new Set();
+        return projectsArray.filter(project => {
+            if (!project || !project._id) return false;
+            if (seenIds.has(project._id)) return false;
+            seenIds.add(project._id);
+            return true;
+        });
+    };
+
     useEffect(() => {
         fetchData();
     }, [activeTab]);
@@ -53,7 +67,7 @@ const Marketplace = () => {
             setRouteProjectLoading(true);
             const token = localStorage.getItem('token');
             try {
-                const res = await axios.get(`/api/marketplace/projects/${routeProjectId}`, {
+                const res = await axios.get(`${API_URL}/marketplace/projects/${routeProjectId}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setRouteProject(res.data.project || null);
@@ -74,32 +88,34 @@ const Marketplace = () => {
         
         try {
             if (activeTab === 'browse') {
-                const res = await axios.get('/api/marketplace/open-projects', {
+                const res = await axios.get(`${API_URL}/marketplace/open-projects`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setProjects(res.data.projects);
+                setProjects(res.data.projects || []);
             } else if (activeTab === 'my-projects') {
-                const res = await axios.get('/api/marketplace/my-projects', {
+                const res = await axios.get(`${API_URL}/marketplace/my-projects`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setMyProjects(res.data.projects);
+                setMyProjects(res.data.projects || []);
                 
-                for (const project of res.data.projects) {
-                    const bidsRes = await axios.get(`/api/marketplace/projects/${project._id}/bids`, {
+                for (const project of res.data.projects || []) {
+                    const bidsRes = await axios.get(`${API_URL}/marketplace/projects/${project._id}/bids`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
-                    setProjectBids(prev => ({ ...prev, [project._id]: bidsRes.data.bids }));
+                    setProjectBids(prev => ({ ...prev, [project._id]: bidsRes.data.bids || [] }));
                 }
             } else if (activeTab === 'my-bids') {
-                const res = await axios.get('/api/marketplace/my-bids', {
+                const res = await axios.get(`${API_URL}/marketplace/my-bids`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setMyBids(res.data.bids || []);
             } else if (activeTab === 'active-projects') {
-                const res = await axios.get('/api/marketplace/my-active-projects', {
+                const res = await axios.get(`${API_URL}/marketplace/my-active-projects`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setActiveProjects(res.data.projects);
+                // FIX: Deduplicate projects by ID to prevent duplicate listings
+                const uniqueProjects = deduplicateProjects(res.data.projects || []);
+                setActiveProjects(uniqueProjects);
             }
         } catch (err) {
             console.error('Error fetching data:', err);
@@ -113,7 +129,7 @@ const Marketplace = () => {
         const token = localStorage.getItem('token');
         
         try {
-            await axios.post('/api/marketplace/projects', {
+            await axios.post(`${API_URL}/marketplace/projects`, {
                 ...newProject,
                 client_name: user?.full_name,
                 skills_required: newProject.skills_required.split(',').map(s => s.trim()).filter(s => s)
@@ -189,7 +205,7 @@ const Marketplace = () => {
         const token = localStorage.getItem('token');
         
         try {
-            await axios.post('/api/marketplace/bids', {
+            await axios.post(`${API_URL}/marketplace/bids`, {
                 project_id: projectId,
                 bid_amount: bidAmountNum,
                 estimated_days: estimatedDaysNum,
@@ -219,65 +235,76 @@ const Marketplace = () => {
         const token = localStorage.getItem('token');
         
         try {
-            await axios.put(`/api/marketplace/bids/${bidId}/accept`, {}, {
+            const res = await axios.put(`${API_URL}/marketplace/bids/${bidId}/accept`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            alert('Bid accepted! The project is now in progress.');
+            alert(res.data?.message || 'Bid accepted! The project is now in progress.');
             fetchData();
         } catch (err) {
             console.error('Error accepting bid:', err);
-            alert('Failed to accept bid');
+            const errorMessage = err.response?.data?.error || 'Failed to accept bid';
+            alert(errorMessage);
         }
     };
 
     const renderProjectCard = (project, showBidButton = true, isOwner = false) => {
+        // Safety check: if project is null or undefined, return null
+        if (!project || !project._id) {
+            console.warn('Invalid project object:', project);
+            return null;
+        }
+        
         const isProjectOwner = project.client_id === user?._id || project.client_name === user?.full_name;
         const showBid = showBidButton && !isProjectOwner && project.status === 'open';
         const isSelectedFreelancer = project.selected_freelancer_id === user?._id;
+        
+        // Check if project is in freelancer's active list
+        const isFreelancerActive = activeProjects.some(p => p._id === project._id);
         
         return (
             <div key={project._id} style={{
                 background: 'white',
                 borderRadius: '12px',
-                padding: '1.5rem',
+                padding: 'clamp(1rem, 2vw, 1.5rem)',
                 marginBottom: '1rem',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 border: '1px solid #e5e7eb'
             }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                    <div>
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.25rem' }}>{project.title}</h3>
-                        <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Posted by: {project.client_name}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 'clamp(200px, 50%, 500px)' }}>
+                        <h3 style={{ fontSize: 'clamp(1rem, 2.5vw, 1.125rem)', fontWeight: '600', marginBottom: '0.25rem' }}>{project.title}</h3>
+                        <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: '#6b7280' }}>Posted by: {project.client_name}</p>
                     </div>
                     <span style={{
                         padding: '0.25rem 0.75rem',
                         borderRadius: '20px',
                         fontSize: '0.75rem',
                         background: project.status === 'open' ? '#d1fae5' : project.status === 'in_progress' ? '#fef3c7' : project.status === 'completed' ? '#dbeafe' : '#fee2e2',
-                        color: project.status === 'open' ? '#065f46' : project.status === 'in_progress' ? '#92400e' : project.status === 'completed' ? '#1e40af' : '#991b1b'
+                        color: project.status === 'open' ? '#065f46' : project.status === 'in_progress' ? '#92400e' : project.status === 'completed' ? '#1e40af' : '#991b1b',
+                        whiteSpace: 'nowrap'
                     }}>
                         {project.status === 'open' ? 'Open' : project.status === 'in_progress' ? 'In Progress' : project.status === 'completed' ? 'Completed' : project.status}
                     </span>
                 </div>
                 
-                <p style={{ color: '#4b5563', marginBottom: '1rem', fontSize: '0.875rem' }}>{project.description}</p>
+                <p style={{ color: '#4b5563', marginBottom: '1rem', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)' }}>{project.description}</p>
                 
-                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <DollarSign size={16} color="#10b981" />
-                        <span style={{ fontSize: '0.875rem' }}>${project.budget_min} - ${project.budget_max}</span>
+                        <span style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)' }}>${project.budget_min} - ${project.budget_max}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Clock size={16} color="#f59e0b" />
-                        <span style={{ fontSize: '0.875rem' }}>{project.duration}</span>
+                        <span style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)' }}>{project.duration}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Briefcase size={16} color="#8b5cf6" />
-                        <span style={{ fontSize: '0.875rem' }}>{project.category}</span>
+                        <span style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)' }}>{project.category}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Users size={16} color="#3b82f6" />
-                        <span style={{ fontSize: '0.875rem' }}>{project.bids_count || 0} bids</span>
+                        <span style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)' }}>{project.bids_count || 0} bids</span>
                     </div>
                 </div>
                 
@@ -288,7 +315,7 @@ const Marketplace = () => {
                                 padding: '0.25rem 0.5rem',
                                 background: '#f3f4f6',
                                 borderRadius: '4px',
-                                fontSize: '0.7rem'
+                                fontSize: 'clamp(0.65rem, 1vw, 0.7rem)'
                             }}>
                                 {skill}
                             </span>
@@ -296,51 +323,59 @@ const Marketplace = () => {
                     </div>
                 )}
                 
-                {/* View Bids Button for Project Owner */}
-                {isOwner && project.status === 'open' && (
-                    <button
-                        onClick={() => setSelectedProject(selectedProject === project._id ? null : project._id)}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            background: '#8b5cf6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            marginRight: '0.5rem'
-                        }}
-                    >
-                        {selectedProject === project._id ? 'Hide Bids' : `View Bids (${project.bids_count || 0})`}
-                    </button>
-                )}
-                
-                {/* Bid Button for Freelancers */}
-                {showBid && (
-                    <button
-                        onClick={() => {
-                            if (showBidForm === project._id) {
-                                setShowBidForm(null);
-                            } else {
-                                setShowBidForm(project._id);
-                            }
-                        }}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {showBidForm === project._id ? 'Cancel Bid' : 'Place Bid'}
-                    </button>
-                )}
+                {/* Action Buttons Section - Mobile Responsive */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    {/* View Bids Button for Project Owner */}
+                    {isOwner && project.status === 'open' && (
+                        <button
+                            onClick={() => setSelectedProject(selectedProject === project._id ? null : project._id)}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                background: '#8b5cf6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                                flex: '1 1 auto',
+                                minWidth: '100px'
+                            }}
+                        >
+                            {selectedProject === project._id ? 'Hide Bids' : `View Bids (${project.bids_count || 0})`}
+                        </button>
+                    )}
+                    
+                    {/* Bid Button for Freelancers */}
+                    {showBid && (
+                        <button
+                            onClick={() => {
+                                if (showBidForm === project._id) {
+                                    setShowBidForm(null);
+                                } else {
+                                    setShowBidForm(project._id);
+                                }
+                            }}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                background: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                                flex: '1 1 auto',
+                                minWidth: '100px'
+                            }}
+                        >
+                            {showBidForm === project._id ? 'Cancel' : 'Place Bid'}
+                        </button>
+                    )}
+                </div>
                 
                 {/* Display Bids for Project Owner */}
                 {selectedProject === project._id && projectBids[project._id] && (
                     <div style={{ marginTop: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
-                        <h4 style={{ marginBottom: '0.75rem', fontWeight: '600' }}>Bids Received</h4>
+                        <h4 style={{ marginBottom: '0.75rem', fontWeight: '600', fontSize: 'clamp(0.85rem, 1.5vw, 1rem)' }}>Bids Received</h4>
                         {projectBids[project._id].length === 0 ? (
                             <p style={{ color: '#6b7280' }}>No bids yet.</p>
                         ) : (
@@ -354,11 +389,11 @@ const Marketplace = () => {
                                     flexWrap: 'wrap',
                                     gap: '1rem'
                                 }}>
-                                    <div>
-                                        <p style={{ fontWeight: '500' }}>{bid.freelancer_name}</p>
-                                        <p style={{ fontSize: '0.875rem' }}>Bid: <strong>${bid.bid_amount}</strong></p>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Days: {bid.estimated_days}</p>
-                                        <p style={{ fontSize: '0.875rem' }}>Proposal: {bid.proposal}</p>
+                                    <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
+                                        <p style={{ fontWeight: '500', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)' }}>{bid.freelancer_name}</p>
+                                        <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>Bid: <strong>${bid.bid_amount}</strong></p>
+                                        <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', color: '#6b7280' }}>Days: {bid.estimated_days}</p>
+                                        <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>Proposal: {bid.proposal}</p>
                                     </div>
                                     {bid.status === 'pending' && (
                                         <button
@@ -372,19 +407,21 @@ const Marketplace = () => {
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '0.5rem'
+                                                gap: '0.5rem',
+                                                fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                                                whiteSpace: 'nowrap'
                                             }}
                                         >
                                             <Check size={16} /> Accept
                                         </button>
                                     )}
                                     {bid.status === 'accepted' && (
-                                        <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>
                                             <Check size={16} /> Accepted
                                         </span>
                                     )}
                                     {bid.status === 'rejected' && (
-                                        <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>
                                             <X size={16} /> Rejected
                                         </span>
                                     )}
@@ -397,10 +434,10 @@ const Marketplace = () => {
                 {/* Bid Form for Freelancers */}
                 {showBidForm === project._id && (
                     <div style={{ marginTop: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
-                        <h4 style={{ marginBottom: '0.75rem', fontWeight: '600' }}>Place Your Bid</h4>
+                        <h4 style={{ marginBottom: '0.75rem', fontWeight: '600', fontSize: 'clamp(0.85rem, 1.5vw, 1rem)' }}>Place Your Bid</h4>
                         <div style={{ display: 'grid', gap: '0.75rem' }}>
                             <div>
-                                <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Bid Amount ($)</label>
+                                <label style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Bid Amount ($)</label>
                                 <input
                                     type="text"
                                     inputMode="numeric"
@@ -412,13 +449,14 @@ const Marketplace = () => {
                                         padding: '0.75rem', 
                                         border: '1px solid #d1d5db', 
                                         borderRadius: '6px', 
-                                        fontSize: '1rem',
-                                        backgroundColor: 'white'
+                                        fontSize: 'clamp(0.75rem, 1.5vw, 1rem)',
+                                        backgroundColor: 'white',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Estimated Days</label>
+                                <label style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Estimated Days</label>
                                 <input
                                     type="text"
                                     inputMode="numeric"
@@ -430,13 +468,14 @@ const Marketplace = () => {
                                         padding: '0.75rem', 
                                         border: '1px solid #d1d5db', 
                                         borderRadius: '6px', 
-                                        fontSize: '1rem',
-                                        backgroundColor: 'white'
+                                        fontSize: 'clamp(0.75rem, 1.5vw, 1rem)',
+                                        backgroundColor: 'white',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Phone Number</label>
+                                <label style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Phone Number</label>
                                 <input
                                     type="tel"
                                     placeholder="Enter your phone number"
@@ -447,13 +486,14 @@ const Marketplace = () => {
                                         padding: '0.75rem', 
                                         border: '1px solid #d1d5db', 
                                         borderRadius: '6px', 
-                                        fontSize: '1rem',
-                                        backgroundColor: 'white'
+                                        fontSize: 'clamp(0.75rem, 1.5vw, 1rem)',
+                                        backgroundColor: 'white',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
                             </div>
                             <div>
-                                <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Proposal</label>
+                                <label style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>Proposal</label>
                                 <textarea
                                     placeholder="Why are you the best fit for this project? Describe your experience and approach."
                                     value={proposals[project._id] || ''}
@@ -464,23 +504,25 @@ const Marketplace = () => {
                                         padding: '0.75rem', 
                                         border: '1px solid #d1d5db', 
                                         borderRadius: '6px',
-                                        fontFamily: 'inherit'
+                                        fontFamily: 'inherit',
+                                        fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
                             </div>
-                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
                                 <button
                                     onClick={() => handlePlaceBid(project._id)}
                                     disabled={!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id] || !phoneNumbers[project._id]}
                                     style={{
-                                        flex: 1,
                                         padding: '0.75rem',
                                         background: (!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id] || !phoneNumbers[project._id]) ? '#9ca3af' : '#10b981',
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: '6px',
                                         cursor: (!bidAmounts[project._id] || !estimatedDaysList[project._id] || !proposals[project._id] || !phoneNumbers[project._id]) ? 'not-allowed' : 'pointer',
-                                        fontWeight: '500'
+                                        fontWeight: '500',
+                                        fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)'
                                     }}
                                 >
                                     Submit Bid
@@ -494,13 +536,13 @@ const Marketplace = () => {
                                         setPhoneNumbers(prev => ({ ...prev, [project._id]: '' }));
                                     }}
                                     style={{
-                                        flex: 1,
                                         padding: '0.75rem',
                                         background: '#6b7280',
                                         color: 'white',
                                         border: 'none',
                                         borderRadius: '6px',
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)'
                                     }}
                                 >
                                     Cancel
@@ -525,6 +567,7 @@ const Marketplace = () => {
         );
     };
 
+    // Render single project view (when routeProjectId is present)
     if (routeProjectId) {
         const isOwner = routeProject?.client_id?.toString() === user?.id || routeProject?.client_id?.toString() === user?._id;
         const isSelectedFreelancer = routeProject?.selected_freelancer_id?.toString() === user?.id || routeProject?.selected_freelancer_id?.toString() === user?._id;
@@ -562,14 +605,15 @@ const Marketplace = () => {
         );
     }
 
+    // Render the main marketplace view
     return (
-        <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ padding: 'clamp(1rem, 2vw, 2rem)', maxWidth: '1200px', margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <h1 style={{ fontSize: '2rem' }}>Project Marketplace</h1>
+                <h1 style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)', margin: 0 }}>Project Marketplace</h1>
                 <button
                     onClick={() => setShowPostForm(!showPostForm)}
                     style={{
-                        padding: '0.75rem 1.5rem',
+                        padding: 'clamp(0.5rem, 1.5vw, 0.75rem) clamp(1rem, 2vw, 1.5rem)',
                         background: '#3b82f6',
                         color: 'white',
                         border: 'none',
@@ -578,7 +622,8 @@ const Marketplace = () => {
                         fontWeight: '500',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem'
+                        gap: '0.5rem',
+                        fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)'
                     }}
                 >
                     <Plus size={18} />
@@ -587,7 +632,7 @@ const Marketplace = () => {
             </div>
             
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', borderBottom: '1px solid #e5e7eb', flexWrap: 'wrap', overflowX: 'auto' }}>
                 {['browse', 'my-projects', 'my-bids', 'active-projects'].map(tab => (
                     <button
                         key={tab}
@@ -597,13 +642,15 @@ const Marketplace = () => {
                             setShowBidForm(null);
                         }}
                         style={{
-                            padding: '0.75rem 1.5rem',
+                            padding: 'clamp(0.5rem, 1.2vw, 0.75rem) clamp(0.75rem, 1.5vw, 1.5rem)',
                             background: activeTab === tab ? '#3b82f6' : 'transparent',
                             color: activeTab === tab ? 'white' : '#6b7280',
                             border: 'none',
                             borderRadius: '8px 8px 0 0',
                             cursor: 'pointer',
-                            fontWeight: activeTab === tab ? '500' : 'normal'
+                            fontWeight: activeTab === tab ? '500' : 'normal',
+                            fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                            whiteSpace: 'nowrap'
                         }}
                     >
                         {tab.replace('-', ' ').charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
@@ -616,25 +663,25 @@ const Marketplace = () => {
                 <div style={{
                     background: 'white',
                     borderRadius: '12px',
-                    padding: '1.5rem',
+                    padding: 'clamp(1rem, 2vw, 1.5rem)',
                     marginBottom: '2rem',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}>
-                    <h2 style={{ marginBottom: '1rem', fontSize: '1.25rem' }}>Post a New Project</h2>
+                    <h2 style={{ marginBottom: '1rem', fontSize: 'clamp(1.1rem, 2.5vw, 1.25rem)' }}>Post a New Project</h2>
                     <form onSubmit={handlePostProject}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                             <input
                                 type="text"
                                 placeholder="Project Title"
                                 value={newProject.title}
                                 onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
                                 required
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             />
                             <select
                                 value={newProject.category}
                                 onChange={(e) => setNewProject({ ...newProject, category: e.target.value })}
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             >
                                 <option>Web Development</option>
                                 <option>Mobile App</option>
@@ -651,17 +698,17 @@ const Marketplace = () => {
                             onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
                             rows="4"
                             required
-                            style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '1rem' }}
+                            style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '1rem', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)', boxSizing: 'border-box' }}
                         />
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                             <input
                                 type="number"
                                 placeholder="Min Budget ($)"
                                 value={newProject.budget_min}
                                 onChange={(e) => setNewProject({ ...newProject, budget_min: e.target.value })}
                                 required
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             />
                             <input
                                 type="number"
@@ -669,7 +716,7 @@ const Marketplace = () => {
                                 value={newProject.budget_max}
                                 onChange={(e) => setNewProject({ ...newProject, budget_max: e.target.value })}
                                 required
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             />
                             <input
                                 type="text"
@@ -677,32 +724,32 @@ const Marketplace = () => {
                                 value={newProject.duration}
                                 onChange={(e) => setNewProject({ ...newProject, duration: e.target.value })}
                                 required
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             />
                         </div>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                             <input
                                 type="text"
                                 placeholder="Skills Required (comma separated)"
                                 value={newProject.skills_required}
                                 onChange={(e) => setNewProject({ ...newProject, skills_required: e.target.value })}
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             />
                             <input
                                 type="date"
                                 placeholder="Deadline"
                                 value={newProject.deadline}
                                 onChange={(e) => setNewProject({ ...newProject, deadline: e.target.value })}
-                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px' }}
+                                style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)' }}
                             />
                         </div>
                         
-                        <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button type="submit" style={{ padding: '0.75rem 1.5rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>
+                        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                            <button type="submit" style={{ padding: '0.75rem 1.5rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '500', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', flex: '1 1 auto', minWidth: '120px' }}>
                                 Post Project
                             </button>
-                            <button type="button" onClick={() => setShowPostForm(false)} style={{ padding: '0.75rem 1.5rem', background: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                            <button type="button" onClick={() => setShowPostForm(false)} style={{ padding: '0.75rem 1.5rem', background: '#6b7280', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', flex: '1 1 auto', minWidth: '120px' }}>
                                 Cancel
                             </button>
                         </div>
@@ -726,8 +773,8 @@ const Marketplace = () => {
                             borderRadius: '12px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                         }}>
-                            <p style={{ color: '#6b7280' }}>No bids placed yet</p>
-                            <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                            <p style={{ color: '#6b7280', fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>No bids placed yet</p>
+                            <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: '#9ca3af' }}>
                                 Browse open projects and place your first bid
                             </p>
                         </div>
@@ -736,32 +783,32 @@ const Marketplace = () => {
                             <div key={bid._id} style={{
                                 background: 'white',
                                 borderRadius: '12px',
-                                padding: '1.5rem',
+                                padding: 'clamp(1rem, 2vw, 1.5rem)',
                                 marginBottom: '1rem',
                                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                                 border: '1px solid #e5e7eb'
                             }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                                    <div>
-                                        <h3 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem' }}>
+                                    <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
+                                        <h3 style={{ fontWeight: '600', marginBottom: '0.25rem', fontSize: 'clamp(0.95rem, 2vw, 1rem)' }}>
                                             {bid.project_id?.title || 'Project'}
                                         </h3>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                        <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: '#6b7280' }}>
                                             Posted by: {bid.project_id?.client_name || 'Unknown'}
                                         </p>
-                                        <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                                        <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', marginTop: '0.5rem' }}>
                                             Your Bid: <strong>${bid.bid_amount}</strong>
                                         </p>
-                                        <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                                        <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: '#6b7280' }}>
                                             Estimated Days: {bid.estimated_days}
                                         </p>
                                         {bid.proposal && (
-                                            <p style={{ fontSize: '0.875rem', color: '#4b5563', marginTop: '0.25rem' }}>
+                                            <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: '#4b5563', marginTop: '0.25rem' }}>
                                                 Proposal: {bid.proposal}
                                             </p>
                                         )}
                                     </div>
-                                    <div style={{ textAlign: 'right' }}>
+                                    <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         <span style={{
                                             padding: '0.25rem 0.75rem',
                                             borderRadius: '20px',
@@ -780,7 +827,29 @@ const Marketplace = () => {
                         ))
                     )}
                     
-                    {activeTab === 'active-projects' && activeProjects.map(project => renderProjectCard(project, false, false))}
+                    {activeTab === 'active-projects' && (
+                        activeProjects.length === 0 ? (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: '3rem',
+                                background: 'white',
+                                borderRadius: '12px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                            }}>
+                                <p style={{ color: '#6b7280', fontSize: 'clamp(0.875rem, 1.5vw, 1rem)' }}>
+                                    No active projects assigned to you
+                                </p>
+                                <p style={{ fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', color: '#9ca3af' }}>
+                                    Browse open projects and place bids to get started
+                                </p>
+                            </div>
+                        ) : (
+                            // FIX: Use Map to ensure unique rendering
+                            [...new Map(activeProjects.map(p => [p._id, p])).values()].map(project => 
+                                renderProjectCard(project, false, false)
+                            )
+                        )
+                    )}
                 </>
             )}
         </div>

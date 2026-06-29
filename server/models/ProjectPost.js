@@ -7,6 +7,13 @@ const projectPostSchema = new mongoose.Schema({
         required: true
     },
 
+    // Present only on generated Project records that were historically written
+    // into this collection. Real marketplace posts do not set this field.
+    user_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+
     client_name: {
         type: String,
         required: true

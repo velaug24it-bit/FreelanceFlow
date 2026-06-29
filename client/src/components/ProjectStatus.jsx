@@ -119,12 +119,16 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
 
     const statusOptions = ['in_progress', 'review', 'completed'];
     const phaseOptions = ['planning', 'development', 'testing', 'deployment'];
+    
+    // Different status options for clients vs freelancers
+    const freelancerStatusOptions = ['in_progress', 'review'];
+    const clientStatusOptions = ['review', 'completed'];
 
     return (
         <div style={{
             background: '#f9fafb',
             borderRadius: '12px',
-            padding: '1rem',
+            padding: 'clamp(0.75rem, 2vw, 1rem)',
             marginTop: '1rem',
             border: '1px solid #e5e7eb'
         }}>
@@ -139,15 +143,15 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             background: getStatusColor(project.status),
                             marginRight: '0.5rem'
                         }} />
-                        <span style={{ fontWeight: '600' }}>Status: {getStatusLabel(project.status)}</span>
+                        <span style={{ fontWeight: '600', fontSize: 'clamp(0.85rem, 1.5vw, 1rem)' }}>Status: {getStatusLabel(project.status)}</span>
                     </div>
-                    <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', color: '#6b7280', marginTop: '0.25rem' }}>
                         Phase: {getPhaseLabel(project.current_phase || 'planning')}
                     </div>
                 </div>
                 
                 <div style={{ flex: 1, minWidth: '150px', maxWidth: '300px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#6b7280' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'clamp(0.7rem, 1.2vw, 0.75rem)', color: '#6b7280' }}>
                         <span>Progress</span>
                         <span>{project.progress || 0}%</span>
                     </div>
@@ -167,24 +171,47 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                     </div>
                 </div>
 
-                {/* Update Status Button - ONLY for freelancers, NOT for owners/clients */}
-                {isFreelancer && !isOwner && project.status !== 'completed' && project.status !== 'cancelled' && (
+                {/* Update Status Button - For freelancers */}
+                {isFreelancerUser && !isClientUser && project.status !== 'completed' && project.status !== 'cancelled' && (
                     <button
                         onClick={() => setShowStatusForm(!showStatusForm)}
                         style={{
-                            padding: '0.5rem 1rem',
+                            padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(0.75rem, 1.5vw, 1rem)',
                             background: '#3b82f6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            transition: 'background 0.2s'
+                            fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                            transition: 'background 0.2s',
+                            whiteSpace: 'nowrap'
                         }}
                         onMouseEnter={(e) => e.target.style.background = '#2563eb'}
                         onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
                     >
-                        {showStatusForm ? 'Cancel' : 'Update Status'}
+                        {showStatusForm ? 'Cancel' : 'Update Progress'}
+                    </button>
+                )}
+                
+                {/* Update Status Button - For clients/project owners */}
+                {isClientUser && !isFreelancerUser && project.status !== 'completed' && project.status !== 'cancelled' && (
+                    <button
+                        onClick={() => setShowStatusForm(!showStatusForm)}
+                        style={{
+                            padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(0.75rem, 1.5vw, 1rem)',
+                            background: '#8b5cf6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                            transition: 'background 0.2s',
+                            whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = '#7c3aed'}
+                        onMouseLeave={(e) => e.target.style.background = '#8b5cf6'}
+                    >
+                        {showStatusForm ? 'Cancel' : 'Review Project'}
                     </button>
                 )}
 
@@ -192,16 +219,17 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 <button
                     onClick={() => setShowHistory(!showHistory)}
                     style={{
-                        padding: '0.5rem 1rem',
+                        padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(0.75rem, 1.5vw, 1rem)',
                         background: 'transparent',
                         border: '1px solid #d1d5db',
                         borderRadius: '6px',
                         cursor: 'pointer',
-                        fontSize: '0.875rem',
+                        fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        transition: 'all 0.2s'
+                        transition: 'all 0.2s',
+                        whiteSpace: 'nowrap'
                     }}
                     onMouseEnter={(e) => {
                         e.target.style.background = '#f3f4f6';
@@ -217,19 +245,21 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 </button>
             </div>
 
-            {/* Status Update Form - Only visible to freelancers */}
-            {showStatusForm && isFreelancer && !isOwner && (
+            {/* Status Update Form - For freelancers AND clients */}
+            {showStatusForm && (isFreelancerUser || isClientUser) && (
                 <div style={{
                     marginTop: '1rem',
-                    padding: '1rem',
+                    padding: 'clamp(0.75rem, 2vw, 1rem)',
                     background: 'white',
                     borderRadius: '8px',
                     border: '1px solid #e5e7eb'
                 }}>
-                    <h4 style={{ marginBottom: '0.75rem' }}>Update Project Status</h4>
+                    <h4 style={{ marginBottom: '0.75rem', fontSize: 'clamp(0.9rem, 1.5vw, 1rem)' }}>
+                        {isFreelancerUser ? 'Update Project Progress' : 'Review Project Status'}
+                    </h4>
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
                         <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                            <label style={{ fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
                                 Status
                             </label>
                             <select
@@ -240,53 +270,64 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                     padding: '0.5rem',
                                     border: '1px solid #d1d5db',
                                     borderRadius: '6px',
-                                    fontSize: '0.875rem'
+                                    fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)',
+                                    boxSizing: 'border-box'
                                 }}
                             >
-                                {statusOptions.map(opt => (
+                                {(isFreelancerUser ? freelancerStatusOptions : clientStatusOptions).map(opt => (
                                     <option key={opt} value={opt}>{getStatusLabel(opt)}</option>
                                 ))}
                             </select>
                         </div>
+                        
+                        {/* Progress slider - only for freelancers */}
+                        {isFreelancerUser && (
+                            <div>
+                                <label style={{ fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                    Progress ({statusData.progress}%)
+                                </label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={statusData.progress}
+                                    onChange={(e) => setStatusData({ ...statusData, progress: parseInt(e.target.value) })}
+                                    style={{ width: '100%' }}
+                                />
+                            </div>
+                        )}
+                        
+                        {/* Phase selector - only for freelancers */}
+                        {isFreelancerUser && (
+                            <div>
+                                <label style={{ fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                    Phase
+                                </label>
+                                <select
+                                    value={statusData.current_phase}
+                                    onChange={(e) => setStatusData({ ...statusData, current_phase: e.target.value })}
+                                    style={{
+                                        width: '100%',
+                                        padding: '0.5rem',
+                                        border: '1px solid #d1d5db',
+                                        borderRadius: '6px',
+                                        fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)',
+                                        boxSizing: 'border-box'
+                                    }}
+                                >
+                                    {phaseOptions.map(phase => (
+                                        <option key={phase} value={phase}>{getPhaseLabel(phase)}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        
                         <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
-                                Progress ({statusData.progress}%)
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={statusData.progress}
-                                onChange={(e) => setStatusData({ ...statusData, progress: parseInt(e.target.value) })}
-                                style={{ width: '100%' }}
-                            />
-                        </div>
-                        <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
-                                Phase
-                            </label>
-                            <select
-                                value={statusData.current_phase}
-                                onChange={(e) => setStatusData({ ...statusData, current_phase: e.target.value })}
-                                style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '6px',
-                                    fontSize: '0.875rem'
-                                }}
-                            >
-                                {phaseOptions.map(phase => (
-                                    <option key={phase} value={phase}>{getPhaseLabel(phase)}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label style={{ fontSize: '0.875rem', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
-                                Update Message *
+                            <label style={{ fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', marginBottom: '0.25rem', display: 'block', fontWeight: '500' }}>
+                                {isFreelancerUser ? 'Update Message *' : 'Review Notes *'}
                             </label>
                             <textarea
-                                placeholder="Describe what was done..."
+                                placeholder={isFreelancerUser ? 'Describe what was done...' : 'Enter your review/feedback...'}
                                 value={statusData.message}
                                 onChange={(e) => setStatusData({ ...statusData, message: e.target.value })}
                                 rows="2"
@@ -295,46 +336,54 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                     padding: '0.5rem',
                                     border: '1px solid #d1d5db',
                                     borderRadius: '6px',
-                                    fontSize: '0.875rem',
-                                    resize: 'vertical'
+                                    fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)',
+                                    resize: 'vertical',
+                                    boxSizing: 'border-box'
                                 }}
                             />
                         </div>
+                        
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                             <button
                                 onClick={handleStatusUpdate}
                                 disabled={loading}
                                 style={{
-                                    padding: '0.5rem 1.5rem',
-                                    background: '#10b981',
+                                    padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(1rem, 1.5vw, 1.5rem)',
+                                    background: isFreelancerUser ? '#10b981' : '#8b5cf6',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
                                     opacity: loading ? 0.5 : 1,
                                     transition: 'background 0.2s',
-                                    fontWeight: '500'
+                                    fontWeight: '500',
+                                    fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                                    flex: '1 1 auto',
+                                    minWidth: '100px'
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!loading) e.target.style.background = '#059669';
+                                    if (!loading) e.target.style.background = isFreelancerUser ? '#059669' : '#7c3aed';
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!loading) e.target.style.background = '#10b981';
+                                    if (!loading) e.target.style.background = isFreelancerUser ? '#10b981' : '#8b5cf6';
                                 }}
                             >
-                                {loading ? 'Updating...' : 'Update Status'}
+                                {loading ? 'Submitting...' : (isFreelancerUser ? 'Submit Update' : 'Submit Review')}
                             </button>
                             <button
                                 onClick={() => setShowStatusForm(false)}
                                 style={{
-                                    padding: '0.5rem 1.5rem',
+                                    padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(1rem, 1.5vw, 1.5rem)',
                                     background: '#6b7280',
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '6px',
                                     cursor: 'pointer',
                                     transition: 'background 0.2s',
-                                    fontWeight: '500'
+                                    fontWeight: '500',
+                                    fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                                    flex: '1 1 auto',
+                                    minWidth: '100px'
                                 }}
                                 onMouseEnter={(e) => e.target.style.background = '#4b5563'}
                                 onMouseLeave={(e) => e.target.style.background = '#6b7280'}
@@ -348,35 +397,44 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
 
             {/* Status History - Visible to both client and freelancer */}
             {showHistory && (
-                <div style={{ marginTop: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
-                    <h4 style={{ marginBottom: '0.75rem' }}>Status History</h4>
+                <div style={{ marginTop: '1rem', maxHeight: '400px', overflowY: 'auto' }}>
+                    <h4 style={{ marginBottom: '0.75rem', fontSize: 'clamp(0.9rem, 1.5vw, 1rem)' }}>Status History</h4>
                     {statusHistory.length === 0 ? (
-                        <p style={{ color: '#6b7280', fontSize: '0.875rem', textAlign: 'center', padding: '1rem' }}>
+                        <p style={{ color: '#6b7280', fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', textAlign: 'center', padding: '1rem' }}>
                             No updates yet
                         </p>
                     ) : (
-                        statusHistory.slice().reverse().map((update, idx) => (
-                            <div key={idx} style={{
-                                padding: '0.75rem',
-                                borderBottom: '1px solid #e5e7eb',
-                                background: idx === 0 ? '#eff6ff' : 'transparent',
-                                borderRadius: idx === 0 ? '8px' : '0'
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <p style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{update.message}</p>
-                                        <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#6b7280', flexWrap: 'wrap' }}>
-                                            <span>Status: <strong>{getStatusLabel(update.status)}</strong></span>
-                                            <span>Progress: <strong>{update.progress}%</strong></span>
-                                            <span>By: <strong>{update.updated_by_name || 'System'}</strong></span>
+                        statusHistory.slice().reverse().map((update, idx) => {
+                            const isFreelancerUpdate = update.updated_by_name && update.updated_by_name !== project.client_name;
+                            return (
+                                <div key={idx} style={{
+                                    padding: '0.75rem',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    background: isFreelancerUpdate ? '#eff6ff' : '#f3e8ff',
+                                    borderLeft: `4px solid ${isFreelancerUpdate ? '#3b82f6' : '#8b5cf6'}`,
+                                    borderRadius: idx === 0 ? '8px' : '0',
+                                    marginBottom: '0.5rem'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontWeight: '500', marginBottom: '0.25rem', fontSize: 'clamp(0.8rem, 1.3vw, 0.9rem)' }}>
+                                                {update.message}
+                                            </p>
+                                            <div style={{ display: 'flex', gap: 'clamp(0.5rem, 1vw, 1rem)', fontSize: 'clamp(0.7rem, 1.1vw, 0.75rem)', color: '#6b7280', flexWrap: 'wrap' }}>
+                                                <span>Status: <strong>{getStatusLabel(update.status)}</strong></span>
+                                                <span>Progress: <strong>{update.progress}%</strong></span>
+                                                <span style={{ fontWeight: '600', color: isFreelancerUpdate ? '#3b82f6' : '#8b5cf6' }}>
+                                                    {isFreelancerUpdate ? '👨‍💻 ' : '👤 '}{update.updated_by_name || 'System'}
+                                                </span>
+                                            </div>
                                         </div>
+                                        <span style={{ fontSize: 'clamp(0.65rem, 1vw, 0.7rem)', color: '#9ca3af', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                            {new Date(update.created_at).toLocaleDateString()} {new Date(update.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </span>
                                     </div>
-                                    <span style={{ fontSize: '0.7rem', color: '#9ca3af', whiteSpace: 'nowrap' }}>
-                                        {new Date(update.created_at).toLocaleDateString()} {new Date(update.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                    </span>
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             )}
