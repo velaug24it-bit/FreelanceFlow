@@ -1,4 +1,5 @@
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -22,8 +23,11 @@ const razorpayRoutes = require('./routes/razorpay');
 const notificationRoutes = require('./routes/notifications');
 const checkoutRoutes = require('./routes/checkout');
 const paymentRoutes = require('./routes/payments');
+const chatRoutes = require('./routes/chat');
+const { initializeSocket } = require('./socket');
 
 const app = express();
+const server = http.createServer(app);
 
 // Passport (OAuth)
 const passport = require('passport');
@@ -152,6 +156,7 @@ app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/connects', connectsRoutes);
 app.use('/api/razorpay', razorpayRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api', checkoutRoutes);
 app.use('/api/payments', paymentRoutes);
 
@@ -175,7 +180,9 @@ app.use((err, req, res, next) => {
 
 // ============ START SERVER ============
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+initializeSocket(server);
+
+server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api/test`);
     console.log(`🏠 Root: http://localhost:${PORT}/`);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import ProjectPayment from './ProjectPayment';
+import ProjectChat from './ProjectChat';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config/api';
 
@@ -455,6 +456,8 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                     👨‍💻 Working with: <strong>{project.selected_freelancer_name}</strong>
                 </div>
             )}
+
+            <ProjectChat project={project} />
 
             {/* Payment Section - Show only when project is completed */}
             {project.status === 'completed' && (
