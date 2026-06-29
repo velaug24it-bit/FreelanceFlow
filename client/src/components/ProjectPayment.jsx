@@ -55,7 +55,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
       setPayment(paymentData);
 
       if (paymentData) {
-        if (paymentData.status === 'completed') {
+        if (paymentData.status === 'completed' || project?.payment_status === 'paid') {
           setPaymentStatus('completed');
         } else if (paymentData.status === 'processing') {
           setPaymentStatus('processing');
@@ -70,6 +70,8 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
           setTotalAmount(paymentData.amount);
           setDataLoaded(true);
         }
+      } else if (project?.payment_status === 'paid') {
+        setPaymentStatus('completed');
       }
 
       // Process bids to find accepted one
@@ -99,7 +101,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
       }
 
       // Check if payment is stuck
-      if (project.release_requested && !paymentData) {
+      if (project.release_requested && !paymentData && project?.payment_status !== 'paid') {
         console.log('🔄 Payment stuck, attempting auto-reset...');
         await autoResetPayment();
       }

@@ -70,6 +70,23 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  bid_amount: {
+    type: Number,
+    default: 0
+  },
+  platform_fee: {
+    type: Number,
+    default: 0
+  },
+  freelancer_amount: {
+    type: Number,
+    default: 0
+  },
+  payment_type: {
+    type: String,
+    enum: ['project_release', 'connects', 'subscription', 'other'],
+    default: 'other'
+  },
   // For Connects Purchases
   package_id: {
     type: String

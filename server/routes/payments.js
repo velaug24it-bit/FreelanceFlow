@@ -4,10 +4,11 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
-const Project = require('../models/Project');
+const ProjectPost = require('../models/ProjectPost');
 const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Bid = require('../models/Bid');
+const Transaction = require('../models/Transaction');
 const NotificationHelper = require('../utils/notificationHelper');
 
 // Initialize Razorpay
@@ -79,8 +80,8 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'Invalid project ID format' });
         }
 
-        // Find project
-        const project = await Project.findById(projectId)
+        // Find marketplace project post. Accepted marketplace work lives in ProjectPost.
+        const project = await ProjectPost.findById(projectId)
             .populate('client_id', 'full_name email')
             .populate('selected_freelancer_id', 'full_name email subscription_tier');
 
@@ -147,7 +148,7 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
         }
 
         // Check if payment already completed
-        if (project.payment_status === 'completed') {
+        if (project.payment_status === 'paid') {
             return res.status(400).json({ error: 'Payment already completed for this project' });
         }
 
@@ -233,13 +234,14 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
             description: `Payment for project: ${project.title} (Bid: $${bidAmount} + 5% fee: $${platformFee})`,
             bid_amount: bidAmount,
             platform_fee: platformFee,
-            freelancer_amount: freelancerReceives
+            freelancer_amount: freelancerReceives,
+            payment_type: 'project_release'
         });
         await payment.save();
         console.log(`✅ Payment record created: ${payment._id}`);
 
         // Update project using findOneAndUpdate
-        await Project.findOneAndUpdate(
+        await ProjectPost.findOneAndUpdate(
             { _id: projectId },
             {
                 $set: {
@@ -248,14 +250,16 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
                     payment_id: payment._id,
                     payment_status: 'pending',
                     amount_released: bidAmount,
-                    platform_fee: platformFee
+                    bid_amount: bidAmount,
+                    platform_fee: platformFee,
+                    freelancer_amount: freelancerReceives
                 }
             }
         );
         console.log(`✅ Project updated: ${projectId}`);
 
         // Get updated project for response
-        const updatedProject = await Project.findById(projectId);
+        const updatedProject = await ProjectPost.findById(projectId);
 
         res.json({
             success: true,
@@ -318,27 +322,53 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
             return res.status(404).json({ error: 'Payment not found' });
         }
 
+        const wasAlreadyCompleted = payment.status === 'completed';
+
         // Update payment status
-        payment.status = 'processing';
+        payment.status = 'completed';
         payment.payment_id = razorpay_payment_id;
         payment.paid_at = new Date();
+        payment.released_at = new Date();
         await payment.save();
 
-        // Update project using findOneAndUpdate
+        // Update marketplace project post and release amount to the freelancer
         if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
-            await Project.findOneAndUpdate(
+            await ProjectPost.findOneAndUpdate(
                 { _id: projectId },
                 {
                     $set: {
-                        payment_status: 'processing'
+                        payment_status: 'paid',
+                        payment_id: payment._id,
+                        payment_released_at: new Date(),
+                        amount_released: payment.freelancer_amount || payment.net_amount || payment.bid_amount || 0,
+                        bid_amount: payment.bid_amount || 0,
+                        platform_fee: payment.platform_fee || payment.fee || 0,
+                        freelancer_amount: payment.freelancer_amount || payment.net_amount || payment.bid_amount || 0
+                    }
+                }
+            );
+
+            await Transaction.findOneAndUpdate(
+                { project_id: projectId, freelancer_id: payment.freelancer_id },
+                {
+                    $set: {
+                        status: 'completed',
+                        payment_id: razorpay_payment_id,
+                        completed_at: new Date()
                     }
                 }
             );
         }
 
+        if (!wasAlreadyCompleted && payment.freelancer_id) {
+            await User.findByIdAndUpdate(payment.freelancer_id, {
+                $inc: { total_earnings: payment.freelancer_amount || payment.net_amount || payment.bid_amount || 0 }
+            });
+        }
+
         res.json({
             success: true,
-            message: 'Payment verified successfully',
+            message: 'Payment released to freelancer successfully',
             payment: payment
         });
 
@@ -365,7 +395,7 @@ router.post('/reset-payment/:projectId', verifyToken, async (req, res) => {
             return res.status(400).json({ error: 'Invalid project ID' });
         }
 
-        const project = await Project.findById(projectId);
+        const project = await ProjectPost.findById(projectId);
         if (!project) {
             return res.status(404).json({ error: 'Project not found' });
         }
@@ -397,19 +427,21 @@ router.post('/reset-payment/:projectId', verifyToken, async (req, res) => {
         }
 
         // Only reset if not completed
-        if (project.payment_status === 'completed') {
+        if (project.payment_status === 'paid') {
             return res.status(400).json({ error: 'Payment already completed, cannot reset' });
         }
 
         // Reset project using findOneAndUpdate
-        await Project.findOneAndUpdate(
+        await ProjectPost.findOneAndUpdate(
             { _id: projectId },
             {
                 $set: {
                     release_requested: false,
                     release_requested_at: null,
                     payment_id: null,
-                    payment_status: 'pending'
+                    payment_status: 'unpaid',
+                    amount_released: 0,
+                    payment_released_at: null
                 }
             }
         );
@@ -456,10 +488,15 @@ router.post('/webhook/payment-confirmed', express.raw({ type: 'application/json'
                 payment.released_at = new Date();
                 await payment.save();
 
-                const project = await Project.findById(payment.project_id);
+                const project = await ProjectPost.findById(payment.project_id);
                 if (project) {
-                    project.payment_status = 'completed';
+                    project.payment_status = 'paid';
                     project.payment_released_at = new Date();
+                    project.payment_id = payment._id;
+                    project.amount_released = payment.freelancer_amount || payment.net_amount || payment.bid_amount || 0;
+                    project.bid_amount = payment.bid_amount || 0;
+                    project.platform_fee = payment.platform_fee || payment.fee || 0;
+                    project.freelancer_amount = payment.freelancer_amount || payment.net_amount || payment.bid_amount || 0;
                     await project.save();
                 }
 

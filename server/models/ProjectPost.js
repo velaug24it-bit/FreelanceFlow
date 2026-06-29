@@ -170,6 +170,21 @@ const projectPostSchema = new mongoose.Schema({
         default: 0
     },
 
+    bid_amount: {
+        type: Number,
+        default: 0
+    },
+
+    platform_fee: {
+        type: Number,
+        default: 0
+    },
+
+    freelancer_amount: {
+        type: Number,
+        default: 0
+    },
+
     payment_released_at: {
         type: Date
     }
