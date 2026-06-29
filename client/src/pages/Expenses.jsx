@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Download, Printer } from 'lucide-react';
 
 const Expenses = () => {
     const [expenses, setExpenses] = useState([]);
@@ -119,6 +119,44 @@ const Expenses = () => {
     };
 
     const totalExpenses = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+
+    const openPrintableExpense = (expense, mode = 'print') => {
+        const html = `
+            <html>
+                <head>
+                    <title>Expense ${expense.category || 'Record'}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
+                        .box { border: 1px solid #e5e7eb; padding: 16px; border-radius: 10px; margin-bottom: 16px; }
+                        .row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+                        .bold { font-weight: 700; }
+                    </style>
+                </head>
+                <body>
+                    <h2>Expense Receipt</h2>
+                    <div class="box">
+                        <div class="row"><span>Category</span><span class="bold">${expense.category || 'Other'}</span></div>
+                        <div class="row"><span>Client</span><span>${expense.client_name || '-'}</span></div>
+                        <div class="row"><span>Date</span><span>${new Date(expense.expense_date).toLocaleDateString()}</span></div>
+                        <div class="row"><span>Amount</span><span class="bold">$${parseFloat(expense.amount || 0).toFixed(2)}</span></div>
+                    </div>
+                    <div class="box">
+                        <p><strong>Description</strong></p>
+                        <p>${expense.description || 'No description provided.'}</p>
+                    </div>
+                </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) return;
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 300);
+    };
 
     const getCategoryColor = (category) => {
         const colors = {
@@ -374,19 +412,49 @@ const Expenses = () => {
                                         ${parseFloat(expense.amount).toFixed(2)}
                                     </td>
                                     <td style={{ padding: '1rem', textAlign: 'center' }}>
-                                        <button
-                                            onClick={() => deleteExpense(expense._id)}
-                                            style={{
-                                                padding: '0.5rem',
-                                                background: '#fee2e2',
-                                                border: 'none',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                color: '#dc2626'
-                                            }}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                            <button
+                                                onClick={() => openPrintableExpense(expense, 'download')}
+                                                title="Download PDF"
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    background: '#6366f1',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    color: 'white'
+                                                }}
+                                            >
+                                                <Download size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => openPrintableExpense(expense, 'print')}
+                                                title="Print"
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    background: '#0f766e',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    color: 'white'
+                                                }}
+                                            >
+                                                <Printer size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => deleteExpense(expense._id)}
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    background: '#fee2e2',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    color: '#dc2626'
+                                                }}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

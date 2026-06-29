@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Trash2, Eye, CheckCircle, AlertCircle, Plus, RefreshCw } from 'lucide-react';
+import { Trash2, Download, Printer, CheckCircle, AlertCircle, Plus, RefreshCw } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -123,6 +123,84 @@ const Invoices = () => {
             month: 'short',
             day: 'numeric'
         });
+    };
+
+    const openPrintableInvoice = (invoice, mode = 'print') => {
+        const clientName = invoice.client_id?.contact_name || invoice.client_name || 'Unknown Client';
+        const subtotal = parseFloat(invoice.subtotal || invoice.total_amount || 0);
+        const taxAmount = parseFloat(invoice.tax_amount || 0);
+        const totalAmount = parseFloat(invoice.total_amount || subtotal + taxAmount);
+        const itemsHtml = (invoice.items || []).map(item => `
+            <tr>
+                <td>${item.description || ''}</td>
+                <td>${item.quantity || 0}</td>
+                <td>${formatCurrency(item.unit_price || 0)}</td>
+                <td>${formatCurrency(item.total_price || 0)}</td>
+            </tr>
+        `).join('');
+
+        const html = `
+            <html>
+                <head>
+                    <title>Invoice ${invoice.invoice_number || ''}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; color: #111827; padding: 24px; }
+                        .header { display: flex; justify-content: space-between; margin-bottom: 24px; }
+                        .box { border: 1px solid #e5e7eb; padding: 16px; border-radius: 10px; margin-bottom: 16px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                        th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+                        .right { text-align: right; }
+                        .total { font-weight: 700; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div>
+                            <h2>Invoice</h2>
+                            <p><strong>Invoice #:</strong> ${invoice.invoice_number || 'INV-001'}</p>
+                            <p><strong>Status:</strong> ${invoice.status || 'pending'}</p>
+                        </div>
+                        <div class="box">
+                            <p><strong>Date:</strong> ${formatDate(invoice.created_at || new Date())}</p>
+                            <p><strong>Due Date:</strong> ${formatDate(invoice.due_date)}</p>
+                        </div>
+                    </div>
+                    <div class="box">
+                        <p><strong>Billed To:</strong> ${clientName}</p>
+                        <p><strong>Notes:</strong> ${invoice.notes || 'No notes provided.'}</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th>Qty</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${itemsHtml || '<tr><td colspan="4">No items</td></tr>'}</tbody>
+                    </table>
+                    <div class="box">
+                        <p class="right"><strong>Subtotal:</strong> ${formatCurrency(subtotal)}</p>
+                        <p class="right"><strong>Tax:</strong> ${formatCurrency(taxAmount)}</p>
+                        <p class="right total"><strong>Total:</strong> ${formatCurrency(totalAmount)}</p>
+                    </div>
+                </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank', 'width=900,height=700');
+        if (!printWindow) return;
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            if (mode === 'download') {
+                printWindow.print();
+            } else {
+                printWindow.print();
+            }
+        }, 300);
     };
 
     if (loading) {
@@ -303,6 +381,40 @@ const Invoices = () => {
                                                             <CheckCircle size={14} />
                                                         </button>
                                                     )}
+                                                    <button
+                                                        onClick={() => openPrintableInvoice(invoice, 'download')}
+                                                        title="Download PDF"
+                                                        style={{
+                                                            padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                            background: '#6366f1',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#4f46e5'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#6366f1'}
+                                                    >
+                                                        <Download size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openPrintableInvoice(invoice, 'print')}
+                                                        title="Print"
+                                                        style={{
+                                                            padding: 'clamp(0.3rem, 1.5vw, 0.35rem) clamp(0.5rem, 2vw, 0.75rem)',
+                                                            background: '#0f766e',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            transition: 'background 0.2s'
+                                                        }}
+                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#115e59'}
+                                                        onMouseLeave={(e) => e.currentTarget.style.background = '#0f766e'}
+                                                    >
+                                                        <Printer size={14} />
+                                                    </button>
                                                     <button
                                                         onClick={() => deleteInvoice(invoice._id)}
                                                         style={{
