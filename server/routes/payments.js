@@ -9,13 +9,16 @@ const User = require('../models/User');
 const Payment = require('../models/Payment');
 const Bid = require('../models/Bid');
 const Transaction = require('../models/Transaction');
+const Payout = require('../models/Payout');
 const NotificationHelper = require('../utils/notificationHelper');
 
-// Initialize Razorpay
-const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET
-});
+// Initialize Razorpay only when credentials are available
+const razorpay = process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET
+    ? new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET
+    })
+    : null;
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -29,6 +32,28 @@ const verifyToken = (req, res, next) => {
         next();
     } catch (err) {
         console.error('Token verification failed:', err.message);
+        res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+const verifyAdmin = async (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ error: 'Access denied' });
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id);
+
+        if (!user || user.role !== 'admin') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+
+        req.adminId = decoded.id;
+        next();
+    } catch (err) {
+        console.error('Admin verification failed:', err.message);
         res.status(401).json({ error: 'Invalid token' });
     }
 };
@@ -216,6 +241,12 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
             }
         };
 
+        if (!razorpay) {
+            return res.status(503).json({
+                error: 'Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to continue.'
+            });
+        }
+
         console.log('📦 Creating Razorpay order...');
         const order = await razorpay.orders.create(orderOptions);
         console.log(`✅ Order created: ${order.id}`);
@@ -239,6 +270,21 @@ router.post('/request-payment/:projectId', verifyToken, async (req, res) => {
         });
         await payment.save();
         console.log(`✅ Payment record created: ${payment._id}`);
+
+        // Create a pending payout ledger entry for the freelancer
+        const payout = new Payout({
+            project_id: projectId,
+            freelancer_id: freelancerId,
+            client_id: clientId,
+            payment_id: payment._id,
+            amount: freelancerReceives,
+            currency: 'INR',
+            status: 'pending',
+            description: `Payout for project: ${project.title}`,
+            notes: 'Awaiting manual payout approval'
+        });
+        await payout.save();
+        console.log(`✅ Payout ledger entry created: ${payout._id}`);
 
         // Update project using findOneAndUpdate
         await ProjectPost.findOneAndUpdate(
@@ -452,6 +498,11 @@ router.post('/reset-payment/:projectId', verifyToken, async (req, res) => {
             status: { $in: ['pending', 'processing'] }
         });
 
+        await Payout.updateMany(
+            { project_id: projectId, status: 'pending' },
+            { $set: { status: 'cancelled', notes: 'Payment reset by client' } }
+        );
+
         console.log(`✅ Payment reset for project: ${projectId}`);
 
         res.json({
@@ -584,6 +635,56 @@ router.get('/stats', verifyToken, async (req, res) => {
     } catch (err) {
         console.error('❌ Error fetching payment stats:', err);
         res.status(500).json({ error: 'Failed to fetch payment stats' });
+    }
+});
+
+// ============================================
+// GET PAYOUT LEDGER FOR ADMIN
+// ============================================
+router.get('/admin/payouts', verifyAdmin, async (req, res) => {
+    try {
+        const payouts = await Payout.find()
+            .populate('project_id', 'title status')
+            .populate('freelancer_id', 'full_name email')
+            .populate('client_id', 'full_name email')
+            .sort({ created_at: -1 });
+
+        res.json({ payouts });
+    } catch (err) {
+        console.error('❌ Error fetching payouts:', err);
+        res.status(500).json({ error: 'Failed to fetch payout ledger' });
+    }
+});
+
+// ============================================
+// MARK PAYOUT AS PAID (ADMIN)
+// ============================================
+router.patch('/admin/payouts/:payoutId/mark-paid', verifyAdmin, async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(payoutId)) {
+            return res.status(400).json({ error: 'Invalid payout ID' });
+        }
+
+        const payout = await Payout.findById(payoutId);
+        if (!payout) {
+            return res.status(404).json({ error: 'Payout not found' });
+        }
+
+        if (payout.status === 'paid') {
+            return res.status(400).json({ error: 'Payout already marked as paid' });
+        }
+
+        payout.status = 'paid';
+        payout.paid_at = new Date();
+        payout.notes = payout.notes || 'Marked paid by admin';
+        await payout.save();
+
+        res.json({ success: true, payout });
+    } catch (err) {
+        console.error('❌ Error updating payout:', err);
+        res.status(500).json({ error: 'Failed to update payout status' });
     }
 });
 

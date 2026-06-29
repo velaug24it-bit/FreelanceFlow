@@ -24,6 +24,145 @@ const verifyToken = (req, res, next) => {
     }
 };
 
+// ============================================
+// SYNC FREELANCER ACCEPTED ASSIGNMENTS
+// ============================================
+const syncFreelancerAcceptedAssignments = async (freelancer) => {
+    if (!freelancer) return freelancer;
+
+    if (!freelancer.my_clients) freelancer.my_clients = [];
+    if (!freelancer.my_projects) freelancer.my_projects = [];
+
+    const acceptedBids = await Bid.find({
+        freelancer_id: freelancer._id,
+        status: 'accepted'
+    }).sort({ created_at: -1 });
+
+    console.log(`[SYNC] Freelancer ${freelancer.full_name} (${freelancer._id}): Found ${acceptedBids.length} accepted bids`);
+
+    let changed = false;
+
+    for (const bid of acceptedBids) {
+        const projectPost = await ProjectPost.findById(bid.project_id);
+        if (!projectPost) {
+            console.warn(`[SYNC] ⚠️ ProjectPost not found for bid ${bid._id}`);
+            continue;
+        }
+
+        const client = await User.findById(projectPost.client_id);
+        if (!client) {
+            console.warn(`[SYNC] ⚠️ Client not found for project ${projectPost._id}`);
+            continue;
+        }
+        
+        console.log(`[SYNC] Processing: Project "${projectPost.title}" | Client "${client.full_name}" | Bid Amount: $${bid.bid_amount}`);
+
+        // ✅ ADD/UPDATE PROJECT ENTRY
+        const projectEntryIndex = freelancer.my_projects.findIndex(p =>
+            p.project_id && p.project_id.toString() === projectPost._id.toString()
+        );
+
+        const projectData = {
+            project_id: projectPost._id,
+            project_title: projectPost.title,
+            project_description: projectPost.description,
+            client_id: client._id,
+            client_name: client.full_name,
+            client_email: client.email,
+            client_company: client.company_name || '',
+            budget: bid.bid_amount,
+            status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
+            assigned_at: new Date(),
+            deadline: projectPost.deadline,
+            completed_at: projectPost.status === 'completed' ? projectPost.completed_at : null,
+            bid_amount: bid.bid_amount,
+            estimated_days: bid.estimated_days,
+            proposal: bid.proposal
+        };
+
+        if (projectEntryIndex >= 0) {
+            freelancer.my_projects[projectEntryIndex] = {
+                ...freelancer.my_projects[projectEntryIndex],
+                ...projectData
+            };
+            console.log(`[SYNC] ✅ Updated existing project: ${projectPost.title}`);
+        } else {
+            freelancer.my_projects.push(projectData);
+            console.log(`[SYNC] ✅ Added new project: ${projectPost.title}`);
+        }
+
+        // ✅ ADD/UPDATE CLIENT ENTRY
+        const clientEntryIndex = freelancer.my_clients.findIndex(c =>
+            c.client_id && c.client_id.toString() === client._id.toString() &&
+            c.project_id && c.project_id.toString() === projectPost._id.toString()
+        );
+
+        const clientData = {
+            client_id: client._id,
+            client_name: client.full_name,
+            client_email: client.email,
+            client_company: client.company_name || '',
+            client_phone: client.phone || '',
+            project_id: projectPost._id,
+            project_title: projectPost.title,
+            project_description: projectPost.description,
+            budget: bid.bid_amount,
+            status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
+            assigned_at: new Date(),
+            completed_at: projectPost.status === 'completed' ? projectPost.completed_at : null,
+            bid_amount: bid.bid_amount,
+            estimated_days: bid.estimated_days
+        };
+
+        if (clientEntryIndex >= 0) {
+            freelancer.my_clients[clientEntryIndex] = {
+                ...freelancer.my_clients[clientEntryIndex],
+                ...clientData
+            };
+            console.log(`[SYNC] ✅ Updated existing client: ${client.full_name}`);
+        } else {
+            freelancer.my_clients.push(clientData);
+            console.log(`[SYNC] ✅ Added new client: ${client.full_name}`);
+        }
+
+        changed = true;
+    }
+
+    // ✅ Update totals
+    if (changed) {
+        // Remove duplicates before saving
+        const uniqueProjects = [];
+        const seenProjectIds = new Set();
+        for (const p of freelancer.my_projects) {
+            if (p.project_id && !seenProjectIds.has(p.project_id.toString())) {
+                seenProjectIds.add(p.project_id.toString());
+                uniqueProjects.push(p);
+            }
+        }
+        freelancer.my_projects = uniqueProjects;
+
+        const uniqueClients = [];
+        const seenClientIds = new Set();
+        for (const c of freelancer.my_clients) {
+            if (c.project_id && !seenClientIds.has(c.project_id.toString())) {
+                seenClientIds.add(c.project_id.toString());
+                uniqueClients.push(c);
+            }
+        }
+        freelancer.my_clients = uniqueClients;
+
+        freelancer.total_projects_assigned = freelancer.my_projects.length;
+        freelancer.total_clients = freelancer.my_clients.length;
+
+        await freelancer.save();
+        console.log(`[SYNC] ✅ Saved! Projects: ${freelancer.my_projects.length}, Clients: ${freelancer.my_clients.length}`);
+    } else {
+        console.log(`[SYNC] ℹ️ No changes made. Projects: ${freelancer.my_projects.length}, Clients: ${freelancer.my_clients.length}`);
+    }
+
+    return freelancer;
+};
+
 // ============ CLIENT ROUTES ============
 
 // Post a new project - WITH NOTIFICATION
@@ -285,7 +424,7 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        // ✅ FIX: Check if project already has a freelancer assigned
+        // ✅ Check if project already has a freelancer assigned
         if (projectPost.selected_freelancer_id) {
             const selectedFreelancerId = projectPost.selected_freelancer_id.toString();
             const bidFreelancerId = bid.freelancer_id.toString();
@@ -319,43 +458,13 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
         console.log(`🔍 Accepting bid from ${freelancer.full_name} for project ${projectPost.title}`);
 
         // ============================================
-        // ✅ FIX: Comprehensive deduplication check
+        // ✅ FIX: Add Client to Freelancer's Client List (my_clients)
         // ============================================
-        
-        // Initialize arrays if they don't exist
-        if (!freelancer.my_clients) freelancer.my_clients = [];
-        if (!freelancer.my_projects) freelancer.my_projects = [];
+        freelancer.my_clients = freelancer.my_clients || [];
 
-        // Check if project already exists in my_projects
-        const projectExists = freelancer.my_projects.some(p => 
-            p.project_id && p.project_id.toString() === projectPost._id.toString()
-        );
-
-        let projectAdded = false;
-        if (projectExists) {
-            console.log(`⚠️ Project ${projectPost.title} already exists in freelancer's list. Skipping duplicate.`);
-        } else {
-            // ✅ Add project only once
-            freelancer.my_projects.push({
-                project_id: projectPost._id,
-                project_title: projectPost.title,
-                project_description: projectPost.description,
-                client_id: client._id,
-                client_name: client.full_name,
-                client_email: client.email,
-                budget: bid.bid_amount,
-                status: 'ongoing',
-                assigned_at: new Date(),
-                deadline: projectPost.deadline
-            });
-            freelancer.total_projects_assigned = (freelancer.total_projects_assigned || 0) + 1;
-            projectAdded = true;
-            console.log(`✅ Added project to freelancer's my_projects: ${projectPost.title}`);
-        }
-
-        // Check if client already exists in my_clients
-        const clientExists = freelancer.my_clients.some(c => 
-            c.client_id && c.client_id.toString() === client._id.toString()
+        // Check if client already exists for this project
+        const clientExists = freelancer.my_clients.some(c =>
+            c.project_id && c.project_id.toString() === projectPost._id.toString()
         );
 
         if (!clientExists) {
@@ -364,15 +473,53 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
                 client_name: client.full_name,
                 client_email: client.email,
                 client_company: client.company_name || '',
+                client_phone: client.phone || '',
                 project_id: projectPost._id,
                 project_title: projectPost.title,
                 project_description: projectPost.description,
                 budget: bid.bid_amount,
                 status: 'ongoing',
-                assigned_at: new Date()
+                assigned_at: new Date(),
+                bid_amount: bid.bid_amount,
+                estimated_days: bid.estimated_days
             });
             freelancer.total_clients = (freelancer.total_clients || 0) + 1;
             console.log(`✅ Added client to freelancer's my_clients: ${client.full_name}`);
+        } else {
+            console.log(`⚠️ Client already exists for this project, skipping duplicate`);
+        }
+
+        // ============================================
+        // ✅ FIX: Add Project to Freelancer's Project List (my_projects)
+        // ============================================
+        freelancer.my_projects = freelancer.my_projects || [];
+
+        // Check if project already exists
+        const projectExists = freelancer.my_projects.some(p =>
+            p.project_id && p.project_id.toString() === projectPost._id.toString()
+        );
+
+        if (!projectExists) {
+            freelancer.my_projects.push({
+                project_id: projectPost._id,
+                project_title: projectPost.title,
+                project_description: projectPost.description,
+                client_id: client._id,
+                client_name: client.full_name,
+                client_email: client.email,
+                client_company: client.company_name || '',
+                budget: bid.bid_amount,
+                status: 'ongoing',
+                assigned_at: new Date(),
+                deadline: projectPost.deadline,
+                bid_amount: bid.bid_amount,
+                estimated_days: bid.estimated_days,
+                proposal: bid.proposal
+            });
+            freelancer.total_projects_assigned = (freelancer.total_projects_assigned || 0) + 1;
+            console.log(`✅ Added project to freelancer's my_projects: ${projectPost.title}`);
+        } else {
+            console.log(`⚠️ Project already exists in freelancer's list, skipping duplicate`);
         }
 
         await freelancer.save();
@@ -438,22 +585,23 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
         });
 
         // ============================================
-        // 7. LEGACY PROJECT SYNC GUARD
+        // 7. CREATE PROJECT IN PROJECTS COLLECTION FOR FREELANCER
         // ============================================
         try {
-            // Project currently shares the projectposts collection, so the awarded
-            // marketplace post itself is the only record we should keep.
+            // Check if project already exists in Projects collection
             const existingFreelancerProject = await Project.findOne({
-                _id: projectPost._id
+                user_id: bid.freelancer_id,
+                title: projectPost.title,
+                status: { $in: ['in_progress', 'active', 'draft'] }
             });
 
             if (!existingFreelancerProject) {
                 // Get or create client for freelancer
-                let existingClient = await Client.findOne({ 
-                    user_id: bid.freelancer_id, 
-                    email: client.email 
+                let existingClient = await Client.findOne({
+                    user_id: bid.freelancer_id,
+                    email: client.email
                 });
-                
+
                 let createdClient = existingClient;
                 if (!existingClient) {
                     createdClient = await Client.create({
@@ -461,7 +609,7 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
                         contact_name: client.full_name,
                         company_name: client.company_name || '',
                         email: client.email,
-                        phone: '',
+                        phone: client.phone || '',
                         address: '',
                         notes: `Imported from marketplace project ${projectPost._id}`
                     });
@@ -492,9 +640,11 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
                 console.log(`ℹ️ Project already exists for freelancer: ${projectPost.title}`);
             }
 
-            // Same guard for the client-side legacy sync branch.
+            // Check if project already exists for client
             const existingClientProject = await Project.findOne({
-                _id: projectPost._id
+                user_id: projectPost.client_id,
+                title: projectPost.title,
+                selected_freelancer_id: bid.freelancer_id
             });
 
             if (!existingClientProject) {
@@ -533,7 +683,7 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             message: `Your bid of $${bid.bid_amount} for "${projectPost.title}" has been accepted! You now have a new client: ${client.full_name}`,
             referenceId: projectPost._id,
             referenceType: 'project',
-            actionUrl: `/projects`
+            actionUrl: `/clients`  // Redirect to clients page
         });
 
         await NotificationHelper.createBulkNotifications({
@@ -548,10 +698,12 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
 
         console.log(`✅ Successfully accepted bid! Freelancer: ${freelancer.full_name}, Project: ${projectPost.title}`);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             contract,
-            message: 'Bid accepted successfully. Freelancer has been updated with client and project details.'
+            message: 'Bid accepted successfully. Freelancer has been updated with client and project details.',
+            clientAdded: !clientExists,
+            projectAdded: !projectExists
         });
 
     } catch (err) {
@@ -565,15 +717,31 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
 // ============================================
 router.get('/freelancer/my-clients', verifyToken, async (req, res) => {
     try {
-        const freelancer = await User.findById(req.userId)
-            .populate('my_clients.client_id', 'full_name email company_name');
-        
+        let freelancer = await User.findById(req.userId);
+
         if (!freelancer) {
             return res.status(404).json({ error: 'Freelancer not found' });
         }
 
+        // ✅ Sync freelancer's accepted assignments
+        await syncFreelancerAcceptedAssignments(freelancer);
+
+        // ✅ Re-fetch with populated references to get updated data
+        freelancer = await User.findById(req.userId)
+            .populate('my_clients.client_id', 'full_name email company_name');
+
+        // ✅ Remove duplicates before sending
+        const uniqueClients = [];
+        const seenIds = new Set();
+        for (const client of freelancer.my_clients || []) {
+            if (client.project_id && !seenIds.has(client.project_id.toString())) {
+                seenIds.add(client.project_id.toString());
+                uniqueClients.push(client);
+            }
+        }
+
         res.json({
-            clients: freelancer.my_clients || [],
+            clients: uniqueClients,
             totalClients: freelancer.total_clients || 0
         });
     } catch (err) {
@@ -587,16 +755,32 @@ router.get('/freelancer/my-clients', verifyToken, async (req, res) => {
 // ============================================
 router.get('/freelancer/my-projects', verifyToken, async (req, res) => {
     try {
-        const freelancer = await User.findById(req.userId)
-            .populate('my_projects.project_id', 'title description')
-            .populate('my_projects.client_id', 'full_name email company_name');
-        
+        let freelancer = await User.findById(req.userId);
+
         if (!freelancer) {
             return res.status(404).json({ error: 'Freelancer not found' });
         }
 
+        // ✅ Sync freelancer's accepted assignments
+        await syncFreelancerAcceptedAssignments(freelancer);
+
+        // ✅ Re-fetch with populated references to get updated data
+        freelancer = await User.findById(req.userId)
+            .populate('my_projects.project_id', 'title description')
+            .populate('my_projects.client_id', 'full_name email company_name');
+
+        // ✅ Remove duplicates before sending
+        const uniqueProjects = [];
+        const seenIds = new Set();
+        for (const project of freelancer.my_projects || []) {
+            if (project.project_id && !seenIds.has(project.project_id.toString())) {
+                seenIds.add(project.project_id.toString());
+                uniqueProjects.push(project);
+            }
+        }
+
         res.json({
-            projects: freelancer.my_projects || [],
+            projects: uniqueProjects,
             totalProjects: freelancer.total_projects_assigned || 0
         });
     } catch (err) {
@@ -615,13 +799,31 @@ router.get('/freelancer/stats', verifyToken, async (req, res) => {
             return res.status(404).json({ error: 'Freelancer not found' });
         }
 
+        // ✅ Sync first to ensure accurate stats
+        await syncFreelancerAcceptedAssignments(freelancer);
+
         const totalEarnings = freelancer.my_projects
             ?.filter(p => p.status === 'completed')
             .reduce((sum, p) => sum + (p.budget || 0), 0) || 0;
 
+        // ✅ Use unique counts
+        const uniqueProjectIds = new Set();
+        const uniqueClientIds = new Set();
+
+        for (const project of freelancer.my_projects || []) {
+            if (project.project_id) {
+                uniqueProjectIds.add(project.project_id.toString());
+            }
+        }
+        for (const client of freelancer.my_clients || []) {
+            if (client.project_id) {
+                uniqueClientIds.add(client.project_id.toString());
+            }
+        }
+
         res.json({
-            totalClients: freelancer.total_clients || 0,
-            totalProjects: freelancer.total_projects_assigned || 0,
+            totalClients: uniqueClientIds.size,
+            totalProjects: uniqueProjectIds.size,
             completedProjects: freelancer.my_projects?.filter(p => p.status === 'completed').length || 0,
             ongoingProjects: freelancer.my_projects?.filter(p => p.status === 'ongoing').length || 0,
             totalEarnings: totalEarnings
@@ -657,7 +859,7 @@ router.patch('/projects/:projectId/complete', verifyToken, async (req, res) => {
         if (freelancer) {
             // Update client list
             const clientIndex = freelancer.my_clients.findIndex(
-                c => c.project_id.toString() === projectId
+                c => c.project_id && c.project_id.toString() === projectId
             );
             if (clientIndex !== -1) {
                 freelancer.my_clients[clientIndex].status = 'completed';
@@ -666,7 +868,7 @@ router.patch('/projects/:projectId/complete', verifyToken, async (req, res) => {
 
             // Update project list
             const projectIndex = freelancer.my_projects.findIndex(
-                p => p.project_id.toString() === projectId
+                p => p.project_id && p.project_id.toString() === projectId
             );
             if (projectIndex !== -1) {
                 freelancer.my_projects[projectIndex].status = 'completed';
@@ -679,16 +881,19 @@ router.patch('/projects/:projectId/complete', verifyToken, async (req, res) => {
 
         // Also update the project in Projects collection
         await Project.findOneAndUpdate(
-            { 
+            {
                 title: projectPost.title,
                 selected_freelancer_id: userId
             },
-            { 
+            {
                 status: 'completed',
                 completed_at: new Date(),
                 progress: 100
             }
         );
+
+        // ✅ Re-sync to ensure consistency
+        await syncFreelancerAcceptedAssignments(freelancer);
 
         res.json({
             success: true,
@@ -751,6 +956,7 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             { returnDocument: 'after' }
         );
 
+        // ✅ Sync changes to Projects collection
         await Project.updateMany(
             {
                 title: project.title,
@@ -928,7 +1134,7 @@ router.post('/projects', verifyToken, async (req, res) => {
 router.post('/cleanup/deduplicate-projects', verifyToken, async (req, res) => {
     try {
         console.log('🧹 Starting project deduplication cleanup...');
-        
+
         const users = await User.find({
             $or: [
                 { my_projects: { $exists: true, $ne: [] } },
@@ -1006,6 +1212,135 @@ router.post('/cleanup/deduplicate-projects', verifyToken, async (req, res) => {
         });
     } catch (err) {
         console.error('Error during deduplication cleanup:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============ SYNC ACCEPTED ASSIGNMENTS FOR FREELANCER ============
+router.post('/sync-accepted-assignments', verifyToken, async (req, res) => {
+    try {
+        console.log('🔄 Syncing accepted assignments for freelancer...');
+
+        const freelancer = await User.findById(req.userId);
+        if (!freelancer) {
+            return res.status(404).json({ error: 'Freelancer not found' });
+        }
+
+        if (!freelancer.my_clients) freelancer.my_clients = [];
+        if (!freelancer.my_projects) freelancer.my_projects = [];
+
+        const acceptedBids = await Bid.find({
+            freelancer_id: req.userId,
+            status: 'accepted'
+        }).sort({ created_at: -1 });
+
+        console.log(`📋 Found ${acceptedBids.length} accepted bid(s) for freelancer`);
+
+        let projectsAdded = 0;
+        let clientsAdded = 0;
+        let projectsUpdated = 0;
+        let clientsUpdated = 0;
+
+        for (const bid of acceptedBids) {
+            const projectPost = await ProjectPost.findById(bid.project_id);
+            if (!projectPost) {
+                console.warn(`⚠️ ProjectPost not found for bid: ${bid._id}`);
+                continue;
+            }
+
+            const client = await User.findById(projectPost.client_id);
+            if (!client) {
+                console.warn(`⚠️ Client not found for project: ${projectPost._id}`);
+                continue;
+            }
+
+            // Sync project entry
+            const projectEntryIndex = freelancer.my_projects.findIndex(p =>
+                p.project_id && p.project_id.toString() === projectPost._id.toString()
+            );
+
+            const projectData = {
+                project_id: projectPost._id,
+                project_title: projectPost.title,
+                project_description: projectPost.description,
+                client_id: client._id,
+                client_name: client.full_name,
+                client_email: client.email,
+                budget: bid.bid_amount,
+                status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
+                assigned_at: freelancer.my_projects[projectEntryIndex]?.assigned_at || new Date(),
+                deadline: projectPost.deadline,
+                completed_at: projectPost.status === 'completed' ? projectPost.completed_at : null
+            };
+
+            if (projectEntryIndex >= 0) {
+                freelancer.my_projects[projectEntryIndex] = {
+                    ...freelancer.my_projects[projectEntryIndex],
+                    ...projectData
+                };
+                projectsUpdated++;
+                console.log(`✅ Updated project entry: ${projectPost.title}`);
+            } else {
+                freelancer.my_projects.push(projectData);
+                projectsAdded++;
+                console.log(`✅ Added project entry: ${projectPost.title}`);
+            }
+
+            // Sync client entry
+            const clientEntryIndex = freelancer.my_clients.findIndex(c =>
+                c.client_id && c.client_id.toString() === client._id.toString() &&
+                c.project_id && c.project_id.toString() === projectPost._id.toString()
+            );
+
+            const clientData = {
+                client_id: client._id,
+                client_name: client.full_name,
+                client_email: client.email,
+                client_company: client.company_name || '',
+                project_id: projectPost._id,
+                project_title: projectPost.title,
+                project_description: projectPost.description,
+                budget: bid.bid_amount,
+                status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
+                assigned_at: freelancer.my_clients[clientEntryIndex]?.assigned_at || new Date(),
+                completed_at: projectPost.status === 'completed' ? projectPost.completed_at : null
+            };
+
+            if (clientEntryIndex >= 0) {
+                freelancer.my_clients[clientEntryIndex] = {
+                    ...freelancer.my_clients[clientEntryIndex],
+                    ...clientData
+                };
+                clientsUpdated++;
+                console.log(`✅ Updated client entry: ${client.full_name}`);
+            } else {
+                freelancer.my_clients.push(clientData);
+                clientsAdded++;
+                console.log(`✅ Added client entry: ${client.full_name}`);
+            }
+        }
+
+        freelancer.total_projects_assigned = freelancer.my_projects.length;
+        freelancer.total_clients = freelancer.my_clients.length;
+
+        await freelancer.save();
+        console.log(`🎉 Sync complete!`);
+
+        res.json({
+            success: true,
+            message: 'Freelancer assignments synced successfully',
+            summary: {
+                projects_added: projectsAdded,
+                projects_updated: projectsUpdated,
+                clients_added: clientsAdded,
+                clients_updated: clientsUpdated,
+                total_projects: freelancer.my_projects.length,
+                total_clients: freelancer.my_clients.length,
+                accepted_bids_processed: acceptedBids.length
+            }
+        });
+    } catch (err) {
+        console.error('Error syncing accepted assignments:', err);
         res.status(500).json({ error: err.message });
     }
 });
