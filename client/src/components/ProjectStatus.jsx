@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import ProjectPayment from './ProjectPayment';
 import ProjectChat from './ProjectChat';
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +12,8 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
     const [statusHistory, setStatusHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showStatusForm, setShowStatusForm] = useState(false);
+    const [submitSuccess, setSubmitSuccess] = useState(false);
+    const [submitMessage, setSubmitMessage] = useState('');
     const [statusData, setStatusData] = useState({
         status: project.status || 'in_progress',
         progress: project.progress || 0,
@@ -53,6 +55,9 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
         }
 
         setLoading(true);
+        setSubmitSuccess(false);
+        setSubmitMessage('');
+
         try {
             const token = localStorage.getItem('token');
             if (!token) {
@@ -65,6 +70,11 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
+            // ✅ Show success message
+            setSubmitSuccess(true);
+            setSubmitMessage('✅ Status updated successfully!');
+            
+            // Reset form after successful update
             setShowStatusForm(false);
             setStatusData({
                 status: 'in_progress',
@@ -76,10 +86,19 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
             if (onStatusUpdate) {
                 onStatusUpdate(response.data.project);
             }
-            alert('✅ Status updated successfully!');
+            
+            // ✅ Auto-hide success message after 5 seconds
+            setTimeout(() => {
+                setSubmitSuccess(false);
+                setSubmitMessage('');
+            }, 5000);
+            
         } catch (err) {
             console.error('Failed to update status:', err);
-            alert('❌ Failed to update status: ' + (err.response?.data?.error || err.message));
+            setSubmitMessage('❌ Failed to update status: ' + (err.response?.data?.error || err.message));
+            setTimeout(() => {
+                setSubmitMessage('');
+            }, 5000);
         } finally {
             setLoading(false);
         }
@@ -133,6 +152,7 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
             marginTop: '1rem',
             border: '1px solid #e5e7eb'
         }}>
+            {/* Status Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -175,10 +195,14 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 {/* Update Status Button - For freelancers */}
                 {isFreelancerUser && !isClientUser && project.status !== 'completed' && project.status !== 'cancelled' && (
                     <button
-                        onClick={() => setShowStatusForm(!showStatusForm)}
+                        onClick={() => {
+                            setShowStatusForm(!showStatusForm);
+                            setSubmitSuccess(false);
+                            setSubmitMessage('');
+                        }}
                         style={{
                             padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(0.75rem, 1.5vw, 1rem)',
-                            background: '#3b82f6',
+                            background: showStatusForm ? '#6b7280' : '#3b82f6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '6px',
@@ -187,8 +211,12 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             transition: 'background 0.2s',
                             whiteSpace: 'nowrap'
                         }}
-                        onMouseEnter={(e) => e.target.style.background = '#2563eb'}
-                        onMouseLeave={(e) => e.target.style.background = '#3b82f6'}
+                        onMouseEnter={(e) => {
+                            if (!showStatusForm) e.currentTarget.style.background = '#2563eb';
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!showStatusForm) e.currentTarget.style.background = '#3b82f6';
+                        }}
                     >
                         {showStatusForm ? 'Cancel' : 'Update Progress'}
                     </button>
@@ -197,10 +225,14 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 {/* Update Status Button - For clients/project owners */}
                 {isClientUser && !isFreelancerUser && project.status !== 'completed' && project.status !== 'cancelled' && (
                     <button
-                        onClick={() => setShowStatusForm(!showStatusForm)}
+                        onClick={() => {
+                            setShowStatusForm(!showStatusForm);
+                            setSubmitSuccess(false);
+                            setSubmitMessage('');
+                        }}
                         style={{
                             padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(0.75rem, 1.5vw, 1rem)',
-                            background: '#8b5cf6',
+                            background: showStatusForm ? '#6b7280' : '#8b5cf6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '6px',
@@ -209,8 +241,12 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                             transition: 'background 0.2s',
                             whiteSpace: 'nowrap'
                         }}
-                        onMouseEnter={(e) => e.target.style.background = '#7c3aed'}
-                        onMouseLeave={(e) => e.target.style.background = '#8b5cf6'}
+                        onMouseEnter={(e) => {
+                            if (!showStatusForm) e.currentTarget.style.background = '#7c3aed';
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!showStatusForm) e.currentTarget.style.background = '#8b5cf6';
+                        }}
                     >
                         {showStatusForm ? 'Cancel' : 'Review Project'}
                     </button>
@@ -245,6 +281,25 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                     {showHistory ? 'Hide History' : 'View History'}
                 </button>
             </div>
+
+            {/* ✅ Success/Error Message */}
+            {submitMessage && (
+                <div style={{
+                    marginTop: '0.75rem',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    background: submitMessage.includes('✅') ? '#d1fae5' : '#fee2e2',
+                    color: submitMessage.includes('✅') ? '#065f46' : '#991b1b',
+                    border: submitMessage.includes('✅') ? '1px solid #a7f3d0' : '1px solid #fecaca',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)'
+                }}>
+                    {submitMessage.includes('✅') ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+                    {submitMessage}
+                </div>
+            )}
 
             {/* Status Update Form - For freelancers AND clients */}
             {showStatusForm && (isFreelancerUser || isClientUser) && (
@@ -350,17 +405,21 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                 disabled={loading}
                                 style={{
                                     padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(1rem, 1.5vw, 1.5rem)',
-                                    background: isFreelancerUser ? '#10b981' : '#8b5cf6',
+                                    background: loading ? '#9ca3af' : (isFreelancerUser ? '#10b981' : '#8b5cf6'),
                                     color: 'white',
                                     border: 'none',
                                     borderRadius: '6px',
-                                    cursor: 'pointer',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
                                     opacity: loading ? 0.5 : 1,
                                     transition: 'background 0.2s',
                                     fontWeight: '500',
                                     fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
                                     flex: '1 1 auto',
-                                    minWidth: '100px'
+                                    minWidth: '100px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.5rem'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!loading) e.target.style.background = isFreelancerUser ? '#059669' : '#7c3aed';
@@ -369,10 +428,21 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                     if (!loading) e.target.style.background = isFreelancerUser ? '#10b981' : '#8b5cf6';
                                 }}
                             >
-                                {loading ? 'Submitting...' : (isFreelancerUser ? 'Submit Update' : 'Submit Review')}
+                                {loading ? (
+                                    <>
+                                        <Loader size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                                        Submitting...
+                                    </>
+                                ) : (
+                                    isFreelancerUser ? 'Submit Update' : 'Submit Review'
+                                )}
                             </button>
                             <button
-                                onClick={() => setShowStatusForm(false)}
+                                onClick={() => {
+                                    setShowStatusForm(false);
+                                    setSubmitSuccess(false);
+                                    setSubmitMessage('');
+                                }}
                                 style={{
                                     padding: 'clamp(0.4rem, 1.2vw, 0.5rem) clamp(1rem, 1.5vw, 1.5rem)',
                                     background: '#6b7280',
@@ -467,6 +537,13 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                     isFreelancer={isFreelancerUser}
                 />
             )}
+
+            <style>{`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };
