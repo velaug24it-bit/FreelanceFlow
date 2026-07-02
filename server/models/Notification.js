@@ -20,6 +20,8 @@ const notificationSchema = new mongoose.Schema({
       'invoice_created',
       'new_project',
       'job_match',
+      'prehire_message',
+      'moderation_report',
       'general'
     ],
     required: true

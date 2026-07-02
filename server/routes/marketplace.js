@@ -11,6 +11,8 @@ const Client = require('../models/Client');
 const Project = require('../models/Project');
 const Review = require('../models/Review');
 const SavedSearch = require('../models/SavedSearch');
+const BidMessage = require('../models/BidMessage');
+const Report = require('../models/Report');
 const NotificationHelper = require('../utils/notificationHelper');
 
 // Verify token middleware
@@ -199,7 +201,7 @@ const buildFreelancerSocialProofMap = async (freelancerIds, viewerId = null) => 
 
     const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
     const [freelancers, reviewStats, completedStats, acceptedBids, viewer] = await Promise.all([
-        User.find({ _id: { $in: objectIds } }).select('full_name is_email_verified subscription_tier total_projects_assigned favorite_freelancers'),
+        User.find({ _id: { $in: objectIds } }).select('full_name is_email_verified subscription_tier total_projects_assigned favorite_freelancers availability_status response_time_hours moderation_status'),
         Review.aggregate([
             { $match: { reviewee_id: { $in: objectIds } } },
             { $group: { _id: '$reviewee_id', average_rating: { $avg: '$rating' }, reviews_count: { $sum: 1 } } }
@@ -251,7 +253,10 @@ const buildFreelancerSocialProofMap = async (freelancerIds, viewerId = null) => 
             reviews_count: stats.reviews_count || 0,
             completed_projects: stats.completed_projects || 0,
             badges: getProfileBadges(freelancer, stats.completed_projects || 0, averageResponseHours),
-            is_favorited: favoriteIds.has(id)
+            is_favorited: favoriteIds.has(id),
+            availability_status: freelancer.availability_status || 'available',
+            response_time_hours: freelancer.response_time_hours || 24,
+            moderation_status: freelancer.moderation_status || 'active'
         };
     });
 
@@ -570,6 +575,106 @@ router.get('/my-bids', verifyToken, async (req, res) => {
     }
 });
 
+const getBidMessageAccess = async (projectId, bidId, userId) => {
+    const [project, bid] = await Promise.all([
+        ProjectPost.findById(projectId),
+        Bid.findById(bidId)
+    ]);
+
+    if (!project) return { error: 'Project not found', status: 404 };
+    if (!bid || bid.project_id.toString() !== project._id.toString()) {
+        return { error: 'Bid not found for this project', status: 404 };
+    }
+
+    const isClient = project.client_id.toString() === userId.toString();
+    const isFreelancer = bid.freelancer_id.toString() === userId.toString();
+
+    if (!isClient && !isFreelancer) {
+        return { error: 'You do not have access to this bid conversation', status: 403 };
+    }
+
+    return { project, bid, senderRole: isClient ? 'client' : 'freelancer' };
+};
+
+router.get('/projects/:projectId/bids/:bidId/messages', verifyToken, async (req, res) => {
+    try {
+        const access = await getBidMessageAccess(req.params.projectId, req.params.bidId, req.userId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+
+        const messages = await BidMessage.find({ bid_id: req.params.bidId })
+            .sort({ created_at: 1 })
+            .limit(100)
+            .lean();
+
+        res.json({ messages });
+    } catch (err) {
+        console.error('Error fetching pre-hire messages:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/projects/:projectId/bids/:bidId/messages', verifyToken, async (req, res) => {
+    try {
+        const cleanMessage = typeof req.body.message === 'string' ? req.body.message.trim() : '';
+        if (!cleanMessage) return res.status(400).json({ error: 'Message is required' });
+
+        const access = await getBidMessageAccess(req.params.projectId, req.params.bidId, req.userId);
+        if (access.error) return res.status(access.status).json({ error: access.error });
+        const sender = await User.findById(req.userId).select('full_name');
+
+        const message = await BidMessage.create({
+            project_id: access.project._id,
+            bid_id: access.bid._id,
+            sender_id: req.userId,
+            sender_name: sender?.full_name || 'User',
+            sender_role: access.senderRole,
+            message: cleanMessage,
+            read_by: [req.userId]
+        });
+
+        const recipientId = access.senderRole === 'client' ? access.bid.freelancer_id : access.project.client_id;
+        await NotificationHelper.createNotification({
+            userId: recipientId,
+            type: 'prehire_message',
+            title: 'New Pre-Hire Message',
+            message: `${sender?.full_name || 'Someone'} sent a question about "${access.project.title}".`,
+            referenceId: access.project._id,
+            referenceType: 'project',
+            actionUrl: `/marketplace/projects/${access.project._id}`
+        });
+
+        res.status(201).json({ success: true, message });
+    } catch (err) {
+        console.error('Error sending pre-hire message:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/reports', verifyToken, async (req, res) => {
+    try {
+        const { target_type, target_id, target_label = '', reason, details = '' } = req.body;
+        if (!target_type || !target_id || !reason) {
+            return res.status(400).json({ error: 'Target, reason, and target type are required' });
+        }
+        const reporter = await User.findById(req.userId).select('full_name');
+
+        const report = await Report.create({
+            reporter_id: req.userId,
+            reporter_name: reporter?.full_name || 'User',
+            target_type,
+            target_id,
+            target_label,
+            reason,
+            details
+        });
+
+        res.status(201).json({ success: true, report });
+    } catch (err) {
+        console.error('Error creating report:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/saved-searches', verifyToken, async (req, res) => {
     try {
         const searches = await SavedSearch.find({ user_id: req.userId }).sort({ created_at: -1 });
@@ -641,7 +746,7 @@ router.get('/freelancers/:id', async (req, res) => {
     try {
         const viewerId = optionalToken(req);
         const freelancer = await User.findOne({ _id: req.params.id, role: 'freelancer' })
-            .select('full_name company_name bio skills portfolio_links hourly_rate avatar_url is_email_verified subscription_tier total_projects_assigned created_at');
+            .select('full_name company_name bio skills portfolio_links hourly_rate availability_status response_time_hours avatar_url is_email_verified subscription_tier total_projects_assigned created_at moderation_status');
 
         if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
 

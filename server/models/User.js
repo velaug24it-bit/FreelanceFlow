@@ -96,6 +96,17 @@ const userSchema = new mongoose.Schema({
     skills: { type: [String], default: [] },
     portfolio_links: { type: [String], default: [] },
     hourly_rate: { type: Number, default: 0 },
+    availability_status: {
+        type: String,
+        enum: ['available', 'busy', 'away'],
+        default: 'available'
+    },
+    response_time_hours: { type: Number, default: 24 },
+    moderation_status: {
+        type: String,
+        enum: ['active', 'flagged', 'suspended', 'banned'],
+        default: 'active'
+    },
     avatar_url: { type: String, default: '' },
     is_email_verified: { type: Boolean, default: false },
     verification_token: String,

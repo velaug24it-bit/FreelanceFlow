@@ -184,6 +184,8 @@ router.post('/login', async (req, res) => {
                 skills: user.skills,
                 portfolio_links: user.portfolio_links,
                 hourly_rate: user.hourly_rate,
+                availability_status: user.availability_status,
+                response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url
             }
         });
@@ -222,6 +224,8 @@ router.get('/verify', async (req, res) => {
                 skills: user.skills,
                 portfolio_links: user.portfolio_links,
                 hourly_rate: user.hourly_rate,
+                availability_status: user.availability_status,
+                response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url,
                 is_2fa_enabled: user.is_2fa_enabled
             }
@@ -348,6 +352,8 @@ router.post('/social-login', async (req, res) => {
                 skills: user.skills,
                 portfolio_links: user.portfolio_links,
                 hourly_rate: user.hourly_rate,
+                availability_status: user.availability_status,
+                response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url
             }
         });
@@ -690,7 +696,7 @@ router.post('/reset-password/:token', async (req, res) => {
 // ============================================
 router.put('/profile', authenticateToken, async (req, res) => {
     try {
-        const { full_name, bio, skills, portfolio_links, hourly_rate, company_name, avatar_url } = req.body;
+        const { full_name, bio, skills, portfolio_links, hourly_rate, availability_status, response_time_hours, company_name, avatar_url } = req.body;
         const user = req.user;
 
         if (full_name) user.full_name = full_name;
@@ -698,6 +704,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
         if (skills !== undefined) user.skills = skills;
         if (portfolio_links !== undefined) user.portfolio_links = portfolio_links;
         if (hourly_rate !== undefined) user.hourly_rate = hourly_rate;
+        if (availability_status !== undefined) user.availability_status = availability_status;
+        if (response_time_hours !== undefined) user.response_time_hours = response_time_hours;
         if (company_name) user.company_name = company_name;
         if (avatar_url) user.avatar_url = avatar_url;
 
@@ -717,6 +725,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
                 skills: user.skills,
                 portfolio_links: user.portfolio_links,
                 hourly_rate: user.hourly_rate,
+                availability_status: user.availability_status,
+                response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url
             }
         });
@@ -834,6 +844,8 @@ router.post('/verify-2fa', async (req, res) => {
                 skills: user.skills,
                 portfolio_links: user.portfolio_links,
                 hourly_rate: user.hourly_rate,
+                availability_status: user.availability_status,
+                response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url
             }
         });

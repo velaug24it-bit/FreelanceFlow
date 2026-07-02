@@ -32,6 +32,7 @@ import RazorpayCheckout from './pages/RazorpayCheckout';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminFreelancers from './pages/AdminFreelancers';
+import AdminModeration from './pages/AdminModeration';
 
 // Extra Authentication Pages
 import ForgotPassword from './pages/ForgotPassword';
@@ -58,6 +59,7 @@ function App() {
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
             <Route path="/admin-freelancers" element={<AdminFreelancers />} />
+            <Route path="/admin-moderation" element={<AdminModeration />} />
             
             {/* User Routes - WITH NAVBAR */}
             <Route path="/" element={

@@ -62,6 +62,8 @@ const Settings = () => {
   const [skills, setSkills] = useState('');
   const [portfolioLinks, setPortfolioLinks] = useState('');
   const [hourlyRate, setHourlyRate] = useState(0);
+  const [availabilityStatus, setAvailabilityStatus] = useState('available');
+  const [responseTimeHours, setResponseTimeHours] = useState(24);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
@@ -88,6 +90,8 @@ const Settings = () => {
       setSkills(user.skills?.join(', ') || '');
       setPortfolioLinks(user.portfolio_links?.join('\n') || '');
       setHourlyRate(user.hourly_rate || 0);
+      setAvailabilityStatus(user.availability_status || 'available');
+      setResponseTimeHours(user.response_time_hours || 24);
       setIs2FAEnabled(user.is_2fa_enabled || false);
     }
   }, [user]);
@@ -121,6 +125,8 @@ const Settings = () => {
       bio,
       skills: skillsArray,
       portfolio_links: portfolioArray,
+      availability_status: availabilityStatus,
+      response_time_hours: Number(responseTimeHours) || 24,
       hourly_rate: Number(hourlyRate)
     });
 
@@ -322,6 +328,28 @@ const Settings = () => {
                   />
                 </div>
                 <div className="form-group">
+                  <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Availability</label>
+                  <select
+                    value={availabilityStatus}
+                    onChange={(e) => setAvailabilityStatus(e.target.value)}
+                    style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem' }}
+                  >
+                    <option value="available">Available now</option>
+                    <option value="busy">Busy</option>
+                    <option value="away">Away</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Response Time (hours)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={responseTimeHours}
+                    onChange={(e) => setResponseTimeHours(e.target.value)}
+                    style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem' }}
+                  />
+                </div>
+                <div className="form-group">
                   <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Skills (comma separated)</label>
                   <input
                     type="text"
@@ -393,6 +421,16 @@ const Settings = () => {
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Hourly Rate</label>
                 <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user?.hourly_rate ? `$${user.hourly_rate}/hr` : 'Not set'}</p>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Availability</label>
+                <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>
+                  {user?.availability_status === 'busy' ? 'Busy' : user?.availability_status === 'away' ? 'Away' : 'Available now'}
+                </p>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Response Status</label>
+                <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>Responds within {user?.response_time_hours || 24}h</p>
               </div>
               <div className="span-2" style={{ gridColumn: 'span 2' }}>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Skills</label>

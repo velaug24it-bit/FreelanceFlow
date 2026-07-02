@@ -13,6 +13,8 @@ const Payment = require('../models/Payment');
 const ProjectPost = require('../models/ProjectPost');
 const Bid = require('../models/Bid');
 const Contract = require('../models/Contract');
+const Report = require('../models/Report');
+const Review = require('../models/Review');
 
 // Admin middleware
 const verifyAdmin = async (req, res, next) => {
@@ -762,6 +764,123 @@ router.get('/freelancers/:id', verifyAdmin, async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Error fetching freelancer details:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// MODERATION TOOLS (ADDITIVE)
+// ============================================
+router.get('/moderation/reports', verifyAdmin, async (req, res) => {
+    try {
+        const status = req.query.status || 'all';
+        const filter = status === 'all' ? {} : { status };
+
+        const [reports, summary] = await Promise.all([
+            Report.find(filter)
+                .populate('reporter_id', 'full_name email')
+                .sort({ created_at: -1 })
+                .limit(200),
+            Report.aggregate([
+                { $group: { _id: '$status', count: { $sum: 1 } } }
+            ])
+        ]);
+
+        res.json({
+            reports,
+            summary: summary.reduce((acc, item) => {
+                acc[item._id] = item.count;
+                return acc;
+            }, {})
+        });
+    } catch (err) {
+        console.error('Error fetching moderation reports:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/moderation/reports/:id', verifyAdmin, async (req, res) => {
+    try {
+        const { status, admin_notes = '' } = req.body;
+        const allowed = ['open', 'reviewing', 'resolved', 'dismissed'];
+        if (status && !allowed.includes(status)) {
+            return res.status(400).json({ error: 'Invalid report status' });
+        }
+
+        const updates = {};
+        if (status) updates.status = status;
+        if (admin_notes !== undefined) updates.admin_notes = admin_notes;
+        if (['resolved', 'dismissed'].includes(status)) {
+            updates.resolved_by = req.adminId;
+            updates.resolved_at = new Date();
+        }
+
+        const report = await Report.findByIdAndUpdate(req.params.id, updates, { new: true });
+        if (!report) return res.status(404).json({ error: 'Report not found' });
+
+        res.json({ success: true, report });
+    } catch (err) {
+        console.error('Error updating moderation report:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/users/:id/moderation', verifyAdmin, async (req, res) => {
+    try {
+        const allowed = ['active', 'flagged', 'suspended', 'banned'];
+        const { moderation_status } = req.body;
+        if (!allowed.includes(moderation_status)) {
+            return res.status(400).json({ error: 'Invalid moderation status' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.params.id,
+            { moderation_status },
+            { new: true }
+        ).select('-password_hash');
+
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({ success: true, user });
+    } catch (err) {
+        console.error('Error updating user moderation status:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/moderation/overview', verifyAdmin, async (req, res) => {
+    try {
+        const [
+            openReports,
+            reportedProjects,
+            reportedProfiles,
+            reportedBids,
+            reportedReviews,
+            reportedDisputes,
+            flaggedUsers,
+            suspiciousReviews
+        ] = await Promise.all([
+            Report.countDocuments({ status: { $in: ['open', 'reviewing'] } }),
+            Report.countDocuments({ target_type: 'project', status: { $in: ['open', 'reviewing'] } }),
+            Report.countDocuments({ target_type: 'profile', status: { $in: ['open', 'reviewing'] } }),
+            Report.countDocuments({ target_type: 'bid', status: { $in: ['open', 'reviewing'] } }),
+            Report.countDocuments({ target_type: 'review', status: { $in: ['open', 'reviewing'] } }),
+            Report.countDocuments({ target_type: 'dispute', status: { $in: ['open', 'reviewing'] } }),
+            User.countDocuments({ moderation_status: { $in: ['flagged', 'suspended', 'banned'] } }),
+            Review.countDocuments({ rating: { $lte: 2 } })
+        ]);
+
+        res.json({
+            openReports,
+            reportedProjects,
+            reportedProfiles,
+            reportedBids,
+            reportedReviews,
+            reportedDisputes,
+            flaggedUsers,
+            suspiciousReviews
+        });
+    } catch (err) {
+        console.error('Error fetching moderation overview:', err);
         res.status(500).json({ error: err.message });
     }
 });

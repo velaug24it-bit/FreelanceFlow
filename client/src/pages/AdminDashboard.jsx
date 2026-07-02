@@ -8,7 +8,7 @@ import {
   Download, Edit, Trash2, CheckCircle, 
   XCircle, LogOut, Shield, Eye, Search,
   Calendar, Package, CreditCard, Briefcase,
-  RefreshCw, AlertCircle
+  RefreshCw, AlertCircle, Flag
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -376,6 +376,26 @@ const AdminDashboard = () => {
           >
             <Users size={16} />
             Freelancers
+          </button>
+          <button
+            onClick={() => navigate('/admin-moderation')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.2)'}
+          >
+            <Flag size={16} />
+            Moderation
           </button>
           <button
             onClick={fetchAdminData}

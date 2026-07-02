@@ -1,10 +1,35 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Award, Briefcase, DollarSign, ExternalLink, Heart, ShieldCheck, Star, Zap } from 'lucide-react';
+import { ArrowLeft, Award, Briefcase, DollarSign, ExternalLink, Flag, Heart, ShieldCheck, Star, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+if (!document.querySelector('style[data-freelancer-profile-responsive]')) {
+  const s = document.createElement('style');
+  s.setAttribute('data-freelancer-profile-responsive', 'true');
+  s.textContent = `
+    @media (max-width: 700px) {
+      .freelancer-profile-hero {
+        flex-direction: column !important;
+        align-items: stretch !important;
+      }
+      .freelancer-profile-identity {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+      }
+      .freelancer-profile-actions {
+        width: 100% !important;
+        justify-content: stretch !important;
+      }
+      .freelancer-profile-actions button {
+        flex: 1 1 auto !important;
+      }
+    }
+  `;
+  document.head.appendChild(s);
+}
 
 const FreelancerProfile = () => {
   const { id } = useParams();
@@ -57,6 +82,26 @@ const FreelancerProfile = () => {
     }
   };
 
+  const reportTarget = async (target_type, target_id, target_label) => {
+    const reason = window.prompt(`Report ${target_type}: briefly describe the issue`);
+    if (!reason || !reason.trim()) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      await axios.post(`${API_URL}/marketplace/reports`, {
+        target_type,
+        target_id,
+        target_label,
+        reason: reason.trim()
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert('Report submitted for admin review.');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to submit report');
+    }
+  };
+
   const getInitials = (name = '') => (
     name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2) || 'F'
   );
@@ -98,6 +143,8 @@ const FreelancerProfile = () => {
   }
 
   const proof = profile.social_proof || {};
+  const availabilityLabel = profile.availability_status === 'busy' ? 'Busy' : profile.availability_status === 'away' ? 'Away' : 'Available now';
+  const availabilityColor = profile.availability_status === 'busy' ? '#b45309' : profile.availability_status === 'away' ? '#64748b' : '#047857';
 
   return (
     <div style={{ background: '#f8fafc', minHeight: '100vh', padding: 'clamp(1rem, 2vw, 2rem)' }}>
@@ -108,8 +155,8 @@ const FreelancerProfile = () => {
         </button>
 
         <section style={{ background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', padding: 'clamp(1rem, 2vw, 1.5rem)', marginBottom: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', minWidth: 0 }}>
+          <div className="freelancer-profile-hero" style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <div className="freelancer-profile-identity" style={{ display: 'flex', gap: '1rem', alignItems: 'center', minWidth: 0 }}>
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} alt={profile.full_name} style={{ width: '84px', height: '84px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #e2e8f0' }} />
               ) : (
@@ -136,16 +183,24 @@ const FreelancerProfile = () => {
                       {profile.hourly_rate}/hr
                     </span>
                   )}
+                  <span style={{ color: availabilityColor, fontWeight: 700 }}>{availabilityLabel}</span>
+                  <span>Responds within {profile.response_time_hours || 24}h</span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
                   {renderBadges(proof.badges)}
                 </div>
               </div>
             </div>
-            <button onClick={toggleFavorite} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', padding: '0.7rem 1rem', background: proof.is_favorited ? '#fee2e2' : '#eff6ff', color: proof.is_favorited ? '#dc2626' : '#2563eb', border: '1px solid #dbeafe', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
-              <Heart size={17} fill={proof.is_favorited ? '#dc2626' : 'none'} />
-              {proof.is_favorited ? 'Favorited' : 'Favorite'}
-            </button>
+            <div className="freelancer-profile-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button onClick={toggleFavorite} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', padding: '0.7rem 1rem', background: proof.is_favorited ? '#fee2e2' : '#eff6ff', color: proof.is_favorited ? '#dc2626' : '#2563eb', border: '1px solid #dbeafe', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
+                <Heart size={17} fill={proof.is_favorited ? '#dc2626' : 'none'} />
+                {proof.is_favorited ? 'Favorited' : 'Favorite'}
+              </button>
+              <button onClick={() => reportTarget('profile', profile._id, profile.full_name)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem', padding: '0.7rem 1rem', background: 'white', color: '#b45309', border: '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer', fontWeight: 700 }}>
+                <Flag size={17} />
+                Report
+              </button>
+            </div>
           </div>
         </section>
 
@@ -159,7 +214,12 @@ const FreelancerProfile = () => {
               <div key={review._id} style={{ borderTop: '1px solid #e5e7eb', padding: '0.9rem 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                   <strong style={{ color: '#0f172a' }}>{review.reviewer_name}</strong>
-                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>{review.rating} stars</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>{review.rating} stars</span>
+                    <button onClick={() => reportTarget('review', review._id, `${review.reviewer_name} review`)} style={{ border: 'none', background: 'transparent', color: '#b45309', cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }} title="Report review">
+                      <Flag size={14} />
+                    </button>
+                  </div>
                 </div>
                 {review.project_id?.title && <p style={{ margin: '0.2rem 0', color: '#64748b', fontSize: '0.84rem' }}>{review.project_id.title}</p>}
                 <p style={{ margin: '0.35rem 0 0', color: '#334155' }}>{review.comment || 'No written comment.'}</p>

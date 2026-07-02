@@ -2,10 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award, BellRing, Trash2, ExternalLink } from 'lucide-react';
+import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award, BellRing, Trash2, ExternalLink, MessageCircle, Send, Flag } from 'lucide-react';
 import ProjectStatus from '../components/ProjectStatus';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+if (!document.querySelector('style[data-marketplace-addons-responsive]')) {
+    const s = document.createElement('style');
+    s.setAttribute('data-marketplace-addons-responsive', 'true');
+    s.textContent = `
+        @media (max-width: 700px) {
+            .marketplace-addon-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .marketplace-addon-actions {
+                width: 100% !important;
+                justify-content: stretch !important;
+            }
+            .marketplace-addon-actions button {
+                flex: 1 1 auto !important;
+            }
+            .marketplace-message-row {
+                max-width: 100% !important;
+            }
+        }
+    `;
+    document.head.appendChild(s);
+}
 
 const Marketplace = () => {
     const { user } = useAuth();
@@ -33,6 +56,9 @@ const Marketplace = () => {
         budget_min: '',
         budget_max: ''
     });
+    const [activeBidThread, setActiveBidThread] = useState(null);
+    const [bidMessages, setBidMessages] = useState({});
+    const [bidMessageInputs, setBidMessageInputs] = useState({});
     
     // Individual state for each bid form
     const [bidAmounts, setBidAmounts] = useState({});
@@ -324,6 +350,71 @@ const Marketplace = () => {
         }
     };
 
+    const getBidThreadKey = (projectId, bidId) => `${projectId}:${bidId}`;
+
+    const fetchBidMessages = async (projectId, bidId) => {
+        const token = localStorage.getItem('token');
+        const key = getBidThreadKey(projectId, bidId);
+        try {
+            const res = await axios.get(`${API_URL}/marketplace/projects/${projectId}/bids/${bidId}/messages`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBidMessages(prev => ({ ...prev, [key]: res.data.messages || [] }));
+        } catch (err) {
+            console.error('Error fetching pre-hire messages:', err);
+            alert(err.response?.data?.error || 'Failed to load messages');
+        }
+    };
+
+    const toggleBidThread = (projectId, bidId) => {
+        const key = getBidThreadKey(projectId, bidId);
+        if (activeBidThread === key) {
+            setActiveBidThread(null);
+            return;
+        }
+        setActiveBidThread(key);
+        fetchBidMessages(projectId, bidId);
+    };
+
+    const sendBidMessage = async (projectId, bidId) => {
+        const key = getBidThreadKey(projectId, bidId);
+        const message = (bidMessageInputs[key] || '').trim();
+        if (!message) return;
+
+        const token = localStorage.getItem('token');
+        try {
+            await axios.post(`${API_URL}/marketplace/projects/${projectId}/bids/${bidId}/messages`, { message }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBidMessageInputs(prev => ({ ...prev, [key]: '' }));
+            fetchBidMessages(projectId, bidId);
+        } catch (err) {
+            console.error('Error sending pre-hire message:', err);
+            alert(err.response?.data?.error || 'Failed to send message');
+        }
+    };
+
+    const reportTarget = async (target_type, target_id, target_label) => {
+        const reason = window.prompt(`Report ${target_type}: briefly describe the issue`);
+        if (!reason || !reason.trim()) return;
+
+        const token = localStorage.getItem('token');
+        try {
+            await axios.post(`${API_URL}/marketplace/reports`, {
+                target_type,
+                target_id,
+                target_label,
+                reason: reason.trim()
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Report submitted for admin review.');
+        } catch (err) {
+            console.error('Error reporting item:', err);
+            alert(err.response?.data?.error || 'Failed to submit report');
+        }
+    };
+
     const toggleFavorite = async (freelancerId, projectId) => {
         const token = localStorage.getItem('token');
         try {
@@ -397,6 +488,8 @@ const Marketplace = () => {
 
     const renderSocialProof = (profile) => {
         if (!profile) return null;
+        const availabilityLabel = profile.availability_status === 'busy' ? 'Busy' : profile.availability_status === 'away' ? 'Away' : 'Available now';
+        const availabilityColor = profile.availability_status === 'busy' ? '#b45309' : profile.availability_status === 'away' ? '#64748b' : '#047857';
         return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.35rem', color: '#475569', fontSize: '0.78rem' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -405,7 +498,53 @@ const Marketplace = () => {
                     {profile.reviews_count > 0 ? `(${profile.reviews_count})` : ''}
                 </span>
                 <span>{profile.completed_projects || 0} completed</span>
+                <span style={{ color: availabilityColor, fontWeight: 700 }}>{availabilityLabel}</span>
+                <span>Responds within {profile.response_time_hours || 24}h</span>
                 {renderBadges(profile.badges)}
+            </div>
+        );
+    };
+
+    const renderBidThread = (projectId, bidId) => {
+        const key = getBidThreadKey(projectId, bidId);
+        if (activeBidThread !== key) return null;
+        const messages = bidMessages[key] || [];
+
+        return (
+            <div style={{ width: '100%', marginTop: '0.75rem', padding: '0.75rem', background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'grid', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    {messages.length === 0 ? (
+                        <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>No questions yet.</p>
+                    ) : messages.map(message => {
+                        const isMine = message.sender_id === user?._id || message.sender_id === user?.id;
+                        return (
+                            <div key={message._id} className="marketplace-message-row" style={{ justifySelf: isMine ? 'end' : 'start', maxWidth: '78%', padding: '0.55rem 0.7rem', borderRadius: '8px', background: isMine ? '#dbeafe' : '#f1f5f9', color: '#0f172a' }}>
+                                <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700 }}>{message.sender_name}</div>
+                                <div style={{ fontSize: '0.85rem', lineHeight: 1.4 }}>{message.message}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                        type="text"
+                        placeholder="Ask a question before hiring"
+                        value={bidMessageInputs[key] || ''}
+                        onChange={(e) => setBidMessageInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') sendBidMessage(projectId, bidId);
+                        }}
+                        style={{ flex: 1, padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', minWidth: 0 }}
+                    />
+                    <button
+                        type="button"
+                        onClick={() => sendBidMessage(projectId, bidId)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.6rem 0.8rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 700 }}
+                    >
+                        <Send size={15} />
+                        Send
+                    </button>
+                </div>
             </div>
         );
     };
@@ -530,6 +669,27 @@ const Marketplace = () => {
                             {showBidForm === project._id ? 'Cancel' : 'Place Bid'}
                         </button>
                     )}
+                    <button
+                        type="button"
+                        onClick={() => reportTarget('project', project._id, project.title)}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            background: 'white',
+                            color: '#b45309',
+                            border: '1px solid #fde68a',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                            flex: '1 1 auto',
+                            minWidth: '100px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem'
+                        }}
+                    >
+                        <Flag size={15} /> Report
+                    </button>
                 </div>
                 
                 {/* Display Bids for Project Owner */}
@@ -600,36 +760,77 @@ const Marketplace = () => {
                                         <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', color: '#6b7280' }}>Days: {bid.estimated_days}</p>
                                         <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>Proposal: {bid.proposal}</p>
                                     </div>
-                                    {bid.status === 'pending' && (
+                                    <div className="marketplace-addon-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                         <button
-                                            onClick={() => handleAcceptBid(project._id, bid._id, bid.bid_amount)}
+                                            type="button"
+                                            onClick={() => toggleBidThread(project._id, bid._id)}
                                             style={{
-                                                padding: '0.5rem 1rem',
-                                                background: '#10b981',
-                                                color: 'white',
-                                                border: 'none',
+                                                padding: '0.5rem 0.8rem',
+                                                background: '#eff6ff',
+                                                color: '#2563eb',
+                                                border: '1px solid #bfdbfe',
                                                 borderRadius: '6px',
                                                 cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '0.5rem',
+                                                gap: '0.4rem',
                                                 fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
                                                 whiteSpace: 'nowrap'
                                             }}
                                         >
-                                            <Check size={16} /> Accept
+                                            <MessageCircle size={15} /> Message
                                         </button>
-                                    )}
-                                    {bid.status === 'accepted' && (
-                                        <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>
-                                            <Check size={16} /> Accepted
-                                        </span>
-                                    )}
-                                    {bid.status === 'rejected' && (
-                                        <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>
-                                            <X size={16} /> Rejected
-                                        </span>
-                                    )}
+                                        <button
+                                            type="button"
+                                            onClick={() => reportTarget('bid', bid._id, `${bid.freelancer_name} bid on ${project.title}`)}
+                                            style={{
+                                                padding: '0.5rem 0.8rem',
+                                                background: 'white',
+                                                color: '#b45309',
+                                                border: '1px solid #fde68a',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.4rem',
+                                                fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            <Flag size={15} /> Report
+                                        </button>
+                                        {bid.status === 'pending' && (
+                                            <button
+                                                onClick={() => handleAcceptBid(project._id, bid._id, bid.bid_amount)}
+                                                style={{
+                                                    padding: '0.5rem 1rem',
+                                                    background: '#10b981',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.5rem',
+                                                    fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)',
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                            >
+                                                <Check size={16} /> Accept
+                                            </button>
+                                        )}
+                                        {bid.status === 'accepted' && (
+                                            <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>
+                                                <Check size={16} /> Accepted
+                                            </span>
+                                        )}
+                                        {bid.status === 'rejected' && (
+                                            <span style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>
+                                                <X size={16} /> Rejected
+                                            </span>
+                                        )}
+                                    </div>
+                                    {renderBidThread(project._id, bid._id)}
                                 </div>
                             ))
                         )}
@@ -1111,7 +1312,9 @@ const Marketplace = () => {
                             </p>
                         </div>
                     ) : (
-                        activeTab === 'my-bids' && myBids.map(bid => (
+                        activeTab === 'my-bids' && myBids.map(bid => {
+                            const bidProjectId = bid.project_id?._id || bid.project_id;
+                            return (
                             <div key={bid._id} style={{
                                 background: 'white',
                                 borderRadius: '12px',
@@ -1140,7 +1343,16 @@ const Marketplace = () => {
                                             </p>
                                         )}
                                     </div>
-                                    <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    <div className="marketplace-addon-actions" style={{ textAlign: 'right', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                        {bidProjectId && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleBidThread(bidProjectId, bid._id)}
+                                                style={{ padding: '0.45rem 0.75rem', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                                            >
+                                                <MessageCircle size={15} /> Message
+                                            </button>
+                                        )}
                                         <span style={{
                                             padding: '0.25rem 0.75rem',
                                             borderRadius: '20px',
@@ -1150,13 +1362,15 @@ const Marketplace = () => {
                                         }}>
                                             {bid.status === 'accepted' ? '✅ Accepted' : bid.status === 'rejected' ? '❌ Rejected' : '⏳ Pending'}
                                         </span>
-                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                                        <div style={{ fontSize: '0.65rem', color: '#9ca3af', marginTop: '0.25rem', width: '100%' }}>
                                             {new Date(bid.created_at).toLocaleDateString()}
                                         </div>
                                     </div>
                                 </div>
+                                {bidProjectId && renderBidThread(bidProjectId, bid._id)}
                             </div>
-                        ))
+                            );
+                        })
                     )}
                     
                     {activeTab === 'active-projects' && (
