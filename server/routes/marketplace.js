@@ -9,6 +9,7 @@ const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 const Client = require('../models/Client');
 const Project = require('../models/Project');
+const Review = require('../models/Review');
 const NotificationHelper = require('../utils/notificationHelper');
 
 // Verify token middleware
@@ -161,6 +162,97 @@ const syncFreelancerAcceptedAssignments = async (freelancer) => {
     }
 
     return freelancer;
+};
+
+const getProfileBadges = (user, completedProjects = 0, averageResponseHours = null) => {
+    const badges = [];
+
+    if (user?.is_email_verified || user?.subscription_tier !== 'free') {
+        badges.push('Verified');
+    }
+
+    if (completedProjects >= 5 || user?.total_projects_assigned >= 5) {
+        badges.push('Top-Rated');
+    }
+
+    if (averageResponseHours !== null && averageResponseHours <= 24) {
+        badges.push('Quick-Responder');
+    }
+
+    return badges;
+};
+
+const buildFreelancerSocialProofMap = async (freelancerIds, viewerId = null) => {
+    const ids = [...new Set((freelancerIds || []).filter(Boolean).map(id => id.toString()))];
+    if (ids.length === 0) return {};
+
+    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+    const [freelancers, reviewStats, completedStats, acceptedBids, viewer] = await Promise.all([
+        User.find({ _id: { $in: objectIds } }).select('full_name is_email_verified subscription_tier total_projects_assigned favorite_freelancers'),
+        Review.aggregate([
+            { $match: { reviewee_id: { $in: objectIds } } },
+            { $group: { _id: '$reviewee_id', average_rating: { $avg: '$rating' }, reviews_count: { $sum: 1 } } }
+        ]),
+        ProjectPost.aggregate([
+            { $match: { selected_freelancer_id: { $in: objectIds }, status: 'completed' } },
+            { $group: { _id: '$selected_freelancer_id', completed_projects: { $sum: 1 } } }
+        ]),
+        Bid.find({ freelancer_id: { $in: objectIds }, status: 'accepted' }).select('freelancer_id created_at').sort({ created_at: -1 }),
+        viewerId ? User.findById(viewerId).select('favorite_freelancers') : null
+    ]);
+
+    const statsById = {};
+    reviewStats.forEach(stat => {
+        statsById[stat._id.toString()] = {
+            ...(statsById[stat._id.toString()] || {}),
+            average_rating: Number(stat.average_rating.toFixed(1)),
+            reviews_count: stat.reviews_count
+        };
+    });
+    completedStats.forEach(stat => {
+        statsById[stat._id.toString()] = {
+            ...(statsById[stat._id.toString()] || {}),
+            completed_projects: stat.completed_projects
+        };
+    });
+
+    const responseById = {};
+    acceptedBids.forEach(bid => {
+        const id = bid.freelancer_id.toString();
+        if (!responseById[id]) responseById[id] = { totalHours: 0, count: 0 };
+        responseById[id].totalHours += Math.max(0, (new Date() - bid.created_at) / 36e5);
+        responseById[id].count += 1;
+    });
+
+    const favoriteIds = new Set((viewer?.favorite_freelancers || []).map(id => id.toString()));
+    const map = {};
+
+    freelancers.forEach(freelancer => {
+        const id = freelancer._id.toString();
+        const stats = statsById[id] || {};
+        const response = responseById[id];
+        const averageResponseHours = response ? response.totalHours / response.count : null;
+
+        map[id] = {
+            freelancer_id: id,
+            full_name: freelancer.full_name,
+            average_rating: stats.average_rating || 0,
+            reviews_count: stats.reviews_count || 0,
+            completed_projects: stats.completed_projects || 0,
+            badges: getProfileBadges(freelancer, stats.completed_projects || 0, averageResponseHours),
+            is_favorited: favoriteIds.has(id)
+        };
+    });
+
+    return map;
+};
+
+const attachBidSocialProof = async (bids, viewerId) => {
+    const proofMap = await buildFreelancerSocialProofMap(bids.map(bid => bid.freelancer_id), viewerId);
+    return bids.map(bid => ({
+        ...bid.toObject(),
+        freelancer_profile: proofMap[bid.freelancer_id.toString()] || null
+    }));
 };
 
 // ============ CLIENT ROUTES ============
@@ -393,7 +485,7 @@ router.post('/bids', verifyToken, async (req, res) => {
 router.get('/projects/:projectId/bids', verifyToken, async (req, res) => {
     try {
         const bids = await Bid.find({ project_id: req.params.projectId }).sort({ bid_amount: 1 });
-        res.json({ bids });
+        res.json({ bids: await attachBidSocialProof(bids, req.userId) });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -405,6 +497,82 @@ router.get('/my-bids', verifyToken, async (req, res) => {
         const bids = await Bid.find({ freelancer_id: req.userId }).populate('project_id').sort({ created_at: -1 });
         res.json({ bids });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/favorites/:freelancerId', verifyToken, async (req, res) => {
+    try {
+        if (req.params.freelancerId === req.userId) {
+            return res.status(400).json({ error: 'You cannot favorite your own profile' });
+        }
+
+        const freelancer = await User.findById(req.params.freelancerId);
+        if (!freelancer || freelancer.role !== 'freelancer') {
+            return res.status(404).json({ error: 'Freelancer not found' });
+        }
+
+        const user = await User.findById(req.userId);
+        const existing = (user.favorite_freelancers || []).some(id => id.toString() === req.params.freelancerId);
+
+        if (existing) {
+            user.favorite_freelancers = user.favorite_freelancers.filter(id => id.toString() !== req.params.freelancerId);
+        } else {
+            user.favorite_freelancers.push(freelancer._id);
+        }
+
+        await user.save();
+        res.json({ success: true, is_favorited: !existing });
+    } catch (err) {
+        console.error('Error toggling favorite freelancer:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/projects/:projectId/reviews', verifyToken, async (req, res) => {
+    try {
+        const { rating, comment = '' } = req.body;
+        const numericRating = Number(rating);
+
+        if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+            return res.status(400).json({ error: 'Rating must be a whole number from 1 to 5' });
+        }
+
+        const project = await ProjectPost.findById(req.params.projectId);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.status !== 'completed') {
+            return res.status(400).json({ error: 'Reviews can only be added after a project is completed' });
+        }
+        if (project.client_id.toString() !== req.userId) {
+            return res.status(403).json({ error: 'Only the client can review the freelancer for this project' });
+        }
+        if (!project.selected_freelancer_id) {
+            return res.status(400).json({ error: 'This project does not have an assigned freelancer' });
+        }
+
+        const [reviewer, reviewee] = await Promise.all([
+            User.findById(req.userId),
+            User.findById(project.selected_freelancer_id)
+        ]);
+
+        const review = await Review.findOneAndUpdate(
+            {
+                project_id: project._id,
+                reviewer_id: reviewer._id,
+                reviewee_id: reviewee._id
+            },
+            {
+                reviewer_name: reviewer.full_name,
+                reviewee_name: reviewee.full_name,
+                rating: numericRating,
+                comment: comment.trim().slice(0, 1000)
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        res.status(201).json({ success: true, review });
+    } catch (err) {
+        console.error('Error saving marketplace review:', err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -86,6 +86,10 @@ const userSchema = new mongoose.Schema({
     total_clients: { type: Number, default: 0 },
     total_projects_assigned: { type: Number, default: 0 },
     total_earnings: { type: Number, default: 0 },
+    favorite_freelancers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
 
     // ========== PROFILE COMPLETION & AUTHENTICATION ENHANCEMENTS ==========
     bio: { type: String, default: '' },

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Briefcase, DollarSign, Clock, Users, Plus, Check, X } from 'lucide-react';
+import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award } from 'lucide-react';
 import ProjectStatus from '../components/ProjectStatus';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -23,6 +23,7 @@ const Marketplace = () => {
     const [showBidForm, setShowBidForm] = useState(null);
     const [selectedProject, setSelectedProject] = useState(null);
     const [projectBids, setProjectBids] = useState({});
+    const [reviewDrafts, setReviewDrafts] = useState({});
     
     // Individual state for each bid form
     const [bidAmounts, setBidAmounts] = useState({});
@@ -247,6 +248,92 @@ const Marketplace = () => {
         }
     };
 
+    const toggleFavorite = async (freelancerId, projectId) => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await axios.post(`${API_URL}/marketplace/favorites/${freelancerId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setProjectBids(prev => ({
+                ...prev,
+                [projectId]: (prev[projectId] || []).map(bid => (
+                    bid.freelancer_profile?.freelancer_id === freelancerId
+                        ? { ...bid, freelancer_profile: { ...bid.freelancer_profile, is_favorited: res.data.is_favorited } }
+                        : bid
+                ))
+            }));
+        } catch (err) {
+            console.error('Error toggling favorite:', err);
+            alert(err.response?.data?.error || 'Failed to update favorite');
+        }
+    };
+
+    const handleReviewDraftChange = (projectId, field, value) => {
+        setReviewDrafts(prev => ({
+            ...prev,
+            [projectId]: {
+                rating: 5,
+                comment: '',
+                ...(prev[projectId] || {}),
+                [field]: value
+            }
+        }));
+    };
+
+    const handleSubmitReview = async (projectId) => {
+        const token = localStorage.getItem('token');
+        const draft = reviewDrafts[projectId] || { rating: 5, comment: '' };
+        try {
+            await axios.post(`${API_URL}/marketplace/projects/${projectId}/reviews`, draft, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setReviewDrafts(prev => ({ ...prev, [projectId]: { rating: 5, comment: '' } }));
+            alert('Review saved successfully!');
+            fetchData();
+        } catch (err) {
+            console.error('Error saving review:', err);
+            alert(err.response?.data?.error || 'Failed to save review');
+        }
+    };
+
+    const renderBadges = (badges = []) => {
+        const badgeConfig = {
+            'Verified': { Icon: ShieldCheck, bg: '#ecfdf5', color: '#047857' },
+            'Top-Rated': { Icon: Award, bg: '#fff7ed', color: '#c2410c' },
+            'Quick-Responder': { Icon: Zap, bg: '#eff6ff', color: '#2563eb' }
+        };
+
+        return (
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                {badges.map(badge => {
+                    const config = badgeConfig[badge] || badgeConfig.Verified;
+                    const Icon = config.Icon;
+                    return (
+                        <span key={badge} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.45rem', background: config.bg, color: config.color, borderRadius: '999px', fontSize: '0.7rem', fontWeight: 600 }}>
+                            <Icon size={12} />
+                            {badge}
+                        </span>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    const renderSocialProof = (profile) => {
+        if (!profile) return null;
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.35rem', color: '#475569', fontSize: '0.78rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Star size={14} color="#f59e0b" fill="#f59e0b" />
+                    <strong>{profile.average_rating ? profile.average_rating.toFixed(1) : 'New'}</strong>
+                    {profile.reviews_count > 0 ? `(${profile.reviews_count})` : ''}
+                </span>
+                <span>{profile.completed_projects || 0} completed</span>
+                {renderBadges(profile.badges)}
+            </div>
+        );
+    };
+
     const renderProjectCard = (project, showBidButton = true, isOwner = false) => {
         // Safety check: if project is null or undefined, return null
         if (!project || !project._id) {
@@ -257,9 +344,6 @@ const Marketplace = () => {
         const isProjectOwner = project.client_id === user?._id || project.client_name === user?.full_name;
         const showBid = showBidButton && !isProjectOwner && project.status === 'open';
         const isSelectedFreelancer = project.selected_freelancer_id === user?._id;
-        
-        // Check if project is in freelancer's active list
-        const isFreelancerActive = activeProjects.some(p => p._id === project._id);
         
         return (
             <div key={project._id} style={{
@@ -390,7 +474,31 @@ const Marketplace = () => {
                                     gap: '1rem'
                                 }}>
                                     <div style={{ flex: '1 1 auto', minWidth: '200px' }}>
-                                        <p style={{ fontWeight: '500', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)' }}>{bid.freelancer_name}</p>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                            <p style={{ fontWeight: '500', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', margin: 0 }}>{bid.freelancer_name}</p>
+                                            {bid.freelancer_profile?.freelancer_id && (
+                                                <button
+                                                    type="button"
+                                                    title={bid.freelancer_profile.is_favorited ? 'Remove from favorites' : 'Add to favorites'}
+                                                    onClick={() => toggleFavorite(bid.freelancer_profile.freelancer_id, project._id)}
+                                                    style={{
+                                                        width: '32px',
+                                                        height: '32px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        background: bid.freelancer_profile.is_favorited ? '#fee2e2' : 'white',
+                                                        color: bid.freelancer_profile.is_favorited ? '#dc2626' : '#64748b',
+                                                        border: '1px solid #e5e7eb',
+                                                        borderRadius: '999px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <Heart size={15} fill={bid.freelancer_profile.is_favorited ? '#dc2626' : 'none'} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {renderSocialProof(bid.freelancer_profile)}
                                         <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>Bid: <strong>${bid.bid_amount}</strong></p>
                                         <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)', color: '#6b7280' }}>Days: {bid.estimated_days}</p>
                                         <p style={{ fontSize: 'clamp(0.7rem, 1.2vw, 0.875rem)' }}>Proposal: {bid.proposal}</p>
@@ -562,6 +670,37 @@ const Marketplace = () => {
                             fetchData();
                         }}
                     />
+                )}
+
+                {isProjectOwner && project.status === 'completed' && project.selected_freelancer_id && (
+                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <h4 style={{ margin: '0 0 0.75rem', fontWeight: '600', fontSize: 'clamp(0.85rem, 1.5vw, 1rem)' }}>Review {project.selected_freelancer_name || 'Freelancer'}</h4>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 140px) 1fr auto', gap: '0.75rem', alignItems: 'start' }}>
+                            <select
+                                value={reviewDrafts[project._id]?.rating || 5}
+                                onChange={(e) => handleReviewDraftChange(project._id, 'rating', Number(e.target.value))}
+                                style={{ padding: '0.7rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white' }}
+                            >
+                                {[5, 4, 3, 2, 1].map(value => (
+                                    <option key={value} value={value}>{value} stars</option>
+                                ))}
+                            </select>
+                            <textarea
+                                rows="2"
+                                placeholder="Share a concise review"
+                                value={reviewDrafts[project._id]?.comment || ''}
+                                onChange={(e) => handleReviewDraftChange(project._id, 'comment', e.target.value)}
+                                style={{ width: '100%', padding: '0.7rem', border: '1px solid #cbd5e1', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => handleSubmitReview(project._id)}
+                                style={{ padding: '0.7rem 1rem', background: '#0f766e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                            >
+                                Save Review
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
         );
