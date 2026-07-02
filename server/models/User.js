@@ -94,6 +94,7 @@ const userSchema = new mongoose.Schema({
     // ========== PROFILE COMPLETION & AUTHENTICATION ENHANCEMENTS ==========
     bio: { type: String, default: '' },
     skills: { type: [String], default: [] },
+    portfolio_links: { type: [String], default: [] },
     hourly_rate: { type: Number, default: 0 },
     avatar_url: { type: String, default: '' },
     is_email_verified: { type: Boolean, default: false },

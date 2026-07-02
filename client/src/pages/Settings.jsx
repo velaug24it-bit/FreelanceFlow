@@ -60,6 +60,7 @@ const Settings = () => {
   const [companyName, setCompanyName] = useState('');
   const [bio, setBio] = useState('');
   const [skills, setSkills] = useState('');
+  const [portfolioLinks, setPortfolioLinks] = useState('');
   const [hourlyRate, setHourlyRate] = useState(0);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -85,6 +86,7 @@ const Settings = () => {
       setCompanyName(user.company_name || '');
       setBio(user.bio || '');
       setSkills(user.skills?.join(', ') || '');
+      setPortfolioLinks(user.portfolio_links?.join('\n') || '');
       setHourlyRate(user.hourly_rate || 0);
       setIs2FAEnabled(user.is_2fa_enabled || false);
     }
@@ -111,12 +113,14 @@ const Settings = () => {
     setProfileSaving(true);
 
     const skillsArray = skills.split(',').map(s => s.trim()).filter(s => s !== '');
+    const portfolioArray = portfolioLinks.split('\n').map(link => link.trim()).filter(link => link !== '');
 
     const result = await updateProfile({
       full_name: fullName,
       company_name: companyName,
       bio,
       skills: skillsArray,
+      portfolio_links: portfolioArray,
       hourly_rate: Number(hourlyRate)
     });
 
@@ -338,6 +342,16 @@ const Settings = () => {
                   style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem', fontFamily: 'inherit' }}
                 />
               </div>
+              <div className="form-group" style={{ marginTop: '1rem' }}>
+                <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Portfolio Links</label>
+                <textarea
+                  value={portfolioLinks}
+                  onChange={(e) => setPortfolioLinks(e.target.value)}
+                  rows="3"
+                  placeholder="https://yourportfolio.com&#10;https://github.com/yourname"
+                  style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem', fontFamily: 'inherit' }}
+                />
+              </div>
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                 <button
                   type="submit"
@@ -389,6 +403,20 @@ const Settings = () => {
               <div className="span-2" style={{ gridColumn: 'span 2' }}>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Bio</label>
                 <p style={{ fontSize: '0.95rem', color: '#334155', lineHeight: '1.5' }}>{user?.bio || 'No bio added yet.'}</p>
+              </div>
+              <div className="span-2" style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Portfolio</label>
+                {user?.portfolio_links && user.portfolio_links.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {user.portfolio_links.map((link, index) => (
+                      <a key={index} href={link} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontWeight: 600, fontSize: '0.9rem' }}>
+                        {link}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.95rem', color: '#334155' }}>No portfolio links added yet.</p>
+                )}
               </div>
             </div>
           )}

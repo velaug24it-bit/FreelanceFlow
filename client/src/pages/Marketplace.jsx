@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award } from 'lucide-react';
+import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award, BellRing, Trash2, ExternalLink } from 'lucide-react';
 import ProjectStatus from '../components/ProjectStatus';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -24,6 +24,15 @@ const Marketplace = () => {
     const [selectedProject, setSelectedProject] = useState(null);
     const [projectBids, setProjectBids] = useState({});
     const [reviewDrafts, setReviewDrafts] = useState({});
+    const [savedSearches, setSavedSearches] = useState([]);
+    const [showSavedSearchForm, setShowSavedSearchForm] = useState(false);
+    const [savedSearchForm, setSavedSearchForm] = useState({
+        name: '',
+        category: 'Any',
+        skills: '',
+        budget_min: '',
+        budget_max: ''
+    });
     
     // Individual state for each bid form
     const [bidAmounts, setBidAmounts] = useState({});
@@ -57,6 +66,12 @@ const Marketplace = () => {
     useEffect(() => {
         fetchData();
     }, [activeTab]);
+
+    useEffect(() => {
+        if (user?.role === 'freelancer') {
+            fetchSavedSearches();
+        }
+    }, [user?.role]);
 
     useEffect(() => {
         if (!routeProjectId) {
@@ -122,6 +137,18 @@ const Marketplace = () => {
             console.error('Error fetching data:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSavedSearches = async () => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await axios.get(`${API_URL}/marketplace/saved-searches`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSavedSearches(res.data.searches || []);
+        } catch (err) {
+            console.error('Error fetching saved searches:', err);
         }
     };
 
@@ -245,6 +272,55 @@ const Marketplace = () => {
             console.error('Error accepting bid:', err);
             const errorMessage = err.response?.data?.error || 'Failed to accept bid';
             alert(errorMessage);
+        }
+    };
+
+    const handleSaveSearch = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('token');
+        try {
+            await axios.post(`${API_URL}/marketplace/saved-searches`, {
+                ...savedSearchForm,
+                skills: savedSearchForm.skills.split(',').map(skill => skill.trim()).filter(Boolean)
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSavedSearchForm({ name: '', category: 'Any', skills: '', budget_min: '', budget_max: '' });
+            setShowSavedSearchForm(false);
+            fetchSavedSearches();
+            alert('Saved search alert created!');
+        } catch (err) {
+            console.error('Error saving search:', err);
+            alert(err.response?.data?.error || 'Failed to save search');
+        }
+    };
+
+    const toggleSavedSearch = async (search) => {
+        const token = localStorage.getItem('token');
+        try {
+            await axios.patch(`${API_URL}/marketplace/saved-searches/${search._id}`, {
+                is_active: !search.is_active
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchSavedSearches();
+        } catch (err) {
+            console.error('Error updating saved search:', err);
+            alert(err.response?.data?.error || 'Failed to update saved search');
+        }
+    };
+
+    const deleteSavedSearch = async (searchId) => {
+        if (!window.confirm('Delete this saved search alert?')) return;
+        const token = localStorage.getItem('token');
+        try {
+            await axios.delete(`${API_URL}/marketplace/saved-searches/${searchId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchSavedSearches();
+        } catch (err) {
+            console.error('Error deleting saved search:', err);
+            alert(err.response?.data?.error || 'Failed to delete saved search');
         }
     };
 
@@ -477,25 +553,46 @@ const Marketplace = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                                             <p style={{ fontWeight: '500', fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)', margin: 0 }}>{bid.freelancer_name}</p>
                                             {bid.freelancer_profile?.freelancer_id && (
-                                                <button
-                                                    type="button"
-                                                    title={bid.freelancer_profile.is_favorited ? 'Remove from favorites' : 'Add to favorites'}
-                                                    onClick={() => toggleFavorite(bid.freelancer_profile.freelancer_id, project._id)}
-                                                    style={{
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        background: bid.freelancer_profile.is_favorited ? '#fee2e2' : 'white',
-                                                        color: bid.freelancer_profile.is_favorited ? '#dc2626' : '#64748b',
-                                                        border: '1px solid #e5e7eb',
-                                                        borderRadius: '999px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    <Heart size={15} fill={bid.freelancer_profile.is_favorited ? '#dc2626' : 'none'} />
-                                                </button>
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        title="View public profile"
+                                                        onClick={() => navigate(`/freelancers/${bid.freelancer_profile.freelancer_id}`)}
+                                                        style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            background: 'white',
+                                                            color: '#2563eb',
+                                                            border: '1px solid #dbeafe',
+                                                            borderRadius: '999px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <ExternalLink size={15} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        title={bid.freelancer_profile.is_favorited ? 'Remove from favorites' : 'Add to favorites'}
+                                                        onClick={() => toggleFavorite(bid.freelancer_profile.freelancer_id, project._id)}
+                                                        style={{
+                                                            width: '32px',
+                                                            height: '32px',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            background: bid.freelancer_profile.is_favorited ? '#fee2e2' : 'white',
+                                                            color: bid.freelancer_profile.is_favorited ? '#dc2626' : '#64748b',
+                                                            border: '1px solid #e5e7eb',
+                                                            borderRadius: '999px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <Heart size={15} fill={bid.freelancer_profile.is_favorited ? '#dc2626' : 'none'} />
+                                                    </button>
+                                                </>
                                             )}
                                         </div>
                                         {renderSocialProof(bid.freelancer_profile)}
@@ -796,6 +893,102 @@ const Marketplace = () => {
                     </button>
                 ))}
             </div>
+
+            {activeTab === 'browse' && user?.role === 'freelancer' && (
+                <div style={{ background: 'white', borderRadius: '12px', padding: '1rem', marginBottom: '1rem', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <BellRing size={18} color="#2563eb" />
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1rem', color: '#0f172a' }}>Saved job alerts</h3>
+                                <p style={{ margin: '0.15rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>Get notified when new projects match your category, skills, and budget.</p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowSavedSearchForm(!showSavedSearchForm)}
+                            style={{ padding: '0.55rem 0.9rem', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                            {showSavedSearchForm ? 'Close' : 'Create Alert'}
+                        </button>
+                    </div>
+
+                    {showSavedSearchForm && (
+                        <form onSubmit={handleSaveSearch} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
+                            <input
+                                type="text"
+                                placeholder="Alert name"
+                                value={savedSearchForm.name}
+                                onChange={(e) => setSavedSearchForm({ ...savedSearchForm, name: e.target.value })}
+                                style={{ padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                            />
+                            <select
+                                value={savedSearchForm.category}
+                                onChange={(e) => setSavedSearchForm({ ...savedSearchForm, category: e.target.value })}
+                                style={{ padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                            >
+                                <option>Any</option>
+                                <option>Web Development</option>
+                                <option>Mobile App</option>
+                                <option>Design</option>
+                                <option>Content Writing</option>
+                                <option>Marketing</option>
+                                <option>Other</option>
+                            </select>
+                            <input
+                                type="text"
+                                placeholder="Skills, comma separated"
+                                value={savedSearchForm.skills}
+                                onChange={(e) => setSavedSearchForm({ ...savedSearchForm, skills: e.target.value })}
+                                style={{ padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                            />
+                            <input
+                                type="number"
+                                placeholder="Min budget"
+                                value={savedSearchForm.budget_min}
+                                onChange={(e) => setSavedSearchForm({ ...savedSearchForm, budget_min: e.target.value })}
+                                style={{ padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                            />
+                            <input
+                                type="number"
+                                placeholder="Max budget"
+                                value={savedSearchForm.budget_max}
+                                onChange={(e) => setSavedSearchForm({ ...savedSearchForm, budget_max: e.target.value })}
+                                style={{ padding: '0.65rem', border: '1px solid #cbd5e1', borderRadius: '6px' }}
+                            />
+                            <button type="submit" style={{ padding: '0.65rem 0.9rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
+                                Save Alert
+                            </button>
+                        </form>
+                    )}
+
+                    {savedSearches.length > 0 && (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                            {savedSearches.map(search => (
+                                <div key={search._id} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.45rem 0.55rem', border: '1px solid #e2e8f0', borderRadius: '999px', background: search.is_active ? '#f8fafc' : '#f1f5f9', color: search.is_active ? '#334155' : '#94a3b8', fontSize: '0.78rem' }}>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleSavedSearch(search)}
+                                        title={search.is_active ? 'Pause alert' : 'Resume alert'}
+                                        style={{ width: '18px', height: '18px', borderRadius: '999px', border: '1px solid #cbd5e1', background: search.is_active ? '#22c55e' : 'white', cursor: 'pointer' }}
+                                    />
+                                    <span style={{ fontWeight: 600 }}>{search.name}</span>
+                                    <span>{search.category}</span>
+                                    {search.skills?.length > 0 && <span>{search.skills.join(', ')}</span>}
+                                    <button
+                                        type="button"
+                                        title="Delete alert"
+                                        onClick={() => deleteSavedSearch(search._id)}
+                                        style={{ width: '24px', height: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}
+                                    >
+                                        <Trash2 size={13} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
             
             {/* Post Project Form */}
             {showPostForm && (

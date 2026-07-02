@@ -7,3 +7,5 @@
 - [ ] Update client `ProjectStatus.jsx` to show “Pay to finish” button for clients when `project.status==='completed' && project.payment_status!=='paid'`.
 - [ ] Ensure marketplace project detail page passes required fields (`payment_status`, transaction/project amount) into `ProjectStatus`.
 - [ ] Run server/client smoke test: complete project -> pay -> UI updates.
+
+

@@ -10,6 +10,7 @@ const User = require('../models/User');
 const Client = require('../models/Client');
 const Project = require('../models/Project');
 const Review = require('../models/Review');
+const SavedSearch = require('../models/SavedSearch');
 const NotificationHelper = require('../utils/notificationHelper');
 
 // Verify token middleware
@@ -22,6 +23,16 @@ const verifyToken = (req, res, next) => {
         next();
     } catch (err) {
         res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
+const optionalToken = (req) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return null;
+    try {
+        return jwt.verify(token, process.env.JWT_SECRET).id;
+    } catch (err) {
+        return null;
     }
 };
 
@@ -255,6 +266,62 @@ const attachBidSocialProof = async (bids, viewerId) => {
     }));
 };
 
+const normalizeList = (items) => (
+    Array.isArray(items) ? items : String(items || '').split(',')
+).map(item => item.trim()).filter(Boolean);
+
+const projectMatchesSavedSearch = (project, search) => {
+    const projectCategory = String(project.category || '').toLowerCase();
+    const searchCategory = String(search.category || 'Any').toLowerCase();
+    if (searchCategory !== 'any' && searchCategory && searchCategory !== projectCategory) {
+        return false;
+    }
+
+    const searchSkills = normalizeList(search.skills).map(skill => skill.toLowerCase());
+    const projectSkills = normalizeList(project.skills_required).map(skill => skill.toLowerCase());
+    if (searchSkills.length > 0 && !searchSkills.some(skill => projectSkills.includes(skill))) {
+        return false;
+    }
+
+    const minBudget = Number(search.budget_min || 0);
+    const maxBudget = Number(search.budget_max || 0);
+    if (minBudget > 0 && Number(project.budget_max || 0) < minBudget) return false;
+    if (maxBudget > 0 && Number(project.budget_min || 0) > maxBudget) return false;
+
+    return true;
+};
+
+const notifySavedSearchMatches = async (project) => {
+    try {
+        const searches = await SavedSearch.find({
+            is_active: true,
+            user_id: { $ne: project.client_id },
+            matched_project_ids: { $ne: project._id }
+        });
+
+        const matchedSearches = searches.filter(search => projectMatchesSavedSearch(project, search));
+        if (matchedSearches.length === 0) return;
+
+        const userIds = [...new Set(matchedSearches.map(search => search.user_id.toString()))];
+        await NotificationHelper.createBulkNotifications({
+            userIds,
+            type: 'job_match',
+            title: 'Saved Search Match',
+            message: `"${project.title}" matches your saved marketplace search.`,
+            referenceId: project._id,
+            referenceType: 'project',
+            actionUrl: `/marketplace/projects/${project._id}`
+        });
+
+        await SavedSearch.updateMany(
+            { _id: { $in: matchedSearches.map(search => search._id) } },
+            { $addToSet: { matched_project_ids: project._id } }
+        );
+    } catch (err) {
+        console.error('Error notifying saved search matches:', err);
+    }
+};
+
 // ============ CLIENT ROUTES ============
 
 // Post a new project - WITH NOTIFICATION
@@ -301,6 +368,8 @@ router.post('/projects', verifyToken, async (req, res) => {
                 actionUrl: `/marketplace/projects/${project._id}`
             });
         }
+
+        await notifySavedSearchMatches(project);
 
         res.status(201).json({ success: true, project });
     } catch (err) {
@@ -497,6 +566,108 @@ router.get('/my-bids', verifyToken, async (req, res) => {
         const bids = await Bid.find({ freelancer_id: req.userId }).populate('project_id').sort({ created_at: -1 });
         res.json({ bids });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/saved-searches', verifyToken, async (req, res) => {
+    try {
+        const searches = await SavedSearch.find({ user_id: req.userId }).sort({ created_at: -1 });
+        res.json({ searches });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/saved-searches', verifyToken, async (req, res) => {
+    try {
+        const { name, category = 'Any', skills = [], budget_min = 0, budget_max = 0 } = req.body;
+        const user = await User.findById(req.userId);
+        if (!user || user.role !== 'freelancer') {
+            return res.status(403).json({ error: 'Only freelancer accounts can save job searches' });
+        }
+
+        const search = await SavedSearch.create({
+            user_id: req.userId,
+            name: (name || 'Saved project search').trim(),
+            category: category || 'Any',
+            skills: normalizeList(skills),
+            budget_min: Number(budget_min) || 0,
+            budget_max: Number(budget_max) || 0,
+            is_active: true
+        });
+
+        res.status(201).json({ success: true, search });
+    } catch (err) {
+        console.error('Error saving marketplace search:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.patch('/saved-searches/:id', verifyToken, async (req, res) => {
+    try {
+        const updates = {};
+        ['name', 'category', 'is_active'].forEach(field => {
+            if (req.body[field] !== undefined) updates[field] = req.body[field];
+        });
+        if (req.body.skills !== undefined) updates.skills = normalizeList(req.body.skills);
+        if (req.body.budget_min !== undefined) updates.budget_min = Number(req.body.budget_min) || 0;
+        if (req.body.budget_max !== undefined) updates.budget_max = Number(req.body.budget_max) || 0;
+
+        const search = await SavedSearch.findOneAndUpdate(
+            { _id: req.params.id, user_id: req.userId },
+            updates,
+            { new: true }
+        );
+
+        if (!search) return res.status(404).json({ error: 'Saved search not found' });
+        res.json({ success: true, search });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.delete('/saved-searches/:id', verifyToken, async (req, res) => {
+    try {
+        const deleted = await SavedSearch.findOneAndDelete({ _id: req.params.id, user_id: req.userId });
+        if (!deleted) return res.status(404).json({ error: 'Saved search not found' });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/freelancers/:id', async (req, res) => {
+    try {
+        const viewerId = optionalToken(req);
+        const freelancer = await User.findOne({ _id: req.params.id, role: 'freelancer' })
+            .select('full_name company_name bio skills portfolio_links hourly_rate avatar_url is_email_verified subscription_tier total_projects_assigned created_at');
+
+        if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
+
+        const [proofMap, reviews, completedProjects] = await Promise.all([
+            buildFreelancerSocialProofMap([freelancer._id], viewerId),
+            Review.find({ reviewee_id: freelancer._id })
+                .select('reviewer_name rating comment created_at project_id')
+                .populate('project_id', 'title category')
+                .sort({ created_at: -1 })
+                .limit(10),
+            ProjectPost.find({ selected_freelancer_id: freelancer._id, status: 'completed' })
+                .select('title category completed_at budget_min budget_max')
+                .sort({ completed_at: -1 })
+                .limit(6)
+        ]);
+
+        res.json({
+            freelancer: {
+                ...freelancer.toObject(),
+                social_proof: proofMap[freelancer._id.toString()] || null,
+                reviews,
+                completed_projects: completedProjects
+            }
+        });
+    } catch (err) {
+        console.error('Error fetching public freelancer profile:', err);
         res.status(500).json({ error: err.message });
     }
 });

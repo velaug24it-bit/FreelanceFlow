@@ -17,7 +17,10 @@ const notificationSchema = new mongoose.Schema({
       'bid_accepted',
       'bid_rejected',
       'invoice_paid',
-      'invoice_created'
+      'invoice_created',
+      'new_project',
+      'job_match',
+      'general'
     ],
     required: true
   },

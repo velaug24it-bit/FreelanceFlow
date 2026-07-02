@@ -24,6 +24,7 @@ import NotificationSettings from './pages/NotificationSettings';
 import Pricing from './pages/Pricing';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Marketplace from './pages/Marketplace';
+import FreelancerProfile from './pages/FreelancerProfile';
 import ConnectsShop from './pages/ConnectsShop';
 import RazorpayCheckout from './pages/RazorpayCheckout';
 
@@ -51,6 +52,7 @@ function App() {
             <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route path="/verify-email/:token" element={<EmailVerification />} />
             <Route path="/oauth-redirect" element={<OAuthRedirect />} />
+            <Route path="/freelancers/:id" element={<FreelancerProfile />} />
             
             {/* Admin Routes - NO NAVBAR */}
             <Route path="/admin-login" element={<AdminLogin />} />
