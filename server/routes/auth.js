@@ -4,7 +4,7 @@ const passport = require('passport');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { authenticator } = require('otplib');
+const { generateSecret, generateURI, verify } = require('otplib');
 const qrcode = require('qrcode');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
@@ -741,11 +741,15 @@ router.put('/profile', authenticateToken, async (req, res) => {
 router.post('/generate-2fa', authenticateToken, async (req, res) => {
     try {
         const user = req.user;
-        const secret = authenticator.generateSecret();
+        const secret = generateSecret();
         user.two_factor_temp_secret = secret;
         await user.save();
 
-        const otpauth = authenticator.keyuri(user.email, 'FreelanceFlow', secret);
+        const otpauth = generateURI({
+            issuer: 'FreelanceFlow',
+            label: user.email,
+            secret
+        });
         const qrCodeUrl = await qrcode.toDataURL(otpauth);
 
         res.json({ success: true, qrCode: qrCodeUrl, secret });
@@ -763,7 +767,7 @@ router.post('/verify-2fa-setup', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: '2FA setup was not initialized' });
         }
 
-        const isValid = authenticator.verify({
+        const isValid = await verify({
             token: code,
             secret: user.two_factor_temp_secret
         });
@@ -814,7 +818,7 @@ router.post('/verify-2fa', async (req, res) => {
             return res.status(400).json({ error: '2FA is not enabled or user not found' });
         }
 
-        const isValid = authenticator.verify({
+        const isValid = await verify({
             token: code,
             secret: user.two_factor_secret
         });
