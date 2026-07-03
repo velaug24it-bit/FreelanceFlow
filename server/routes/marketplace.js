@@ -746,7 +746,7 @@ router.delete('/saved-searches/:id', verifyToken, async (req, res) => {
 router.get('/freelancers/:id', async (req, res) => {
     try {
         const viewerId = optionalToken(req);
-        const freelancer = await User.findOne({ _id: req.params.id, role: 'freelancer' })
+        const freelancer = await User.findById(req.params.id)
             .select('full_name company_name bio skills portfolio_links hourly_rate availability_status response_time_hours avatar_url is_email_verified subscription_tier total_projects_assigned created_at moderation_status');
 
         if (!freelancer) return res.status(404).json({ error: 'Freelancer not found' });
@@ -785,7 +785,7 @@ router.post('/favorites/:freelancerId', verifyToken, async (req, res) => {
         }
 
         const freelancer = await User.findById(req.params.freelancerId);
-        if (!freelancer || freelancer.role !== 'freelancer') {
+        if (!freelancer) {
             return res.status(404).json({ error: 'Freelancer not found' });
         }
 
