@@ -83,6 +83,7 @@ const syncFreelancerAcceptedAssignments = async (freelancer) => {
             client_id: client._id,
             client_name: client.full_name,
             client_email: client.email,
+            client_phone: client.phone || '',
             client_company: client.company_name || '',
             budget: bid.bid_amount,
             status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
@@ -951,6 +952,7 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
                 client_id: client._id,
                 client_name: client.full_name,
                 client_email: client.email,
+                client_phone: client.phone || '',
                 client_company: client.company_name || '',
                 budget: bid.bid_amount,
                 status: 'ongoing',
@@ -1082,35 +1084,6 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
                 }
             } else {
                 console.log(`ℹ️ Project already exists for freelancer: ${projectPost.title}`);
-            }
-
-            // Check if project already exists for client
-            const existingClientProject = await Project.findOne({
-                user_id: projectPost.client_id,
-                title: projectPost.title,
-                selected_freelancer_id: bid.freelancer_id
-            });
-
-            if (!existingClientProject) {
-                const clientProject = await Project.create({
-                    user_id: projectPost.client_id,
-                    client_name: projectPost.client_name || client.full_name,
-                    client_email: client.email,
-                    client_company: client.company_name || '',
-                    title: projectPost.title,
-                    description: projectPost.description,
-                    budget: bid.bid_amount,
-                    due_date: projectPost.deadline || null,
-                    project_type: 'marketplace',
-                    status: 'in_progress',
-                    selected_freelancer_id: bid.freelancer_id,
-                    selected_freelancer_name: freelancer.full_name,
-                    freelancer_email: freelancer.email,
-                    freelancer_company: freelancer.company_name || ''
-                });
-                console.log(`✅ Project created for client: ${clientProject.title} (${clientProject._id})`);
-            } else {
-                console.log(`ℹ️ Project already exists for client: ${projectPost.title}`);
             }
 
         } catch (err) {

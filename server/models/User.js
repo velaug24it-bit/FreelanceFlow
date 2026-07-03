@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
         client_name: String,
         client_email: String,
         client_company: String,
+        client_phone: String,
         project_id: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'ProjectPost'
@@ -68,6 +69,7 @@ const userSchema = new mongoose.Schema({
         },
         client_name: String,
         client_email: String,
+        client_phone: String,
         budget: Number,
         status: {
             type: String,
