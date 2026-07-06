@@ -303,7 +303,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                       <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.5rem' }}>
                         <h4 style={{ margin: '0 0 1rem 0', color: '#1e293b' }}>Freelancer Payment Details</h4>
                         {freelancerPaymentInfo ? (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
                             <div>
                               <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 0.25rem 0' }}>UPI ID</p>
                               <p style={{ fontWeight: '600', margin: 0 }}>{freelancerPaymentInfo.upi_id}</p>
@@ -425,7 +425,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                 {documentUrl && <p style={{ color: '#10b981', fontSize: '0.85rem', marginTop: '0.5rem' }}>✓ Document uploaded</p>}
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
                 <button
                   onClick={() => handleVerifyPayment(true)}
                   disabled={processing || !documentUrl}

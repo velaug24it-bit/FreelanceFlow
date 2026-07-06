@@ -136,19 +136,22 @@ const userSchema = new mongoose.Schema({
                 invoice: { type: Boolean, default: true },
                 project: { type: Boolean, default: true },
                 message: { type: Boolean, default: true },
-                subscription: { type: Boolean, default: true }
+                subscription: { type: Boolean, default: true },
+                payment: { type: Boolean, default: true }
             },
             in_app: {
                 invoice: { type: Boolean, default: true },
                 project: { type: Boolean, default: true },
                 message: { type: Boolean, default: true },
-                subscription: { type: Boolean, default: true }
+                subscription: { type: Boolean, default: true },
+                payment: { type: Boolean, default: true }
             },
             push: {
                 invoice: { type: Boolean, default: true },
                 project: { type: Boolean, default: true },
                 message: { type: Boolean, default: true },
-                subscription: { type: Boolean, default: true }
+                subscription: { type: Boolean, default: true },
+                payment: { type: Boolean, default: true }
             }
         },
         default: {}

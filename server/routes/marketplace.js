@@ -1781,12 +1781,13 @@ router.post('/:id/submit-payment', verifyToken, async (req, res) => {
         await project.save();
 
         // Send notification to freelancer
-        await NotificationHelper.createNotification(
-            project.selected_freelancer_id,
-            'payment_submitted',
-            `Client has submitted payment proof for ${project.title}. Please review and approve.`,
-            `/dashboard?tab=payments`
-        );
+        await NotificationHelper.createNotification({
+            userId: project.selected_freelancer_id,
+            type: 'payment',
+            title: 'payment_submitted',
+            message: `Client has submitted payment proof for ${project.title}. Please review and approve.`,
+            actionUrl: `/dashboard?tab=payments`
+        });
 
         res.json({ success: true, project });
     } catch (err) {
@@ -1824,24 +1825,26 @@ router.post('/:id/verify-payment', verifyToken, async (req, res) => {
             await syncFreelancerAcceptedAssignments(freelancer);
 
             // Notify client
-            await NotificationHelper.createNotification(
-                project.client_id,
-                'payment_approved',
-                `Freelancer has approved your payment for ${project.title}. Project is now marked completed!`,
-                `/dashboard?tab=payments`
-            );
+            await NotificationHelper.createNotification({
+                userId: project.client_id,
+                type: 'payment',
+                title: 'payment_approved',
+                message: `Freelancer has approved your payment for ${project.title}. Project is now marked completed!`,
+                actionUrl: `/dashboard?tab=payments`
+            });
         } else {
             if (!reason) return res.status(400).json({ error: 'Rejection reason is required' });
             project.payment_status = 'failed';
             project.rejection_reason = reason;
 
             // Notify client
-            await NotificationHelper.createNotification(
-                project.client_id,
-                'payment_rejected',
-                `Your payment for ${project.title} was rejected. Reason: ${reason}`,
-                `/manage-project/${project._id}`
-            );
+            await NotificationHelper.createNotification({
+                userId: project.client_id,
+                type: 'payment',
+                title: 'payment_rejected',
+                message: `Your payment for ${project.title} was rejected. Reason: ${reason}`,
+                actionUrl: `/manage-project/${project._id}`
+            });
         }
 
         await project.save();

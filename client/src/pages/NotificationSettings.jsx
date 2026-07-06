@@ -65,7 +65,7 @@ const NotificationSettings = () => {
                 {['email', 'in_app', 'push'].map(cat => (
                     <div key={cat} style={{ padding: 16, border: '1px solid #e6eef8', borderRadius: 8 }}>
                         <h4 style={{ marginTop: 0, textTransform: 'capitalize' }}>{cat.replace('_',' ')}</h4>
-                        {['invoice', 'project', 'message', 'subscription'].map(key => (
+                        {['invoice', 'project', 'message', 'subscription', 'payment'].map(key => (
                             <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                                 <input type="checkbox" checked={!!((prefs[cat] || {})[key])} onChange={() => toggle(cat, key)} />
                                 <span style={{ textTransform: 'capitalize' }}>{key.replace('_', ' ')}</span>
