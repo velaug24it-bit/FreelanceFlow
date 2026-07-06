@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Invoice = require('../models/Invoice');
 const Client = require('../models/Client');
+const { checkResourceLimit } = require('../middleware/planLimits');
 const NotificationHelper = require('../utils/notificationHelper');
 
 const verifyToken = (req, res, next) => {
@@ -53,7 +54,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // Create invoice
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, checkResourceLimit('invoices'), async (req, res) => {
     try {
         const { client_id, due_date, tax_rate, notes, items, subtotal, total_amount } = req.body;
 

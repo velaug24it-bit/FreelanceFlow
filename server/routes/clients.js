@@ -44,8 +44,10 @@ router.get('/:id', verifyToken, async (req, res) => {
     }
 });
 
+const { checkResourceLimit } = require('../middleware/planLimits');
+
 // Create client
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, checkResourceLimit('clients'), async (req, res) => {
     try {
         const { company_name, contact_name, email, phone, address, notes } = req.body;
         

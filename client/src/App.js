@@ -40,6 +40,23 @@ import ResetPassword from './pages/ResetPassword';
 import EmailVerification from './pages/EmailVerification';
 import OAuthRedirect from './pages/OAuthRedirect';
 
+import axios from 'axios';
+
+// Add a global interceptor to catch plan limit errors
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 403) {
+      const data = error.response.data;
+      if (data.error === 'LIMIT_REACHED' || data.error === 'UPGRADE_REQUIRED') {
+        alert(data.message || 'You need to upgrade your plan to perform this action.');
+        // Optionally redirect to pricing page: window.location.href = '/pricing';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 function App() {
   return (
     <AuthProvider>

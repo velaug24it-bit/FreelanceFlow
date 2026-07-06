@@ -7,6 +7,7 @@ const fs = require('fs');
 
 const Task = require('../models/Task');
 const Project = require('../models/Project');
+const { requireProPlan } = require('../middleware/planLimits');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -31,7 +32,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // GET /api/tasks — list all tasks for user (and kanban grouping)
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requireProPlan('Task Board'), async (req, res) => {
   try {
     const tasks = await Task.find({ user_id: req.userId }).sort({ created_at: -1 });
     const groupedTasks = {
@@ -53,7 +54,7 @@ router.get('/project/:projectId', verifyToken, async (req, res) => {
 });
 
 // Create a task (optionally link to project)
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requireProPlan('Task Board'), async (req, res) => {
   try {
     const { title, description, status, priority, due_date, project_id, estimate_hours, assignees } = req.body;
     if (!title) return res.status(400).json({ error: 'Task title is required' });

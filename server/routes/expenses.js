@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Expense = require('../models/Expense');
+const { requireProPlan } = require('../middleware/planLimits');
 
 const verifyToken = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -16,7 +17,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // Get all expenses
-router.get('/', verifyToken, async (req, res) => {
+router.get('/', verifyToken, requireProPlan('Expenses'), async (req, res) => {
     try {
         const expenses = await Expense.find({ user_id: req.userId }).sort({ expense_date: -1 });
         res.json({ expenses });
@@ -27,7 +28,7 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // Create expense
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, requireProPlan('Expenses'), async (req, res) => {
     try {
         const { category, amount, description, expense_date, client_id, client_name } = req.body;
         

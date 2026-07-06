@@ -12,6 +12,7 @@ const Invoice = require('../models/Invoice');
 const Task = require('../models/Task');
 const Milestone = require('../models/Milestone');
 const ProjectTemplate = require('../models/ProjectTemplate');
+const { checkResourceLimit } = require('../middleware/planLimits');
 
 // ─── File Upload Config ──────────────────────────────────────────────────────
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -150,7 +151,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 });
 
 // POST /api/projects — create project
-router.post('/', verifyToken, async (req, res) => {
+router.post('/', verifyToken, checkResourceLimit('projects'), async (req, res) => {
     try {
         const { client_id, title, description, budget, due_date, project_type, status, color, tags } = req.body;
         if (!title) return res.status(400).json({ error: 'Project title is required' });
