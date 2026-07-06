@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle, Clock, AlertCircle, Loader, UploadCloud, XCircle } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const BASE_URL = API_URL.replace(/\/api$/, '');
 
 const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const { user } = useAuth();
@@ -321,7 +322,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                             {freelancerPaymentInfo.qr_code_image && (
                               <div style={{ gridColumn: 'span 2', textAlign: 'center', marginTop: '1rem' }}>
                                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 0.5rem 0' }}>Scan to Pay</p>
-                                <img src={`http://localhost:5000${freelancerPaymentInfo.qr_code_image}`} alt="QR Code" style={{ width: '150px', height: '150px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                <img src={`${BASE_URL}${freelancerPaymentInfo.qr_code_image}`} alt="QR Code" style={{ width: '150px', height: '150px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                               </div>
                             )}
                           </div>
@@ -342,7 +343,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                           {screenshotUrl && (
                             <div style={{ marginBottom: '1rem' }}>
                               <p style={{ fontSize: '0.85rem', color: '#10b981', marginBottom: '0.5rem' }}>Screenshot uploaded successfully</p>
-                              <img src={`http://localhost:5000${screenshotUrl}`} alt="Payment Proof" style={{ height: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                              <img src={`${BASE_URL}${screenshotUrl}`} alt="Payment Proof" style={{ height: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                             </div>
                           )}
 
@@ -382,7 +383,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
               <h4 style={{ margin: '0 0 0.5rem 0', color: '#0369a1' }}>Final Project Document</h4>
               <p style={{ fontSize: '0.9rem', color: '#0c4a6e', marginBottom: '0.75rem' }}>The freelancer has attached the final project delivery.</p>
               <a 
-                href={project.final_delivery_document.startsWith('http') ? project.final_delivery_document : `http://localhost:5000${project.final_delivery_document}`} 
+                href={project.final_delivery_document.startsWith('http') ? project.final_delivery_document : `${BASE_URL}${project.final_delivery_document}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 style={{ display: 'inline-block', padding: '0.5rem 1rem', background: '#0284c7', color: 'white', textDecoration: 'none', borderRadius: '6px', fontSize: '0.9rem', fontWeight: '500' }}
@@ -412,7 +413,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
               
               {project.payment_screenshot && (
                 <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-                  <img src={project.payment_screenshot.startsWith('http') ? project.payment_screenshot : `http://localhost:5000${project.payment_screenshot}`} 
+                  <img src={project.payment_screenshot.startsWith('http') ? project.payment_screenshot : `${BASE_URL}${project.payment_screenshot}`} 
                        alt="Payment Proof" 
                        style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                 </div>
