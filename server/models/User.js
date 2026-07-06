@@ -22,6 +22,17 @@ const userSchema = new mongoose.Schema({
     subscription_amount: { type: Number, default: 0 },
     last_payment_date: Date,
     
+    payment_info: {
+        upi_id: String,
+        payment_app: { 
+            type: String, 
+            enum: ['Google Pay', 'PhonePe', 'Paytm', 'BHIM', 'Amazon Pay', 'Others', '']
+        },
+        qr_code_image: String,
+        bank_account_holder_name: String,
+        payment_verified: { type: Boolean, default: false }
+    },
+    
     // ============================================
     // FREELANCER'S CLIENTS (Clients who hired this freelancer)
     // ============================================

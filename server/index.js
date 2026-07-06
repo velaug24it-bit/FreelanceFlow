@@ -24,6 +24,7 @@ const notificationRoutes = require('./routes/notifications');
 const checkoutRoutes = require('./routes/checkout');
 const paymentRoutes = require('./routes/payments');
 const chatRoutes = require('./routes/chat');
+const uploadRoutes = require('./routes/upload');
 const { initializeSocket } = require('./socket');
 
 const app = express();
@@ -140,6 +141,10 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// ============ STATIC FILES ============
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // ============ ROUTES ============
 app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
@@ -159,6 +164,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api', checkoutRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // ============ 404 HANDLER ============
 app.use((req, res) => {

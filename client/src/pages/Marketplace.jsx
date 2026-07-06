@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award, BellRing, Trash2, ExternalLink, MessageCircle, Send, Flag } from 'lucide-react';
 import ProjectStatus from '../components/ProjectStatus';
+import ProjectPayment from '../components/ProjectPayment';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -1368,6 +1369,12 @@ const Marketplace = () => {
                                     </div>
                                 </div>
                                 {bidProjectId && renderBidThread(bidProjectId, bid._id)}
+                                
+                                {bid.status === 'accepted' && bid.project_id?.status === 'completed' && (
+                                    <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+                                        <ProjectPayment project={bid.project_id} isFreelancer={true} />
+                                    </div>
+                                )}
                             </div>
                             );
                         })

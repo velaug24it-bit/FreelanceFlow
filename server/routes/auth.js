@@ -227,7 +227,8 @@ router.get('/verify', async (req, res) => {
                 availability_status: user.availability_status,
                 response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url,
-                is_2fa_enabled: user.is_2fa_enabled
+                is_2fa_enabled: user.is_2fa_enabled,
+                payment_info: user.payment_info
             }
         });
     } catch (err) {
@@ -696,7 +697,7 @@ router.post('/reset-password/:token', async (req, res) => {
 // ============================================
 router.put('/profile', authenticateToken, async (req, res) => {
     try {
-        const { full_name, bio, skills, portfolio_links, hourly_rate, availability_status, response_time_hours, company_name, avatar_url } = req.body;
+        const { full_name, bio, skills, portfolio_links, hourly_rate, availability_status, response_time_hours, company_name, avatar_url, payment_info } = req.body;
         const user = req.user;
 
         if (full_name) user.full_name = full_name;
@@ -708,6 +709,12 @@ router.put('/profile', authenticateToken, async (req, res) => {
         if (response_time_hours !== undefined) user.response_time_hours = response_time_hours;
         if (company_name) user.company_name = company_name;
         if (avatar_url) user.avatar_url = avatar_url;
+        if (payment_info) {
+            user.payment_info = {
+                ...user.payment_info,
+                ...payment_info
+            };
+        }
 
         await user.save();
 
@@ -727,7 +734,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
                 hourly_rate: user.hourly_rate,
                 availability_status: user.availability_status,
                 response_time_hours: user.response_time_hours,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                payment_info: user.payment_info
             }
         });
     } catch (err) {
@@ -869,6 +877,19 @@ router.post('/dev-verify', authenticateToken, async (req, res) => {
         user.verification_token_expires = undefined;
         await user.save();
         res.json({ success: true, message: 'Account verified via Dev Mode!' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET PUBLIC USER INFO
+// ============================================
+router.get('/user/:id', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id).select('-password_hash -reset_password_token -verification_token');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({ user });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

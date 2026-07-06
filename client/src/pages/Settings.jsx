@@ -68,6 +68,13 @@ const Settings = () => {
   const [profileError, setProfileError] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
 
+  // Payment Info States
+  const [upiId, setUpiId] = useState('');
+  const [paymentApp, setPaymentApp] = useState('');
+  const [bankAccountHolderName, setBankAccountHolderName] = useState('');
+  const [qrCodeImage, setQrCodeImage] = useState('');
+  const [uploadingQr, setUploadingQr] = useState(false);
+
   // 2FA States
   const [is2FAEnabled, setIs2FAEnabled] = useState(false);
   const [show2FASetup, setShow2FASetup] = useState(false);
@@ -93,6 +100,13 @@ const Settings = () => {
       setAvailabilityStatus(user.availability_status || 'available');
       setResponseTimeHours(user.response_time_hours || 24);
       setIs2FAEnabled(user.is_2fa_enabled || false);
+      
+      if (user.payment_info) {
+        setUpiId(user.payment_info.upi_id || '');
+        setPaymentApp(user.payment_info.payment_app || '');
+        setBankAccountHolderName(user.payment_info.bank_account_holder_name || '');
+        setQrCodeImage(user.payment_info.qr_code_image || '');
+      }
     }
   }, [user]);
 
@@ -127,7 +141,13 @@ const Settings = () => {
       portfolio_links: portfolioArray,
       availability_status: availabilityStatus,
       response_time_hours: Number(responseTimeHours) || 24,
-      hourly_rate: Number(hourlyRate)
+      hourly_rate: Number(hourlyRate),
+      payment_info: {
+        upi_id: upiId,
+        payment_app: paymentApp,
+        bank_account_holder_name: bankAccountHolderName,
+        qr_code_image: qrCodeImage
+      }
     });
 
     if (result.success) {
@@ -138,6 +158,32 @@ const Settings = () => {
       setProfileError(result.error);
     }
     setProfileSaving(false);
+  };
+
+  const handleQrUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingQr(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (response.data.success) {
+        setQrCodeImage(response.data.url);
+      }
+    } catch (err) {
+      setProfileError('Failed to upload QR code');
+    } finally {
+      setUploadingQr(false);
+    }
   };
 
   const handleEnable2FAClick = async () => {
@@ -361,6 +407,62 @@ const Settings = () => {
                 </div>
               </div>
               <div className="form-group" style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#1e293b' }}>Payment Information</h3>
+                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+                  <div>
+                    <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>UPI ID *</label>
+                    <input
+                      type="text"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      placeholder="e.g. yourname@okaxis"
+                      style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Payment App</label>
+                    <select
+                      value={paymentApp}
+                      onChange={(e) => setPaymentApp(e.target.value)}
+                      style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem' }}
+                    >
+                      <option value="">Select App</option>
+                      <option value="Google Pay">Google Pay</option>
+                      <option value="PhonePe">PhonePe</option>
+                      <option value="Paytm">Paytm</option>
+                      <option value="BHIM">BHIM</option>
+                      <option value="Amazon Pay">Amazon Pay</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Bank Holder Name (Optional)</label>
+                    <input
+                      type="text"
+                      value={bankAccountHolderName}
+                      onChange={(e) => setBankAccountHolderName(e.target.value)}
+                      style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Upload QR Code</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleQrUpload}
+                      disabled={uploadingQr}
+                      style={{ display: 'block', marginTop: '0.5rem' }}
+                    />
+                    {uploadingQr && <span style={{ fontSize: '0.85rem', color: '#3b82f6' }}>Uploading...</span>}
+                    {qrCodeImage && !uploadingQr && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <img src={`http://localhost:5000${qrCodeImage}`} alt="QR Code" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: '1rem' }}>
                 <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Bio / Description</label>
                 <textarea
                   value={bio}
@@ -454,6 +556,35 @@ const Settings = () => {
                   </div>
                 ) : (
                   <p style={{ fontSize: '0.95rem', color: '#334155' }}>No portfolio links added yet.</p>
+                )}
+              </div>
+              <div className="span-2" style={{ gridColumn: 'span 2', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#1e293b' }}>Payment Information</h3>
+                {user?.payment_info?.upi_id ? (
+                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>UPI ID</label>
+                      <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user.payment_info.upi_id}</p>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Payment App</label>
+                      <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user.payment_info.payment_app || 'Not specified'}</p>
+                    </div>
+                    {user.payment_info.bank_account_holder_name && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Bank Holder</label>
+                        <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user.payment_info.bank_account_holder_name}</p>
+                      </div>
+                    )}
+                    {user.payment_info.qr_code_image && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>QR Code</label>
+                        <img src={`http://localhost:5000${user.payment_info.qr_code_image}`} alt="QR Code" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.95rem', color: '#334155' }}>No payment information configured.</p>
                 )}
               </div>
             </div>

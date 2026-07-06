@@ -1762,4 +1762,148 @@ router.post('/sync-accepted-assignments', verifyToken, async (req, res) => {
     }
 });
 
+// ============================================
+// DIRECT UPI PAYMENT FLOW
+// ============================================
+
+// Client submits payment screenshot
+router.post('/:id/submit-payment', verifyToken, async (req, res) => {
+    try {
+        const { screenshotUrl } = req.body;
+        if (!screenshotUrl) return res.status(400).json({ error: 'Screenshot URL is required' });
+
+        const project = await ProjectPost.findOne({ _id: req.params.id, client_id: req.userId });
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        project.payment_screenshot = screenshotUrl;
+        project.payment_date = new Date();
+        project.payment_status = 'payment_pending_verification';
+        await project.save();
+
+        // Send notification to freelancer
+        await NotificationHelper.createNotification(
+            project.selected_freelancer_id,
+            'payment_submitted',
+            `Client has submitted payment proof for ${project.title}. Please review and approve.`,
+            `/dashboard?tab=payments`
+        );
+
+        res.json({ success: true, project });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Freelancer verifies or rejects payment
+router.post('/:id/verify-payment', verifyToken, async (req, res) => {
+    try {
+        const { approved, reason, documentUrl } = req.body;
+        const project = await ProjectPost.findOne({ _id: req.params.id, selected_freelancer_id: req.userId });
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        if (approved) {
+            project.payment_status = 'paid';
+            project.status = 'completed';
+            project.payment_verified_by_freelancer = true;
+            project.verification_date = new Date();
+            project.completed_at = new Date();
+            project.rejection_reason = '';
+            
+            if (documentUrl) {
+                project.final_delivery_document = documentUrl;
+            }
+
+            // Also update the freelancer stats
+            const freelancer = await User.findById(req.userId);
+            if (freelancer) {
+                freelancer.total_earnings += project.bid_amount;
+                await freelancer.save();
+            }
+
+            // Sync assignments
+            await syncFreelancerAcceptedAssignments(freelancer);
+
+            // Notify client
+            await NotificationHelper.createNotification(
+                project.client_id,
+                'payment_approved',
+                `Freelancer has approved your payment for ${project.title}. Project is now marked completed!`,
+                `/dashboard?tab=payments`
+            );
+        } else {
+            if (!reason) return res.status(400).json({ error: 'Rejection reason is required' });
+            project.payment_status = 'failed';
+            project.rejection_reason = reason;
+
+            // Notify client
+            await NotificationHelper.createNotification(
+                project.client_id,
+                'payment_rejected',
+                `Your payment for ${project.title} was rejected. Reason: ${reason}`,
+                `/manage-project/${project._id}`
+            );
+        }
+
+        await project.save();
+        res.json({ success: true, project });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// PAYMENT DASHBOARD DATA
+// ============================================
+router.get('/payments/dashboard', verifyToken, async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId);
+        const role = user ? user.role : 'client'; // 'client' or 'freelancer'
+
+        // Freelancer: Payments where they are the selected freelancer
+        // Client: Payments where they are the client
+        
+        let query = {};
+        if (role === 'freelancer' || (user && user.is_freelancer)) {
+             // In this system, user might be both or specifically one. We will fetch both if applicable.
+             // Actually, let's fetch based on user id matching client_id OR selected_freelancer_id
+             query = {
+                 $or: [
+                     { client_id: userId },
+                     { selected_freelancer_id: userId }
+                 ]
+             };
+        } else {
+             query = { client_id: userId };
+        }
+
+        // Only include projects with payment activity (status includes paid, payment_pending_verification, failed)
+        // Or projects that are completed and release_requested (meaning payment is due)
+        query = {
+            ...query,
+            $or: [
+                { payment_status: { $in: ['paid', 'payment_pending_verification', 'failed'] } },
+                { status: 'completed' }
+            ]
+        };
+
+        const projects = await ProjectPost.find(query)
+            .populate('client_id', 'full_name company_name email')
+            .populate('selected_freelancer_id', 'full_name email')
+            .sort({ updated_at: -1 });
+
+        const asClient = projects.filter(p => p.client_id && p.client_id._id.toString() === userId.toString());
+        const asFreelancer = projects.filter(p => p.selected_freelancer_id && p.selected_freelancer_id._id.toString() === userId.toString());
+
+        res.json({
+            success: true,
+            asClient,
+            asFreelancer
+        });
+    } catch (err) {
+        console.error('Error fetching payments dashboard:', err);
+        res.status(500).json({ error: 'Failed to fetch payments data' });
+    }
+});
+
 module.exports = router;

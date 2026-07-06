@@ -140,16 +140,22 @@ const projectPostSchema = new mongoose.Schema({
         type: Date
     },
 
-    completed_at: {
-        type: Date
-    },
+
 
     // Payment tracking
     payment_status: {
         type: String,
-        enum: ['unpaid', 'pending', 'processing', 'paid', 'failed', 'refunded'],
+        enum: ['unpaid', 'pending', 'processing', 'paid', 'failed', 'refunded', 'payment_pending_verification'],
         default: 'unpaid'
     },
+    
+    // Manual Payment fields (UPI)
+    payment_screenshot: String,
+    final_delivery_document: String,
+    payment_date: Date,
+    payment_verified_by_freelancer: { type: Boolean, default: false },
+    verification_date: Date,
+    rejection_reason: String,
 
     payment_id: {
         type: mongoose.Schema.Types.ObjectId,
