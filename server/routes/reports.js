@@ -7,6 +7,7 @@ const Project = require('../models/Project');
 const Invoice = require('../models/Invoice');
 const Expense = require('../models/Expense');
 const Task = require('../models/Task');
+const ProjectPost = require('../models/ProjectPost');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -29,17 +30,22 @@ router.get('/business-summary', verifyToken, async (req, res) => {
         const userId = req.userId;
         
         // Get all data for this user
-        const [clients, projects, invoices, expenses] = await Promise.all([
+        const [clients, projects, invoices, expenses, marketplaceProjects] = await Promise.all([
             Client.find({ user_id: userId }),
             Project.find({ user_id: userId }),
             Invoice.find({ user_id: userId }),
-            Expense.find({ user_id: userId })
+            Expense.find({ user_id: userId }),
+            ProjectPost.find({ selected_freelancer_id: userId, payment_status: 'paid' })
         ]);
         
         // Calculate totals
-        const totalRevenue = invoices
+        const invoiceRevenue = invoices
             .filter(inv => inv.status === 'paid')
             .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+            
+        const marketplaceRevenue = marketplaceProjects.reduce((sum, mp) => sum + (mp.bid_amount || 0), 0);
+        
+        const totalRevenue = invoiceRevenue + marketplaceRevenue;
         
         const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         
@@ -49,10 +55,19 @@ router.get('/business-summary', verifyToken, async (req, res) => {
         
         // Monthly revenue for chart
         const monthlyRevenue = {};
+        
         invoices.filter(inv => inv.status === 'paid').forEach(inv => {
             if (inv.paid_at) {
                 const month = new Date(inv.paid_at).toISOString().slice(0, 7);
                 monthlyRevenue[month] = (monthlyRevenue[month] || 0) + inv.total_amount;
+            }
+        });
+        
+        marketplaceProjects.forEach(mp => {
+            const paidDate = mp.payment_date || mp.completed_at || mp.updated_at;
+            if (paidDate) {
+                const month = new Date(paidDate).toISOString().slice(0, 7);
+                monthlyRevenue[month] = (monthlyRevenue[month] || 0) + (mp.bid_amount || 0);
             }
         });
         

@@ -120,19 +120,27 @@ const DashboardEnhanced = () => {
     try {
       const token = localStorage.getItem('token');
 
-      const [clientsRes, projectsRes, invoicesRes] = await Promise.all([
+      const [clientsRes, projectsRes, invoicesRes, mpProjectsRes] = await Promise.all([
         axios.get(`${API_URL}/clients`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get(`${API_URL}/projects`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API_URL}/invoices`, { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`${API_URL}/invoices`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API_URL}/marketplace/freelancer/my-projects`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: { projects: [] } }))
       ]);
 
       const clients = clientsRes.data.clients || [];
       const projects = projectsRes.data.projects || [];
       const invoices = invoicesRes.data.invoices || [];
+      const mpProjects = mpProjectsRes.data.projects || [];
 
-      const currentRevenue = invoices
+      let currentRevenue = invoices
         .filter(inv => inv.status === 'paid')
         .reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
+        
+      if (mpProjects.length > 0) {
+        currentRevenue += mpProjects
+          .filter(p => p.payment_status === 'paid' || p.status === 'completed') // Include completed projects for total earnings
+          .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
+      }
 
       const pendingInvoices = invoices.filter(inv => inv.status === 'pending');
       const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);

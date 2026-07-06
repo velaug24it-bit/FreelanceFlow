@@ -35,21 +35,29 @@ const Reports = () => {
       const token = localStorage.getItem('token');
       
       // Fetch all required data
-      const [clientsRes, projectsRes, invoicesRes, expensesRes] = await Promise.all([
+      const [clientsRes, projectsRes, invoicesRes, expensesRes, mpProjectsRes] = await Promise.all([
         axios.get('/api/clients', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/projects', { headers: { Authorization: `Bearer ${token}` } }),
         axios.get('/api/invoices', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('/api/expenses', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: { expenses: [] } }))
+        axios.get('/api/expenses', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: { expenses: [] } })),
+        axios.get('/api/marketplace/freelancer/my-projects', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: { projects: [] } }))
       ]);
       
       const clients = clientsRes.data.clients || [];
       const projects = projectsRes.data.projects || [];
       const invoices = invoicesRes.data.invoices || [];
       const expenses = expensesRes.data.expenses || [];
+      const mpProjects = mpProjectsRes.data.projects || [];
       
       // Calculate revenue from paid invoices
       const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-      const totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
+      let totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
+      
+      if (mpProjects.length > 0) {
+        totalRevenue += mpProjects
+          .filter(p => p.payment_status === 'paid' || p.status === 'completed')
+          .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
+      }
       
       // Calculate expenses
       const totalExpenses = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
@@ -93,7 +101,7 @@ const Reports = () => {
       const totalProjectCount = projects.length;
       
       // Generate monthly data for chart
-      const monthlyData = generateMonthlyData(invoices, expenses);
+      const monthlyData = generateMonthlyData(invoices, expenses, mpProjects);
       
       setReportData({
         totalRevenue,
@@ -118,7 +126,7 @@ const Reports = () => {
     }
   };
 
-  const generateMonthlyData = (invoices, expenses) => {
+  const generateMonthlyData = (invoices, expenses, mpProjects) => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
     
@@ -137,8 +145,21 @@ const Reports = () => {
           return expDate.getFullYear() === currentYear && expDate.getMonth() + 1 === monthNum;
         })
         .reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+        
+      let mpRevenue = 0;
+      if (mpProjects && mpProjects.length > 0) {
+        mpRevenue = mpProjects
+          .filter(p => {
+            if (p.payment_status !== 'paid' && p.status !== 'completed') return false;
+            const pDate = new Date(p.payment_date || p.completed_at || p.updated_at);
+            return pDate.getFullYear() === currentYear && pDate.getMonth() + 1 === monthNum;
+          })
+          .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
+      }
       
-      return { month, revenue: monthlyRevenue, expenses: monthlyExpenses, profit: monthlyRevenue - monthlyExpenses };
+      const totalMonthRevenue = monthlyRevenue + mpRevenue;
+      
+      return { month, revenue: totalMonthRevenue, expenses: monthlyExpenses, profit: totalMonthRevenue - monthlyExpenses };
     });
   };
 
