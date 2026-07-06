@@ -72,6 +72,14 @@ router.get('/users', verifyAdmin, async (req, res) => {
             },
             {
                 $lookup: {
+                    from: 'projectposts',
+                    localField: '_id',
+                    foreignField: 'selected_freelancer_id',
+                    as: 'freelancer_projects'
+                }
+            },
+            {
+                $lookup: {
                     from: 'payments',
                     let: { userId: '$_id' },
                     pipeline: [
@@ -135,6 +143,33 @@ router.get('/users', verifyAdmin, async (req, res) => {
                                         },
                                         as: 'p',
                                         in: { $toDouble: '$$p.amount' }
+                                    }
+                                }
+                            },
+                            {
+                                $sum: {
+                                    $map: {
+                                        input: {
+                                            $filter: {
+                                                input: '$freelancer_projects',
+                                                as: 'fp',
+                                                cond: {
+                                                    $or: [
+                                                        { $eq: ['$$fp.payment_status', 'paid'] },
+                                                        { $eq: ['$$fp.status', 'completed'] }
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        as: 'fp',
+                                        in: {
+                                            $convert: {
+                                                input: { $ifNull: ['$$fp.bid_amount', { $ifNull: ['$$fp.budget', 0] }] },
+                                                to: 'double',
+                                                onError: 0,
+                                                onNull: 0
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -624,7 +659,7 @@ router.get('/freelancers', verifyAdmin, async (req, res) => {
     try {
         const users = await User.find({ role: { $ne: 'admin' } });
         const freelancers = await Promise.all(users.map(async (user) => {
-            const [clientsCount, projects, invoices, expenses, payments, bids] = await Promise.all([
+            const [clientsCount, projects, invoices, expenses, payments, bids, marketplaceProjects] = await Promise.all([
                 Client.countDocuments({ user_id: user._id }),
                 Project.find({ user_id: user._id }),
                 Invoice.find({ user_id: user._id, status: 'paid' }),
@@ -636,13 +671,17 @@ router.get('/freelancers', verifyAdmin, async (req, res) => {
                         { freelancer_id: user._id }
                     ]
                 }),
-                Bid.find({ freelancer_id: user._id })
+                Bid.find({ freelancer_id: user._id }),
+                ProjectPost.find({ selected_freelancer_id: user._id })
             ]);
 
             const invoiceRevenue = invoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
             const projectPayments = payments.filter(p => p.project_id && p.status === 'completed' && p.freelancer_id?.toString() === user._id.toString());
             const projectRevenue = projectPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
-            const totalRevenue = invoiceRevenue + projectRevenue;
+            const marketplaceRevenue = marketplaceProjects
+                .filter(p => p.status === 'completed' || p.payment_status === 'paid')
+                .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
+            const totalRevenue = invoiceRevenue + projectRevenue + marketplaceRevenue;
 
             const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
             const bidsPlaced = bids.length;

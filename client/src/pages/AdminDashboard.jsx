@@ -114,7 +114,6 @@ const AdminDashboard = () => {
         totalConnectsSold: 0
       });
 
-      await fetchPayouts();
     } catch (err) {
       console.error('❌ Failed to fetch admin data:', err);
       console.error('❌ Error response:', err.response?.data);
@@ -128,38 +127,6 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  };
-
-  const fetchPayouts = async () => {
-    try {
-      setPayoutsLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/payments/admin/payouts`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setPayouts(response.data.payouts || []);
-    } catch (err) {
-      console.error('❌ Failed to fetch payouts:', err);
-    } finally {
-      setPayoutsLoading(false);
-    }
-  };
-
-  const markPayoutAsPaid = async (payoutId) => {
-    try {
-      setMarkingPayoutId(payoutId);
-      const token = localStorage.getItem('token');
-      await axios.patch(`${API_URL}/payments/admin/payouts/${payoutId}/mark-paid`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      await fetchPayouts();
-      alert('✅ Payout marked as paid');
-    } catch (err) {
-      console.error('❌ Failed to mark payout as paid:', err);
-      alert(err.response?.data?.error || 'Failed to mark payout as paid');
-    } finally {
-      setMarkingPayoutId(null);
     }
   };
 
@@ -632,65 +599,6 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Manual Payout Ledger */}
-        <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '600' }}>Manual Payout Ledger</h3>
-              <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Track who needs to be paid, for which project, and how much.</p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{ padding: '0.35rem 0.75rem', borderRadius: '999px', background: '#fef3c7', color: '#92400e', fontSize: '0.8rem', fontWeight: '600' }}>
-                Pending: {payouts.filter(p => p.status === 'pending').length}
-              </span>
-              <span style={{ padding: '0.35rem 0.75rem', borderRadius: '999px', background: '#dcfce7', color: '#166534', fontSize: '0.8rem', fontWeight: '600' }}>
-                Paid: {payouts.filter(p => p.status === 'paid').length}
-              </span>
-            </div>
-          </div>
-
-          {payoutsLoading ? (
-            <p style={{ color: '#6b7280' }}>Loading payouts...</p>
-          ) : payouts.length === 0 ? (
-            <p style={{ color: '#6b7280' }}>No payout records yet.</p>
-          ) : (
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {payouts.map(payout => (
-                <div key={payout._id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 220, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <strong>{payout.freelancer_id?.full_name || 'Freelancer'}</strong>
-                      <span style={{ padding: '0.2rem 0.5rem', borderRadius: '999px', background: payout.status === 'paid' ? '#dcfce7' : '#fef3c7', color: payout.status === 'paid' ? '#166534' : '#92400e', fontSize: '0.75rem', fontWeight: '600' }}>
-                        {payout.status === 'paid' ? 'Paid' : 'Pending'}
-                      </span>
-                    </div>
-                    <p style={{ color: '#6b7280', fontSize: '0.9rem', marginBottom: '0.2rem' }}>
-                      Project: {payout.project_id?.title || 'Unknown project'}
-                    </p>
-                    <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>
-                      Client: {payout.client_id?.full_name || 'Unknown client'}
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: '1.05rem', fontWeight: '700', color: '#111827' }}>{formatCurrency(payout.amount || 0)}</p>
-                    <p style={{ color: '#6b7280', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
-                      {payout.notes || 'Manual payout pending'}
-                    </p>
-                    {payout.status !== 'paid' && (
-                      <button
-                        onClick={() => markPayoutAsPaid(payout._id)}
-                        disabled={markingPayoutId === payout._id}
-                        style={{ padding: '0.5rem 0.85rem', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
-                      >
-                        {markingPayoutId === payout._id ? 'Updating...' : 'Mark as Paid'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Search & Filter */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'stretch', flexDirection: isMobile ? 'column' : 'row' }}>
