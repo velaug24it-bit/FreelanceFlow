@@ -42,6 +42,10 @@ try {
 // Connect to MongoDB
 connectDB();
 
+// Initialize Background Task Scheduler
+const { initScheduler } = require('./utils/scheduler');
+initScheduler();
+
 // ============ CORS CONFIGURATION ============
 const allowedOrigins = [
     'http://localhost:3000',
