@@ -974,11 +974,11 @@ const Marketplace = () => {
                 {isProjectOwner && project.status === 'completed' && project.selected_freelancer_id && (
                     <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                         <h4 style={{ margin: '0 0 0.75rem', fontWeight: '600', fontSize: 'clamp(0.85rem, 1.5vw, 1rem)' }}>Review {project.selected_freelancer_name || 'Freelancer'}</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 140px) 1fr auto', gap: '0.75rem', alignItems: 'start' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'start' }}>
                             <select
                                 value={reviewDrafts[project._id]?.rating || 5}
                                 onChange={(e) => handleReviewDraftChange(project._id, 'rating', Number(e.target.value))}
-                                style={{ padding: '0.7rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white' }}
+                                style={{ padding: '0.7rem', border: '1px solid #cbd5e1', borderRadius: '6px', background: 'white', flex: '0 0 auto' }}
                             >
                                 {[5, 4, 3, 2, 1].map(value => (
                                     <option key={value} value={value}>{value} stars</option>
@@ -989,12 +989,12 @@ const Marketplace = () => {
                                 placeholder="Share a concise review"
                                 value={reviewDrafts[project._id]?.comment || ''}
                                 onChange={(e) => handleReviewDraftChange(project._id, 'comment', e.target.value)}
-                                style={{ width: '100%', padding: '0.7rem', border: '1px solid #cbd5e1', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }}
+                                style={{ flex: '1 1 200px', padding: '0.7rem', border: '1px solid #cbd5e1', borderRadius: '6px', resize: 'vertical', boxSizing: 'border-box' }}
                             />
                             <button
                                 type="button"
                                 onClick={() => handleSubmitReview(project._id)}
-                                style={{ padding: '0.7rem 1rem', background: '#0f766e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                                style={{ flex: '0 0 auto', padding: '0.7rem 1rem', background: '#0f766e', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
                             >
                                 Save Review
                             </button>
