@@ -638,36 +638,35 @@ const AdminDashboard = () => {
           </select>
         </div>
 
-        {/* Users Table */}
-        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        {/* Client Management Table */}
+        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '2rem' }}>
           <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>All Customers</h3>
-            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Manage subscriptions and track revenue</p>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Client Management</h3>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Manage clients and track their spending</p>
           </div>
           <div style={{ display: isMobile ? 'none' : 'block', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ padding: '1rem', textAlign: 'left' }}>Customer</th>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Client</th>
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Email</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Connects</th>
-                  <th style={{ padding: '1rem', textAlign: 'center' }}>Clients</th>
-                  <th style={{ padding: '1rem', textAlign: 'center' }}>Projects</th>
-                  <th style={{ padding: '1rem', textAlign: 'right' }}>Revenue</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Projects Posted</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Total Spent</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.length === 0 ? (
+                {filteredUsers.filter(u => u.client_spent > 0 || u.project_count > 0 || u.client_count > 0 || (!u.total_revenue && u.role !== 'freelancer' && !u.is_freelancer)).length === 0 ? (
                   <tr>
-                    <td colSpan="9" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
-                      No customers found
+                    <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                      No clients found
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map(user => (
+                  filteredUsers.filter(u => u.client_spent > 0 || u.project_count > 0 || u.client_count > 0 || (!u.total_revenue && u.role !== 'freelancer' && !u.is_freelancer)).map(user => (
                     <tr key={user._id || user.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
                       <td style={{ padding: '1rem' }}>
                         <div>
@@ -685,96 +684,29 @@ const AdminDashboard = () => {
                           background: getPlanColor(user.plan || 'free'),
                           color: user.plan === 'free' ? '#92400e' : '#065f46'
                         }}>
-                          {user.plan === 'free' ? 'Free' : user.plan?.charAt(0).toUpperCase() + user.plan?.slice(1)}
+                          {(user.plan || 'free').toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
-                        {user.connects_balance || 0}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
-                        {user.client_count || 0}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '500' }}>
-                        {user.project_count || 0}
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '600', color: '#10b981' }}>
-                        {formatCurrency(user.total_revenue || 0)}
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>{user.connects_balance || 0}</td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>{user.project_count || 0}</td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500' }}>
+                        {formatCurrency(user.client_spent || 0)}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
                         {getStatusBadge(user.status || 'active')}
                       </td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <button
-                          onClick={() => {
-                            const userId = user._id || user.id;
-                            if (userId) {
-                              fetchUserDetail(userId);
-                            } else {
-                              alert('User ID not found');
-                            }
-                          }}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            background: '#8b5cf6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            marginRight: '0.5rem',
-                            fontSize: '0.75rem',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#7c3aed'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#8b5cf6'}
-                        >
-                          <Eye size={14} style={{ marginRight: '0.25rem' }} />
-                          History
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setEditData({ 
-                              plan: user.plan || 'free', 
-                              status: user.status || 'active', 
-                              amount: user.subscription_amount || 19 
-                            });
-                            setShowEditModal(true);
-                          }}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            background: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            marginRight: '0.5rem',
-                            fontSize: '0.75rem',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
-                        >
-                          <Edit size={14} style={{ marginRight: '0.25rem' }} />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => deleteUser(user._id || user.id, user.full_name)}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            background: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.75rem',
-                            transition: 'background 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#dc2626'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#ef4444'}
-                        >
-                          <Trash2 size={14} style={{ marginRight: '0.25rem' }} />
-                          Delete
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                          <button onClick={() => fetchUserDetail(user._id || user.id)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="View Details">
+                            <Eye size={18} />
+                          </button>
+                          <button onClick={() => { setEditData({ plan: user.plan || 'free', status: user.status || 'active', amount: 0 }); setSelectedUser(user); setShowEditModal(true); }} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer' }} title="Edit">
+                            <Edit size={18} />
+                          </button>
+                          <button onClick={() => deleteUser(user._id || user.id, user.full_name)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }} title="Delete">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -782,64 +714,163 @@ const AdminDashboard = () => {
               </tbody>
             </table>
           </div>
-          <div style={{ display: isMobile ? 'grid' : 'none', gap: '0.75rem', padding: '1rem' }}>
-            {filteredUsers.map(user => (
-              <div key={user._id || user.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '1rem', background: '#fff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+          
+          {/* Mobile View for Clients */}
+          <div style={{ display: isMobile ? 'block' : 'none', padding: '1rem' }}>
+            {filteredUsers.filter(u => u.client_spent > 0 || u.project_count > 0 || u.client_count > 0 || (!u.total_revenue && u.role !== 'freelancer' && !u.is_freelancer)).map(user => (
+              <div key={user._id || user.id} style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <div>
-                    <p style={{ fontWeight: '600' }}>{user.full_name || 'User'}</p>
-                    <p style={{ fontSize: '0.8rem', color: '#6b7280' }}>{user.email}</p>
+                    <h4 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{user.full_name || 'User'}</h4>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>{user.email}</p>
                   </div>
-                  <span style={{
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: '500',
-                    background: getPlanColor(user.plan || 'free'),
-                    color: user.plan === 'free' ? '#92400e' : '#065f46'
-                  }}>
-                    {user.plan === 'free' ? 'Free' : user.plan?.charAt(0).toUpperCase() + user.plan?.slice(1)}
-                  </span>
+                  {getStatusBadge(user.status || 'active')}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563', marginBottom: '0.75rem' }}>
-                  <div><strong>Connects:</strong> {user.connects_balance || 0}</div>
-                  <div><strong>Clients:</strong> {user.client_count || 0}</div>
-                  <div><strong>Projects:</strong> {user.project_count || 0}</div>
-                  <div><strong>Revenue:</strong> {formatCurrency(user.total_revenue || 0)}</div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                  <div>
+                    <p style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Plan</p>
+                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '12px', background: getPlanColor(user.plan || 'free'), color: user.plan === 'free' ? '#92400e' : '#065f46', fontWeight: '500' }}>
+                      {(user.plan || 'free').toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Total Spent</p>
+                    <p style={{ fontWeight: '600' }}>{formatCurrency(user.client_spent || 0)}</p>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <button onClick={() => { const userId = user._id || user.id; if (userId) { fetchUserDetail(userId); } else { alert('User ID not found'); } }} style={{ padding: '0.4rem 0.65rem', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>History</button>
-                  <button onClick={() => { setSelectedUser(user); setEditData({ plan: user.plan || 'free', status: user.status || 'active', amount: user.subscription_amount || 19 }); setShowEditModal(true); }} style={{ padding: '0.4rem 0.65rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Edit</button>
-                  <button onClick={() => deleteUser(user._id || user.id, user.full_name)} style={{ padding: '0.4rem 0.65rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Delete</button>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+                  <button onClick={() => fetchUserDetail(user._id || user.id)} style={{ padding: '0.5rem', background: '#eff6ff', color: '#3b82f6', borderRadius: '8px', border: 'none' }}>
+                    <Eye size={16} />
+                  </button>
+                  <button onClick={() => { setEditData({ plan: user.plan || 'free', status: user.status || 'active', amount: 0 }); setSelectedUser(user); setShowEditModal(true); }} style={{ padding: '0.5rem', background: '#fef3c7', color: '#f59e0b', borderRadius: '8px', border: 'none' }}>
+                    <Edit size={16} />
+                  </button>
+                  <button onClick={() => deleteUser(user._id || user.id, user.full_name)} style={{ padding: '0.5rem', background: '#fee2e2', color: '#ef4444', borderRadius: '8px', border: 'none' }}>
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             ))}
           </div>
-          <div style={{
-            padding: '1rem',
-            background: '#f9fafb',
-            borderTop: '1px solid #e5e7eb',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: '0.875rem',
-            color: '#6b7280',
-            flexDirection: isMobile ? 'column' : 'row',
-            gap: isMobile ? '0.5rem' : '0'
-          }}>
-            <span>Showing {filteredUsers.length} user(s)</span>
-            <button
-              onClick={fetchAdminData}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#3b82f6',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
-            >
-              Refresh
-            </button>
+        </div>
+
+        {/* Freelancer Management Table */}
+        <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600' }}>Freelancer Management</h3>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>Manage freelancers and track their revenue</p>
+          </div>
+          <div style={{ display: isMobile ? 'none' : 'block', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Freelancer</th>
+                  <th style={{ padding: '1rem', textAlign: 'left' }}>Email</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Connects</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Clients Worked</th>
+                  <th style={{ padding: '1rem', textAlign: 'right' }}>Total Revenue</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '1rem', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.filter(u => u.role === 'freelancer' || u.is_freelancer || u.total_revenue > 0).length === 0 ? (
+                  <tr>
+                    <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                      No freelancers found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.filter(u => u.role === 'freelancer' || u.is_freelancer || u.total_revenue > 0).map(user => (
+                    <tr key={user._id || user.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '1rem' }}>
+                        <div>
+                          <p style={{ fontWeight: '500' }}>{user.full_name || 'User'}</p>
+                          <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>{user.title || 'Freelancer'}</p>
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>{user.email}</td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '20px',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          background: getPlanColor(user.plan || 'free'),
+                          color: user.plan === 'free' ? '#92400e' : '#065f46'
+                        }}>
+                          {(user.plan || 'free').toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>{user.connects_balance || 0}</td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>{user.client_count || 0}</td>
+                      <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500' }}>
+                        {formatCurrency(user.total_revenue || 0)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        {getStatusBadge(user.status || 'active')}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                          <button onClick={() => fetchUserDetail(user._id || user.id)} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer' }} title="View Details">
+                            <Eye size={18} />
+                          </button>
+                          <button onClick={() => { setEditData({ plan: user.plan || 'free', status: user.status || 'active', amount: 0 }); setSelectedUser(user); setShowEditModal(true); }} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer' }} title="Edit">
+                            <Edit size={18} />
+                          </button>
+                          <button onClick={() => deleteUser(user._id || user.id, user.full_name)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }} title="Delete">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Mobile View for Freelancers */}
+          <div style={{ display: isMobile ? 'block' : 'none', padding: '1rem' }}>
+            {filteredUsers.filter(u => u.role === 'freelancer' || u.is_freelancer || u.total_revenue > 0).map(user => (
+              <div key={user._id || user.id} style={{ background: 'white', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <div>
+                    <h4 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{user.full_name || 'User'}</h4>
+                    <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>{user.email}</p>
+                  </div>
+                  {getStatusBadge(user.status || 'active')}
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                  <div>
+                    <p style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Plan</p>
+                    <span style={{ padding: '0.25rem 0.5rem', borderRadius: '12px', background: getPlanColor(user.plan || 'free'), color: user.plan === 'free' ? '#92400e' : '#065f46', fontWeight: '500' }}>
+                      {(user.plan || 'free').toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p style={{ color: '#6b7280', marginBottom: '0.25rem' }}>Total Revenue</p>
+                    <p style={{ fontWeight: '600' }}>{formatCurrency(user.total_revenue || 0)}</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid #e5e7eb', paddingTop: '1rem' }}>
+                  <button onClick={() => fetchUserDetail(user._id || user.id)} style={{ padding: '0.5rem', background: '#eff6ff', color: '#3b82f6', borderRadius: '8px', border: 'none' }}>
+                    <Eye size={16} />
+                  </button>
+                  <button onClick={() => { setEditData({ plan: user.plan || 'free', status: user.status || 'active', amount: 0 }); setSelectedUser(user); setShowEditModal(true); }} style={{ padding: '0.5rem', background: '#fef3c7', color: '#f59e0b', borderRadius: '8px', border: 'none' }}>
+                    <Edit size={16} />
+                  </button>
+                  <button onClick={() => deleteUser(user._id || user.id, user.full_name)} style={{ padding: '0.5rem', background: '#fee2e2', color: '#ef4444', borderRadius: '8px', border: 'none' }}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

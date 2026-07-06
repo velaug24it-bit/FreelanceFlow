@@ -175,6 +175,32 @@ router.get('/users', verifyAdmin, async (req, res) => {
                             }
                         ]
                     },
+                    // NEW: Total spent by client on projects and platform
+                    client_spent: {
+                        $sum: {
+                            $map: {
+                                input: {
+                                    $filter: {
+                                        input: '$payments',
+                                        as: 'p',
+                                        cond: {
+                                            $and: [
+                                                { $eq: ['$$p.status', 'completed'] },
+                                                {
+                                                    $or: [
+                                                        { $eq: ['$$p.client_id', '$_id'] },
+                                                        { $eq: ['$$p.user_id', '$_id'] }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                as: 'p',
+                                in: { $toDouble: '$$p.amount' }
+                            }
+                        }
+                    },
                     // NEW: Subscription revenue from payments
                     subscription_revenue: {
                         $sum: {
