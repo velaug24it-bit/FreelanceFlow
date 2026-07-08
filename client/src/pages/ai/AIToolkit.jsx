@@ -640,7 +640,7 @@ const AIToolkit = () => {
                     <input
                       type="text"
                       value={githubUrl}
-                      onChange={e => setgithubUrl ? setGithubUrl(e.target.value) : setGithubUrl(e.target.value)}
+                      onChange={e => setGithubUrl(e.target.value)}
                       placeholder="https://github.com/myname"
                       style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none' }}
                     />
