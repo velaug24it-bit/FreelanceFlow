@@ -327,7 +327,27 @@ const Reports = () => {
   });
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ padding: '1rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .responsive-tabs {
+            flex-direction: column !important;
+            gap: 0.5rem !important;
+            border-bottom: none !important;
+          }
+          .responsive-tabs button {
+            width: 100% !important;
+            text-align: left !important;
+            padding: 0.6rem 0.8rem !important;
+            border-bottom: none !important;
+            border-left: 3px solid transparent !important;
+          }
+          .responsive-tabs button.active-tab {
+            border-left: 3px solid #4f46e5 !important;
+            background-color: #f8fafc !important;
+          }
+        }
+      `}</style>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -379,14 +399,16 @@ const Reports = () => {
       </div>
 
       {/* Modern Tabs Navigation */}
-      <div style={{
+      <div className="responsive-tabs" style={{
         display: 'flex',
         borderBottom: '1px solid #e2e8f0',
         marginBottom: '2rem',
-        gap: '1.5rem'
+        gap: '1.5rem',
+        flexWrap: 'wrap'
       }}>
         <button
           onClick={() => setActiveTab('overview')}
+          className={activeTab === 'overview' ? 'active-tab' : ''}
           style={{
             padding: '0.8rem 0.5rem',
             fontWeight: 600,
@@ -403,6 +425,7 @@ const Reports = () => {
         </button>
         <button
           onClick={() => setActiveTab('earnings')}
+          className={activeTab === 'earnings' ? 'active-tab' : ''}
           style={{
             padding: '0.8rem 0.5rem',
             fontWeight: 600,
@@ -419,6 +442,7 @@ const Reports = () => {
         </button>
         <button
           onClick={() => setActiveTab('invoices')}
+          className={activeTab === 'invoices' ? 'active-tab' : ''}
           style={{
             padding: '0.8rem 0.5rem',
             fontWeight: 600,
@@ -435,6 +459,7 @@ const Reports = () => {
         </button>
         <button
           onClick={() => setActiveTab('expenses')}
+          className={activeTab === 'expenses' ? 'active-tab' : ''}
           style={{
             padding: '0.8rem 0.5rem',
             fontWeight: 600,
@@ -451,6 +476,7 @@ const Reports = () => {
         </button>
         <button
           onClick={() => setActiveTab('ledger')}
+          className={activeTab === 'ledger' ? 'active-tab' : ''}
           style={{
             padding: '0.8rem 0.5rem',
             fontWeight: 600,

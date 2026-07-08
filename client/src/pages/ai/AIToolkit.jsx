@@ -236,7 +236,23 @@ const AIToolkit = () => {
 
 
   return (
-    <div style={{ padding: '2.5rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>
+    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .responsive-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.5rem !important;
+          }
+          .responsive-metrics {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 0.75rem !important;
+          }
+          .responsive-tabs {
+            flex-direction: column !important;
+            gap: 0.5rem !important;
+          }
+        }
+      `}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
         <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)', color: 'white', padding: '0.75rem', borderRadius: '16px', display: 'flex' }}>
           <Sparkles size={28} />
@@ -248,7 +264,7 @@ const AIToolkit = () => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+      <div className="responsive-tabs" style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', gap: '1.5rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         {[
           { id: 'generator', label: 'Spec Writer', icon: <FileText size={18} /> },
           { id: 'estimator', label: 'Timeline & Budget', icon: <DollarSign size={18} /> },
@@ -287,7 +303,7 @@ const AIToolkit = () => {
         {activeTab === 'generator' && (
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1.5rem' }}>AI Project Specification Generator</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem' }}>Project Title</label>
@@ -375,7 +391,7 @@ const AIToolkit = () => {
         {activeTab === 'estimator' && (
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1.5rem' }}>AI Budget & Timeline Estimator</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem' }}>Project Title</label>
@@ -432,7 +448,7 @@ const AIToolkit = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     <div>
                       <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', color: '#4f46e5' }}>Budget Estimation Breakdown</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                      <div className="responsive-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                         <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                           <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Minimum cost</span>
                           <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ef4444', marginTop: '0.25rem' }}>₹{estOutput.budget?.minimum}</div>
@@ -503,7 +519,7 @@ const AIToolkit = () => {
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 0.5rem' }}>AI Freelancer Skill Gap Analyzer</h2>
             <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.9rem' }}>Scans your profile skills against live projects demand and outlines steps to boost bookings</p>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
               <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', height: 'fit-content' }}>
                 <h3 style={{ margin: '0 0 1rem', fontSize: '1.1rem', fontWeight: 700 }}>Profile Health</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -555,7 +571,7 @@ const AIToolkit = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>
+                    <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>
                       <div>
                         <strong style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.5rem', color: '#0f172a' }}>Suggested Certifications</strong>
                         <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
@@ -596,7 +612,7 @@ const AIToolkit = () => {
         {activeTab === 'portfolio' && (
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1.5rem' }}>AI Portfolio & Resume Analyzer</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr', gap: '2rem' }}>
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 2fr', gap: '2rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div>
                   <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem' }}>Paste Resume/Portfolio text</label>
@@ -608,7 +624,7 @@ const AIToolkit = () => {
                     style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none', resize: 'vertical' }}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem' }}>Portfolio Link</label>
                     <input
@@ -624,7 +640,7 @@ const AIToolkit = () => {
                     <input
                       type="text"
                       value={githubUrl}
-                      onChange={e => setGithubUrl(e.target.value)}
+                      onChange={e => setgithubUrl ? setGithubUrl(e.target.value) : setGithubUrl(e.target.value)}
                       placeholder="https://github.com/myname"
                       style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none' }}
                     />
@@ -653,7 +669,7 @@ const AIToolkit = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#4f46e5' }}>Technical Scoring Breakdown</h3>
                     
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                    <div className="responsive-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                       <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
                         <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Skills Score</span>
                         <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#3b82f6', marginTop: '0.25rem' }}>{portOutput.skill_score}/100</div>
@@ -700,9 +716,9 @@ const AIToolkit = () => {
         {activeTab === 'contract' && (
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0 0 1.5rem' }}>AI Professional Contract Generator</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem' }}>Client Name</label>
                     <input
@@ -734,7 +750,7 @@ const AIToolkit = () => {
                     style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid #cbd5e1', outline: 'none' }}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontWeight: 600, fontSize: '0.875rem', marginBottom: '0.5rem' }}>Start Date</label>
                     <input
