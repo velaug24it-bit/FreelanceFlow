@@ -68,14 +68,14 @@ async function generatePlatformAnalytics() {
       signups: signupMap[month]
     })).slice(-6);
 
-    // Call Gemini to generate business insights based on these aggregated figures
+    // Call Gemini (via Groq) to generate business insights based on these aggregated figures
     const analyticsContext = `
       Platform Statistics:
       - Total Registered Users: ${totalUsers} (Clients: ${clientsCount}, Freelancers: ${freelancersCount})
       - Total Posted Projects: ${totalProjects} (Completed: ${completedProjects}, Completion Rate: ${projectCompletionRate}%)
       - Monthly Revenue History: ${JSON.stringify(monthlyRevenue)}
       - Current Avg Monthly Growth Rate: ${avgGrowthRate}%
-      - Forecasted Revenue Next Month: ₹${forecastedRev}
+      - Forecasted Revenue Next Month: $${forecastedRev}
       - Signups History: ${JSON.stringify(clientGrowthData)}
     `;
 
@@ -106,7 +106,7 @@ async function generatePlatformAnalytics() {
       totalProjects,
       totalUsers,
       insights: result?.insights || [
-        "Revenue is showing standard cyclical patterns. Focus on boosting web development projects.",
+        "Revenue is showing standard cyclical patterns. Focus on boosting high-value technical projects.",
         "User acquisition remains steady. Target freelancer engagement in high-demand technical categories.",
         "Increase milestone checkout reminders to reduce pending invoice release times."
       ],

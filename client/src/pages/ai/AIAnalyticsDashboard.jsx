@@ -90,7 +90,7 @@ const AIAnalyticsDashboard = () => {
             <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ fontSize: '0.825rem', color: '#64748b', fontWeight: 600 }}>Next Month Forecast</span>
-                <h3 style={{ margin: '0.25rem 0 0.5rem', fontSize: '1.75rem', fontWeight: 800, color: '#4f46e5' }}>₹{data.forecastedRevenue.toLocaleString()}</h3>
+                <h3 style={{ margin: '0.25rem 0 0.5rem', fontSize: '1.75rem', fontWeight: 800, color: '#4f46e5' }}>${data.forecastedRevenue.toLocaleString()}</h3>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', color: data.growthRate >= 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>
                   <TrendingUp size={14} />
                   {data.growthRate >= 0 ? '+' : ''}{data.growthRate}% growth rate
@@ -152,7 +152,7 @@ const AIAnalyticsDashboard = () => {
             
             {/* Revenue Trend Area Chart */}
             <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '1.75rem' }}>
-              <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', fontWeight: 700 }}>Invoiced Revenue Trend (INR)</h3>
+              <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.1rem', fontWeight: 700 }}>Invoiced Revenue Trend (USD)</h3>
               <div style={{ width: '100%', height: '300px' }}>
                 <ResponsiveContainer>
                   <AreaChart data={data.monthlyRevenue} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
