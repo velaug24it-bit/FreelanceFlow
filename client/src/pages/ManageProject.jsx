@@ -4,6 +4,8 @@ import axios from 'axios';
 import ProjectTasks from '../components/ProjectTasks';
 import KanbanBoard from '../components/KanbanBoard';
 import GanttChart from '../components/GanttChart';
+import AIRecommendations from '../components/ai/AIRecommendations';
+import { AlertTriangle, Sparkles } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -12,9 +14,11 @@ const ManageProject = () => {
   const [project, setProject] = useState(null);
   const [tab, setTab] = useState('tasks');
   const [loading, setLoading] = useState(true);
+  const [riskData, setRiskData] = useState(null);
 
   useEffect(() => {
     fetchProject();
+    fetchRiskPrediction();
   }, [id]);
 
   const fetchProject = async () => {
@@ -30,6 +34,20 @@ const ManageProject = () => {
       setProject(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRiskPrediction = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/ai/projects/${id}/risk-prediction`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        setRiskData(res.data.prediction);
+      }
+    } catch (err) {
+      console.error('Error fetching risk prediction:', err);
     }
   };
 
@@ -153,6 +171,35 @@ const ManageProject = () => {
                 </div>
               </div>
 
+              {riskData && (
+                <div style={{ background: 'white', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <Sparkles size={18} style={{ color: '#7c3aed' }} />
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>AI Health & Risk</h3>
+                  </div>
+                  <div style={{ display: 'grid', gap: '0.75rem', fontSize: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Delay Risk:</span>
+                      <strong style={{ color: riskData.delayProbability === 'High' ? '#ef4444' : riskData.delayProbability === 'Medium' ? '#f59e0b' : '#10b981' }}>
+                        {riskData.delayProbability}
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Budget Overrun:</span>
+                      <strong style={{ color: riskData.budgetOverrunRisk === 'High' ? '#ef4444' : '#10b981' }}>{riskData.budgetOverrunRisk}</strong>
+                    </div>
+                    <div style={{ background: '#f8fafc', padding: '0.6rem', borderRadius: '8px', marginTop: '0.25rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.75rem', color: '#475569', marginBottom: '0.2rem' }}>AI Recovery Action Plan:</div>
+                      <ul style={{ margin: 0, paddingLeft: '1rem', fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+                        {riskData.suggestedActions?.slice(0, 2).map((act, i) => (
+                          <li key={i}>{act}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ background: 'white', borderRadius: '20px', padding: '1.5rem', boxShadow: '0 8px 30px rgba(15, 23, 42, 0.06)' }}>
                 <h3 style={{ margin: 0, marginBottom: '1rem', fontSize: '1.25rem' }}>Additional Notes</h3>
                 <p style={{ margin: 0, color: '#475569', lineHeight: 1.8 }}>{project.notes || 'No additional notes have been added for this project.'}</p>
@@ -164,7 +211,7 @@ const ManageProject = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Project Workspace</h2>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                {['tasks', 'kanban', 'gantt'].map((option) => (
+                {['tasks', 'kanban', 'gantt', 'ai-recs'].map((option) => (
                   <button
                     key={option}
                     onClick={() => setTab(option)}
@@ -178,7 +225,7 @@ const ManageProject = () => {
                       fontWeight: tab === option ? 700 : 500
                     }}
                   >
-                    {option === 'tasks' ? 'Tasks' : option === 'kanban' ? 'Kanban' : 'Gantt'}
+                    {option === 'tasks' ? 'Tasks' : option === 'kanban' ? 'Kanban' : option === 'gantt' ? 'Gantt' : 'AI Matchmaker'}
                   </button>
                 ))}
               </div>
@@ -188,6 +235,7 @@ const ManageProject = () => {
               {tab === 'tasks' && <ProjectTasks projectId={id} />}
               {tab === 'kanban' && <KanbanBoard projectId={id} />}
               {tab === 'gantt' && <GanttChart projectId={id} />}
+              {tab === 'ai-recs' && <AIRecommendations projectId={id} />}
             </div>
           </div>
         </>

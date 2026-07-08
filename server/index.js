@@ -25,6 +25,7 @@ const checkoutRoutes = require('./routes/checkout');
 const paymentRoutes = require('./routes/payments');
 const chatRoutes = require('./routes/chat');
 const uploadRoutes = require('./routes/upload');
+const aiRoutes = require('./routes/ai');
 const { initializeSocket } = require('./socket');
 
 const app = express();
@@ -169,6 +170,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api', checkoutRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ============ 404 HANDLER ============
 app.use((req, res) => {

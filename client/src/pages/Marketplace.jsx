@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award, BellRing, Trash2, ExternalLink, MessageCircle, Send, Flag } from 'lucide-react';
+import { Briefcase, DollarSign, Clock, Users, Plus, Check, X, Star, Heart, ShieldCheck, Zap, Award, BellRing, Trash2, ExternalLink, MessageCircle, Send, Flag, Sparkles } from 'lucide-react';
+import { useNavigate as useNav } from 'react-router-dom';
 import ProjectStatus from '../components/ProjectStatus';
 import ProjectPayment from '../components/ProjectPayment';
 
@@ -45,6 +46,7 @@ const Marketplace = () => {
     const [loading, setLoading] = useState(true);
     const [showPostForm, setShowPostForm] = useState(false);
     const [showBidForm, setShowBidForm] = useState(null);
+    const [aiDescLoading, setAiDescLoading] = useState(false);
     const [selectedProject, setSelectedProject] = useState(null);
     const [projectBids, setProjectBids] = useState({});
     const [reviewDrafts, setReviewDrafts] = useState({});
@@ -231,6 +233,35 @@ const Marketplace = () => {
         setPhoneNumbers(prev => ({ ...prev, [projectId]: value }));
     };
 
+    const [proposalAnalysis, setProposalAnalysis] = useState({});
+    const [proposalAnalysisLoading, setProposalAnalysisLoading] = useState({});
+
+    const handleAnalyzeProposal = async (projectId, projectDesc) => {
+        if (!proposals[projectId] || proposals[projectId].trim() === '') {
+            alert('Please type a proposal description first.');
+            return;
+        }
+        setProposalAnalysisLoading(prev => ({ ...prev, [projectId]: true }));
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API_URL}/ai/proposals/analyze`, {
+                proposal_text: proposals[projectId],
+                project_description: projectDesc,
+                bid_amount: parseFloat(bidAmounts[projectId]) || 0
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data?.success) {
+                setProposalAnalysis(prev => ({ ...prev, [projectId]: res.data.analysis }));
+            }
+        } catch (err) {
+            console.error('Proposal analyzer error:', err);
+            alert('Could not complete proposal audit.');
+        } finally {
+            setProposalAnalysisLoading(prev => ({ ...prev, [projectId]: false }));
+        }
+    };
+
     const handlePlaceBid = async (projectId) => {
         const bidAmount = bidAmounts[projectId];
         const estimatedDays = estimatedDaysList[projectId];
@@ -284,7 +315,7 @@ const Marketplace = () => {
         }
     };
 
-    const handleAcceptBid = async (projectId, bidId, bidAmount) => {
+    const handleAcceptBid = async (projectId, bidId, bidAmount, freelancerName, project) => {
         if (!window.confirm(`Accept bid of $${bidAmount}? This will create a contract.`)) return;
         
         const token = localStorage.getItem('token');
@@ -293,8 +324,19 @@ const Marketplace = () => {
             const res = await axios.put(`${API_URL}/marketplace/bids/${bidId}/accept`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            alert(res.data?.message || 'Bid accepted! The project is now in progress.');
+            // After accepting, redirect to AI Toolkit contract generator with pre-filled data
+            const params = new URLSearchParams({
+                tab: 'contracts',
+                projectId: projectId,
+                clientName: user?.full_name || user?.name || 'Client',
+                freelancerName: freelancerName || 'Freelancer',
+                amount: bidAmount,
+                startDate: new Date().toISOString().split('T')[0],
+                endDate: project?.deadline || ''
+            });
+            alert(res.data?.message || 'Bid accepted! Redirecting to AI Contract Generator...');
             fetchData();
+            window.location.href = `/ai-toolkit?${params.toString()}`;
         } catch (err) {
             console.error('Error accepting bid:', err);
             const errorMessage = err.response?.data?.error || 'Failed to accept bid';
@@ -802,7 +844,7 @@ const Marketplace = () => {
                                         </button>
                                         {bid.status === 'pending' && (
                                             <button
-                                                onClick={() => handleAcceptBid(project._id, bid._id, bid.bid_amount)}
+                                                onClick={() => handleAcceptBid(project._id, bid._id, bid.bid_amount, bid.freelancer_name, project)}
                                                 style={{
                                                     padding: '0.5rem 1rem',
                                                     background: '#10b981',
@@ -916,6 +958,57 @@ const Marketplace = () => {
                                         boxSizing: 'border-box'
                                     }}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => handleAnalyzeProposal(project._id, project.description)}
+                                    disabled={proposalAnalysisLoading[project._id]}
+                                    style={{
+                                        background: '#eff6ff',
+                                        color: '#2563eb',
+                                        border: '1px dashed #3b82f6',
+                                        padding: '0.45rem 0.85rem',
+                                        borderRadius: '6px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        marginTop: '0.5rem',
+                                        display: 'block',
+                                        width: 'fit-content'
+                                    }}
+                                >
+                                    {proposalAnalysisLoading[project._id] ? 'Analyzing Proposal...' : '🔍 Analyze pitch with AI'}
+                                </button>
+                                
+                                {proposalAnalysis[project._id] && (
+                                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '8px', marginTop: '0.5rem', fontSize: '0.8rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '0.5rem', textAlign: 'center' }}>
+                                            <div style={{ background: 'white', padding: '0.25rem', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                                                <div style={{ fontSize: '0.6rem', color: '#64748b' }}>Pitch</div>
+                                                <strong style={{ color: '#4f46e5' }}>{proposalAnalysis[project._id].professionalism}%</strong>
+                                            </div>
+                                            <div style={{ background: 'white', padding: '0.25rem', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                                                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Grammar</div>
+                                                <strong style={{ color: '#4f46e5' }}>{proposalAnalysis[project._id].grammar_completeness}%</strong>
+                                            </div>
+                                            <div style={{ background: 'white', padding: '0.25rem', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                                                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Relevance</div>
+                                                <strong style={{ color: '#4f46e5' }}>{proposalAnalysis[project._id].relevance}%</strong>
+                                            </div>
+                                            <div style={{ background: 'white', padding: '0.25rem', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                                                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>Hired %</div>
+                                                <strong style={{ color: '#10b981' }}>{proposalAnalysis[project._id].selection_probability}%</strong>
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                                            <strong>AI Recommendations:</strong>
+                                            <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1rem', color: '#64748b' }}>
+                                                {proposalAnalysis[project._id].suggestions?.slice(0, 2).map((s, idx) => (
+                                                    <li key={idx}>{s}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.5rem' }}>
                                 <button
@@ -1226,14 +1319,40 @@ const Marketplace = () => {
                             </select>
                         </div>
                         
-                        <textarea
-                            placeholder="Project Description"
-                            value={newProject.description}
-                            onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                            rows="4"
-                            required
-                            style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '1rem', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)', boxSizing: 'border-box' }}
-                        />
+                        <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                                <label style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Project Description</label>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (!newProject.title.trim()) { alert('Enter a project title first.'); return; }
+                                        setAiDescLoading(true);
+                                        try {
+                                            const token = localStorage.getItem('token');
+                                            const res = await axios.post(`${API_URL}/ai/projects/generate-description`, { title: newProject.title, keywords: newProject.skills_required }, { headers: { Authorization: `Bearer ${token}` } });
+                                            if (res.data?.success) {
+                                                const d = res.data.data;
+                                                const text = `${d.description}\n\nScope: ${d.scope_of_work?.join(', ')}\nDeliverables: ${d.deliverables?.join(', ')}\nRequired Skills: ${d.required_skills?.join(', ')}`;
+                                                setNewProject(prev => ({ ...prev, description: text, budget_min: prev.budget_min || Math.round((d.suggested_budget || 0) * 0.7), budget_max: prev.budget_max || d.suggested_budget || '' }));
+                                            }
+                                        } catch(e) { alert('AI generation failed.'); }
+                                        finally { setAiDescLoading(false); }
+                                    }}
+                                    disabled={aiDescLoading}
+                                    style={{ background: '#eff6ff', color: '#2563eb', border: '1px dashed #3b82f6', padding: '0.3rem 0.7rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                    <Sparkles size={12} />{aiDescLoading ? 'Writing...' : 'AI Auto-Write'}
+                                </button>
+                            </div>
+                            <textarea
+                                placeholder="Project Description"
+                                value={newProject.description}
+                                onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                                rows="4"
+                                required
+                                style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: 'clamp(0.75rem, 1.5vw, 1rem)', boxSizing: 'border-box' }}
+                            />
+                        </div>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
                             <input

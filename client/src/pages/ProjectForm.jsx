@@ -13,6 +13,41 @@ const ProjectForm = () => {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
+
+    const handleAIGenerate = async () => {
+        if (!formData.title.trim()) {
+            alert('Please enter a project title first.');
+            return;
+        }
+        setAiGenerating(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API_URL}/ai/projects/generate-description`, {
+                title: formData.title,
+                keywords: ''
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data?.success) {
+                const { description, scope_of_work, deliverables, required_skills, suggested_budget } = res.data.data;
+                
+                // Format details
+                const formattedDescription = `Project Description:\n${description}\n\nScope of Work:\n${scope_of_work?.map(s => `- ${s}`).join('\n')}\n\nDeliverables:\n${deliverables?.map(d => `- ${d}`).join('\n')}\n\nRequired Skills: ${required_skills?.join(', ')}`;
+                
+                setFormData(prev => ({
+                    ...prev,
+                    description: formattedDescription,
+                    budget: suggested_budget || prev.budget
+                }));
+            }
+        } catch (err) {
+            console.error('AI spec gen failed:', err);
+            alert('Could not generate spec details.');
+        } finally {
+            setAiGenerating(false);
+        }
+    };
     const [formData, setFormData] = useState({
         client_id: '',
         title: '',
@@ -304,9 +339,28 @@ const ProjectForm = () => {
 
                 {/* Description */}
                 <div style={{ marginBottom: '1rem' }}>
-                    <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.25rem' }}>
-                        Description
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                        <label style={{ fontWeight: '500', margin: 0 }}>
+                            Description
+                        </label>
+                        <button
+                            type="button"
+                            onClick={handleAIGenerate}
+                            disabled={aiGenerating}
+                            style={{
+                                background: '#eff6ff',
+                                color: '#2563eb',
+                                border: '1px dashed #3b82f6',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {aiGenerating ? 'AI Writing Spec...' : '✨ Auto-Write Description & Budget with AI'}
+                        </button>
+                    </div>
                     <textarea
                         name="description"
                         value={formData.description}

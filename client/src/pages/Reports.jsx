@@ -5,8 +5,13 @@ import {
   FileText, Calendar, PieChart, BarChart3, 
   ArrowUp, ArrowDown, Wallet, CreditCard
 } from 'lucide-react';
+import Invoices from './Invoices';
+import Expenses from './Expenses';
 
 const Reports = () => {
+  const [activeTab, setActiveTab] = useState('overview'); // overview, earnings, ledger
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [ledgerFilter, setLedgerFilter] = useState('all'); // all, income, expense
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState({
     totalRevenue: 0,
@@ -21,7 +26,12 @@ const Reports = () => {
     pendingInvoices: 0,
     overdueInvoices: 0,
     monthlyData: [],
-    recentActivity: []
+    recentActivity: [],
+    allTransactions: [],
+    invoiceEarnings: 0,
+    marketplaceEarnings: 0,
+    projectedEarnings: 0,
+    topMonth: 'N/A'
   });
   const [timeRange, setTimeRange] = useState('year');
 
@@ -49,15 +59,19 @@ const Reports = () => {
       const expenses = expensesRes.data.expenses || [];
       const mpProjects = mpProjectsRes.data.projects || [];
       
-      // Calculate revenue from paid invoices
+      // Calculate direct client invoice earnings
       const paidInvoices = invoices.filter(inv => inv.status === 'paid');
-      let totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
+      const invoiceEarnings = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
       
+      // Calculate marketplace contract earnings
+      let marketplaceEarnings = 0;
       if (mpProjects.length > 0) {
-        totalRevenue += mpProjects
+        marketplaceEarnings += mpProjects
           .filter(p => p.payment_status === 'paid' || p.status === 'completed')
           .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
       }
+      
+      const totalRevenue = invoiceEarnings + marketplaceEarnings;
       
       // Calculate expenses
       const totalExpenses = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
@@ -102,6 +116,58 @@ const Reports = () => {
       
       // Generate monthly data for chart
       const monthlyData = generateMonthlyData(invoices, expenses, mpProjects);
+
+      // Find top earning month
+      let topMonth = 'N/A';
+      let maxMonthEarnings = 0;
+      monthlyData.forEach(d => {
+        if (d.revenue > maxMonthEarnings) {
+          maxMonthEarnings = d.revenue;
+          topMonth = d.month;
+        }
+      });
+
+      // Calculate projected earnings from pending/unpaid invoices & in-progress marketplace projects
+      const pendingInvoiceSum = pendingInvoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0);
+      let pendingMpSum = 0;
+      if (mpProjects.length > 0) {
+        pendingMpSum += mpProjects
+          .filter(p => p.payment_status !== 'paid' && p.status === 'in_progress')
+          .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
+      }
+      const projectedEarnings = pendingInvoiceSum + pendingMpSum;
+
+      // Build unified transaction ledger
+      const allTransactions = [];
+      invoices.forEach(inv => {
+        const clientName = inv.client_id?.contact_name || inv.client_name || 'Direct Client';
+        allTransactions.push({
+          id: inv._id,
+          date: inv.created_at || inv.date || new Date(),
+          type: 'income',
+          category: 'Invoice Payment',
+          description: `Invoice #${inv.invoice_number || 'INV'} - ${inv.project_id?.title || 'Project Milestone Work'}`,
+          entity: clientName,
+          amount: parseFloat(inv.total_amount || 0),
+          status: inv.status
+        });
+      });
+
+      expenses.forEach(exp => {
+        allTransactions.push({
+          id: exp._id,
+          date: exp.expense_date || new Date(),
+          type: 'expense',
+          category: exp.category || 'Office Expense',
+          description: exp.description || 'Business Expense',
+          entity: exp.vendor || 'Vendor',
+          amount: parseFloat(exp.amount || 0),
+          status: 'paid'
+        });
+      });
+
+      // Sort combined ledger by date (newest first)
+      allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
       
       setReportData({
         totalRevenue,
@@ -116,7 +182,12 @@ const Reports = () => {
         pendingInvoices: pendingInvoices.length,
         overdueInvoices: overdueInvoices.length,
         monthlyData,
-        recentActivity: generateRecentActivity(invoices, projects, clients)
+        recentActivity: generateRecentActivity(invoices, projects, clients),
+        allTransactions,
+        invoiceEarnings,
+        marketplaceEarnings,
+        projectedEarnings,
+        topMonth
       });
       
     } catch (err) {
@@ -243,23 +314,40 @@ const Reports = () => {
     );
   }
 
+  // Filtered transactions for the ledger view
+  const filteredTransactions = reportData.allTransactions.filter(tx => {
+    const matchesSearch = tx.description.toLowerCase().includes(ledgerSearch.toLowerCase()) || 
+                          tx.entity.toLowerCase().includes(ledgerSearch.toLowerCase()) ||
+                          tx.category.toLowerCase().includes(ledgerSearch.toLowerCase());
+    
+    if (ledgerFilter === 'all') return matchesSearch;
+    if (ledgerFilter === 'income') return matchesSearch && tx.type === 'income';
+    if (ledgerFilter === 'expense') return matchesSearch && tx.type === 'expense';
+    return matchesSearch;
+  });
+
   return (
-    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Analytics & Reports</h1>
-          <p style={{ color: '#6b7280' }}>View detailed business insights and performance metrics</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.25rem', color: '#0f172a' }}>Analytics & Reports</h1>
+          <p style={{ color: '#64748b' }}>Detailed financial insights, earnings tracking, and transaction ledger</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
             style={{
-              padding: '0.5rem 1rem',
-              border: '1px solid #d1d5db',
+              padding: '0.6rem 1rem',
+              border: '1px solid #e2e8f0',
               borderRadius: '8px',
-              background: 'white'
+              background: 'white',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              color: '#334155',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
             }}
           >
             <option value="year">This Year</option>
@@ -272,322 +360,728 @@ const Reports = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              padding: '0.5rem 1rem',
+              padding: '0.6rem 1.2rem',
               background: '#10b981',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
-              cursor: 'pointer'
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+              transition: 'all 0.2s'
             }}
           >
-            <Download size={18} />
+            <Download size={16} />
             Export CSV
           </button>
         </div>
       </div>
 
-      {/* Key Metrics Cards */}
+      {/* Modern Tabs Navigation */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '2rem'
-      }}>
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ background: '#10b98120', padding: '0.5rem', borderRadius: '10px' }}>
-              <DollarSign size={24} color="#10b981" />
-            </div>
-            <span style={{ fontSize: '0.875rem', color: '#10b981', background: '#10b98110', padding: '0.25rem 0.5rem', borderRadius: '20px' }}>
-              Total Revenue
-            </span>
-          </div>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatCurrency(reportData.totalRevenue)}</p>
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>From {reportData.paidInvoices} paid invoices</p>
-        </div>
-
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ background: '#ef444420', padding: '0.5rem', borderRadius: '10px' }}>
-              <CreditCard size={24} color="#ef4444" />
-            </div>
-            <span style={{ fontSize: '0.875rem', color: '#ef4444', background: '#ef444410', padding: '0.25rem 0.5rem', borderRadius: '20px' }}>
-              Total Expenses
-            </span>
-          </div>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatCurrency(reportData.totalExpenses)}</p>
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>Business operations cost</p>
-        </div>
-
-        <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '12px', padding: '1.5rem', color: 'white' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '10px' }}>
-              <Wallet size={24} />
-            </div>
-            <span style={{ fontSize: '0.875rem', opacity: 0.9 }}>Net Profit</span>
-          </div>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatCurrency(reportData.netProfit)}</p>
-          <p style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.5rem' }}>
-            Margin: {reportData.totalRevenue > 0 ? ((reportData.netProfit / reportData.totalRevenue) * 100).toFixed(1) : 0}%
-          </p>
-        </div>
-
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ background: '#3b82f620', padding: '0.5rem', borderRadius: '10px' }}>
-              <Users size={24} color="#3b82f6" />
-            </div>
-            <span style={{ fontSize: '0.875rem', color: '#3b82f6', background: '#3b82f610', padding: '0.25rem 0.5rem', borderRadius: '20px' }}>
-              Active Clients
-            </span>
-          </div>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{reportData.totalClients}</p>
-          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>{reportData.activeProjects} active projects</p>
-        </div>
-      </div>
-
-      {/* Monthly Performance Chart */}
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '1.5rem',
+        display: 'flex',
+        borderBottom: '1px solid #e2e8f0',
         marginBottom: '2rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        gap: '1.5rem'
       }}>
-        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>Monthly Performance</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <div style={{ minWidth: '600px' }}>
-            {/* Chart Header */}
-            <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(12, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
-              <div></div>
-              {reportData.monthlyData.map(m => (
-                <div key={m.month} style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: '500' }}>{m.month}</div>
-              ))}
-            </div>
-            
-            {/* Revenue Bar */}
-            <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(12, 1fr)', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
-              <div style={{ fontSize: '0.75rem', color: '#10b981' }}>Revenue</div>
-              {reportData.monthlyData.map((m, idx) => {
-                const maxValue = Math.max(...reportData.monthlyData.map(d => d.revenue), 1000);
-                const height = (m.revenue / maxValue) * 100;
-                return (
-                  <div key={idx} style={{ textAlign: 'center' }}>
-                    <div style={{ 
-                      height: `${Math.max(height, 4)}px`, 
-                      background: '#10b981',
-                      borderRadius: '4px',
-                      width: '100%',
-                      minHeight: '4px'
-                    }} />
-                    <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', color: '#6b7280' }}>
-                      {m.revenue > 0 ? `$${(m.revenue / 1000).toFixed(0)}k` : '0'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* Expenses Bar */}
-            <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(12, 1fr)', gap: '0.5rem', alignItems: 'center' }}>
-              <div style={{ fontSize: '0.75rem', color: '#ef4444' }}>Expenses</div>
-              {reportData.monthlyData.map((m, idx) => {
-                const maxValue = Math.max(...reportData.monthlyData.map(d => d.expenses), 1000);
-                const height = (m.expenses / maxValue) * 100;
-                return (
-                  <div key={idx} style={{ textAlign: 'center' }}>
-                    <div style={{ 
-                      height: `${Math.max(height, 4)}px`, 
-                      background: '#ef4444',
-                      borderRadius: '4px',
-                      width: '100%',
-                      minHeight: '4px'
-                    }} />
-                    <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', color: '#6b7280' }}>
-                      {m.expenses > 0 ? `$${(m.expenses / 1000).toFixed(0)}k` : '0'}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <button
+          onClick={() => setActiveTab('overview')}
+          style={{
+            padding: '0.8rem 0.5rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'overview' ? '#4f46e5' : '#64748b',
+            borderBottom: activeTab === 'overview' ? '3px solid #4f46e5' : '3px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          📈 Financial Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('earnings')}
+          style={{
+            padding: '0.8rem 0.5rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'earnings' ? '#4f46e5' : '#64748b',
+            borderBottom: activeTab === 'earnings' ? '3px solid #4f46e5' : '3px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          💰 Earnings Analytics
+        </button>
+        <button
+          onClick={() => setActiveTab('invoices')}
+          style={{
+            padding: '0.8rem 0.5rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'invoices' ? '#4f46e5' : '#64748b',
+            borderBottom: activeTab === 'invoices' ? '3px solid #4f46e5' : '3px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          📄 Invoices Manager
+        </button>
+        <button
+          onClick={() => setActiveTab('expenses')}
+          style={{
+            padding: '0.8rem 0.5rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'expenses' ? '#4f46e5' : '#64748b',
+            borderBottom: activeTab === 'expenses' ? '3px solid #4f46e5' : '3px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          💳 Expenses Manager
+        </button>
+        <button
+          onClick={() => setActiveTab('ledger')}
+          style={{
+            padding: '0.8rem 0.5rem',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'ledger' ? '#4f46e5' : '#64748b',
+            borderBottom: activeTab === 'ledger' ? '3px solid #4f46e5' : '3px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+        >
+          📋 Transaction Ledger
+        </button>
       </div>
 
-      {/* Secondary Stats Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '1.5rem',
-        marginBottom: '2rem'
-      }}>
-        {/* Project Stats */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Briefcase size={18} /> Project Overview
-          </h3>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '0.875rem' }}>Active Projects</span>
-              <span style={{ fontWeight: '600' }}>{reportData.activeProjects}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '0.875rem' }}>Completed Projects</span>
-              <span style={{ fontWeight: '600' }}>{reportData.completedProjects}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.875rem' }}>Total Projects</span>
-              <span style={{ fontWeight: '600' }}>{reportData.totalProjects}</span>
-            </div>
-          </div>
-          <div style={{ background: '#f3f4f6', borderRadius: '8px', padding: '0.75rem', marginTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span>Completion Rate</span>
-              <span style={{ fontWeight: '600' }}>
-                {reportData.totalProjects > 0 ? ((reportData.completedProjects / reportData.totalProjects) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div style={{ background: '#e5e7eb', borderRadius: '10px', marginTop: '0.5rem', overflow: 'hidden' }}>
-              <div style={{
-                width: `${reportData.totalProjects > 0 ? (reportData.completedProjects / reportData.totalProjects) * 100 : 0}%`,
-                height: '6px',
-                background: '#10b981',
-                borderRadius: '10px'
-              }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Invoice Stats */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={18} /> Invoice Overview
-          </h3>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '0.875rem' }}>Paid Invoices</span>
-              <span style={{ fontWeight: '600', color: '#10b981' }}>{reportData.paidInvoices}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '0.875rem' }}>Pending Invoices</span>
-              <span style={{ fontWeight: '600', color: '#f59e0b' }}>{reportData.pendingInvoices}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '0.875rem' }}>Overdue Invoices</span>
-              <span style={{ fontWeight: '600', color: '#ef4444' }}>{reportData.overdueInvoices}</span>
-            </div>
-          </div>
-          <div style={{ background: '#f3f4f6', borderRadius: '8px', padding: '0.75rem', marginTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-              <span>Collection Rate</span>
-              <span style={{ fontWeight: '600' }}>
-                {reportData.totalInvoices > 0 ? ((reportData.paidInvoices / reportData.totalInvoices) * 100).toFixed(1) : 0}%
-              </span>
-            </div>
-            <div style={{ background: '#e5e7eb', borderRadius: '10px', marginTop: '0.5rem', overflow: 'hidden' }}>
-              <div style={{
-                width: `${reportData.totalInvoices > 0 ? (reportData.paidInvoices / reportData.totalInvoices) * 100 : 0}%`,
-                height: '6px',
-                background: '#10b981',
-                borderRadius: '10px'
-              }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Business Health */}
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <PieChart size={18} /> Business Health
-          </h3>
-          <div>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem' }}>Profit Margin</span>
-                <span style={{ fontWeight: '600', color: reportData.netProfit > 0 ? '#10b981' : '#ef4444' }}>
-                  {reportData.totalRevenue > 0 ? ((reportData.netProfit / reportData.totalRevenue) * 100).toFixed(1) : 0}%
+      {/* Tab 1: Financial Overview */}
+      {activeTab === 'overview' && (
+        <>
+          {/* Key Metrics Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#10b98120', padding: '0.5rem', borderRadius: '10px' }}>
+                  <DollarSign size={24} color="#10b981" />
+                </div>
+                <span style={{ fontSize: '0.875rem', color: '#10b981', background: '#10b98110', padding: '0.25rem 0.5rem', borderRadius: '20px', fontWeight: 600 }}>
+                  Total Revenue
                 </span>
               </div>
-              <div style={{ background: '#e5e7eb', borderRadius: '10px', overflow: 'hidden' }}>
-                <div style={{
-                  width: `${Math.min(100, Math.max(0, reportData.totalRevenue > 0 ? (reportData.netProfit / reportData.totalRevenue) * 100 : 0))}%`,
-                  height: '6px',
-                  background: reportData.netProfit > 0 ? '#10b981' : '#ef4444',
-                  borderRadius: '10px'
-                }} />
-              </div>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#0f172a' }}>{formatCurrency(reportData.totalRevenue)}</p>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.5rem' }}>From {reportData.paidInvoices} paid invoices & contracts</p>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
-              <div>
-                <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Revenue per Client</p>
-                <p style={{ fontWeight: '600' }}>
-                  {reportData.totalClients > 0 ? formatCurrency(reportData.totalRevenue / reportData.totalClients) : '$0'}
-                </p>
+
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#ef444420', padding: '0.5rem', borderRadius: '10px' }}>
+                  <CreditCard size={24} color="#ef4444" />
+                </div>
+                <span style={{ fontSize: '0.875rem', color: '#ef4444', background: '#ef444410', padding: '0.25rem 0.5rem', borderRadius: '20px', fontWeight: 600 }}>
+                  Total Expenses
+                </span>
               </div>
-              <div>
-                <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Avg. Invoice Value</p>
-                <p style={{ fontWeight: '600' }}>
-                  {reportData.paidInvoices > 0 ? formatCurrency(reportData.totalRevenue / reportData.paidInvoices) : '$0'}
-                </p>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#0f172a' }}>{formatCurrency(reportData.totalExpenses)}</p>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.5rem' }}>Business operations cost</p>
+            </div>
+
+            <div style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)', borderRadius: '12px', padding: '1.5rem', color: 'white', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: 'rgba(255,255,255,0.2)', padding: '0.5rem', borderRadius: '10px' }}>
+                  <Wallet size={24} />
+                </div>
+                <span style={{ fontSize: '0.875rem', opacity: 0.9, fontWeight: 600 }}>Net Profit</span>
+              </div>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>{formatCurrency(reportData.netProfit)}</p>
+              <p style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.5rem' }}>
+                Margin: {reportData.totalRevenue > 0 ? ((reportData.netProfit / reportData.totalRevenue) * 100).toFixed(1) : 0}%
+              </p>
+            </div>
+
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#3b82f620', padding: '0.5rem', borderRadius: '10px' }}>
+                  <Users size={24} color="#3b82f6" />
+                </div>
+                <span style={{ fontSize: '0.875rem', color: '#3b82f6', background: '#3b82f610', padding: '0.25rem 0.5rem', borderRadius: '20px', fontWeight: 600 }}>
+                  Active Clients
+                </span>
+              </div>
+              <p style={{ fontSize: '2rem', fontWeight: 'bold', color: '#0f172a' }}>{reportData.totalClients}</p>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.5rem' }}>{reportData.activeProjects} active projects</p>
+            </div>
+          </div>
+
+          {/* Monthly Performance Chart */}
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '1.5rem',
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            border: '1px solid #f1f5f9'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#0f172a' }}>Monthly Performance</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ minWidth: '600px' }}>
+                {/* Chart Header */}
+                <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(12, 1fr)', gap: '0.5rem', marginBottom: '1rem' }}>
+                  <div></div>
+                  {reportData.monthlyData.map(m => (
+                    <div key={m.month} style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: '600', color: '#64748b' }}>{m.month}</div>
+                  ))}
+                </div>
+                
+                {/* Revenue Bar */}
+                <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(12, 1fr)', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#10b981' }}>Revenue</div>
+                  {reportData.monthlyData.map((m, idx) => {
+                    const maxValue = Math.max(...reportData.monthlyData.map(d => d.revenue), 1000);
+                    const height = (m.revenue / maxValue) * 100;
+                    return (
+                      <div key={idx} style={{ textAlign: 'center' }}>
+                        <div style={{ 
+                          height: `${Math.max(height, 4)}px`, 
+                          background: '#10b981',
+                          borderRadius: '4px',
+                          width: '100%',
+                          minHeight: '4px'
+                        }} />
+                        <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', color: '#64748b' }}>
+                          {m.revenue > 0 ? `$${(m.revenue / 1000).toFixed(0)}k` : '0'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Expenses Bar */}
+                <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(12, 1fr)', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ef4444' }}>Expenses</div>
+                  {reportData.monthlyData.map((m, idx) => {
+                    const maxValue = Math.max(...reportData.monthlyData.map(d => d.expenses), 1000);
+                    const height = (m.expenses / maxValue) * 100;
+                    return (
+                      <div key={idx} style={{ textAlign: 'center' }}>
+                        <div style={{ 
+                          height: `${Math.max(height, 4)}px`, 
+                          background: '#ef4444',
+                          borderRadius: '4px',
+                          width: '100%',
+                          minHeight: '4px'
+                        }} />
+                        <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', color: '#64748b' }}>
+                          {m.expenses > 0 ? `$${(m.expenses / 1000).toFixed(0)}k` : '0'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Recent Activity Feed */}
-      {reportData.recentActivity.length > 0 && (
-        <div style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '1.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Recent Activity</h3>
-          <div style={{ spaceY: '0.5rem' }}>
-            {reportData.recentActivity.map((activity, idx) => (
-              <div key={idx} style={{
-                padding: '0.75rem',
-                borderBottom: idx !== reportData.recentActivity.length - 1 ? '1px solid #e5e7eb' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
-              }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: activity.type === 'invoice' ? '#d1fae5' : activity.type === 'project' ? '#dbeafe' : '#fef3c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  {activity.type === 'invoice' ? <FileText size={14} /> : activity.type === 'project' ? <Briefcase size={14} /> : <Users size={14} />}
+          {/* Secondary Stats Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '1.5rem',
+            marginBottom: '2rem'
+          }}>
+            {/* Project Stats */}
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
+                <Briefcase size={18} color="#4f46e5" /> Project Overview
+              </h3>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#475569' }}>Active Projects</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>{reportData.activeProjects}</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: '0.875rem' }}>{activity.message}</p>
-                  <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                    {new Date(activity.date).toLocaleDateString()}
-                    {activity.amount && ` • ${formatCurrency(activity.amount)}`}
-                  </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#475569' }}>Completed Projects</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>{reportData.completedProjects}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#475569' }}>Total Projects</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>{reportData.totalProjects}</span>
                 </div>
               </div>
-            ))}
+              <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '0.75rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ color: '#475569' }}>Completion Rate</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>
+                    {reportData.totalProjects > 0 ? ((reportData.completedProjects / reportData.totalProjects) * 100).toFixed(1) : 0}%
+                  </span>
+                </div>
+                <div style={{ background: '#e2e8f0', borderRadius: '10px', marginTop: '0.5rem', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${reportData.totalProjects > 0 ? (reportData.completedProjects / reportData.totalProjects) * 100 : 0}%`,
+                    height: '6px',
+                    background: '#10b981',
+                    borderRadius: '10px'
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Stats */}
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
+                <FileText size={18} color="#3b82f6" /> Invoice Overview
+              </h3>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#475569' }}>Paid Invoices</span>
+                  <span style={{ fontWeight: '600', color: '#10b981' }}>{reportData.paidInvoices}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#475569' }}>Pending Invoices</span>
+                  <span style={{ fontWeight: '600', color: '#f59e0b' }}>{reportData.pendingInvoices}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.875rem', color: '#475569' }}>Overdue Invoices</span>
+                  <span style={{ fontWeight: '600', color: '#ef4444' }}>{reportData.overdueInvoices}</span>
+                </div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '0.75rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                  <span style={{ color: '#475569' }}>Collection Rate</span>
+                  <span style={{ fontWeight: '600', color: '#0f172a' }}>
+                    {reportData.totalInvoices > 0 ? ((reportData.paidInvoices / reportData.totalInvoices) * 100).toFixed(1) : 0}%
+                  </span>
+                </div>
+                <div style={{ background: '#e2e8f0', borderRadius: '10px', marginTop: '0.5rem', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${reportData.totalInvoices > 0 ? (reportData.paidInvoices / reportData.totalInvoices) * 100 : 0}%`,
+                    height: '6px',
+                    background: '#10b981',
+                    borderRadius: '10px'
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Business Health */}
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0f172a' }}>
+                <PieChart size={18} color="#f59e0b" /> Business Health
+              </h3>
+              <div>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#475569' }}>Profit Margin</span>
+                    <span style={{ fontWeight: '600', color: reportData.netProfit > 0 ? '#10b981' : '#ef4444' }}>
+                      {reportData.totalRevenue > 0 ? ((reportData.netProfit / reportData.totalRevenue) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div style={{ background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.min(100, Math.max(0, reportData.totalRevenue > 0 ? (reportData.netProfit / reportData.totalRevenue) * 100 : 0))}%`,
+                      height: '6px',
+                      background: reportData.netProfit > 0 ? '#10b981' : '#ef4444',
+                      borderRadius: '10px'
+                    }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid #f1f5f9' }}>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Revenue per Client</p>
+                    <p style={{ fontWeight: '600', color: '#0f172a' }}>
+                      {reportData.totalClients > 0 ? formatCurrency(reportData.totalRevenue / reportData.totalClients) : '$0'}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>Avg. Invoice Value</p>
+                    <p style={{ fontWeight: '600', color: '#0f172a' }}>
+                      {reportData.paidInvoices > 0 ? formatCurrency(reportData.totalRevenue / reportData.paidInvoices) : '$0'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Activity Feed */}
+          {reportData.recentActivity.length > 0 && (
+            <div style={{
+              background: 'white',
+              borderRadius: '12px',
+              padding: '1.5rem',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              border: '1px solid #f1f5f9'
+            }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem', color: '#0f172a' }}>Recent Activity</h3>
+              <div>
+                {reportData.recentActivity.map((activity, idx) => (
+                  <div key={idx} style={{
+                    padding: '0.75rem 0',
+                    borderBottom: idx !== reportData.recentActivity.length - 1 ? '1px solid #f1f5f9' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      background: activity.type === 'invoice' ? '#d1fae5' : activity.type === 'project' ? '#dbeafe' : '#fef3c7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {activity.type === 'invoice' ? <FileText size={14} color="#10b981" /> : activity.type === 'project' ? <Briefcase size={14} color="#3b82f6" /> : <Users size={14} color="#f59e0b" />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '0.875rem', margin: 0, fontWeight: 500, color: '#1e293b' }}>{activity.message}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0 }}>
+                        {new Date(activity.date).toLocaleDateString()}
+                        {activity.amount && ` • ${formatCurrency(activity.amount)}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Tab 2: Freelancer Earnings Analytics */}
+      {activeTab === 'earnings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Earnings Analytics Overview cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1.5rem'
+          }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ background: '#4f46e515', padding: '0.4rem', borderRadius: '8px' }}>
+                  <TrendingUp size={20} color="#4f46e5" />
+                </div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Gross Earnings</span>
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0.25rem 0', color: '#0f172a' }}>{formatCurrency(reportData.totalRevenue)}</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Total invoiced + marketplace contract pay</p>
+            </div>
+
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ background: '#10b98115', padding: '0.4rem', borderRadius: '8px' }}>
+                  <Calendar size={20} color="#10b981" />
+                </div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Top Earning Month</span>
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0.25rem 0', color: '#0f172a' }}>{reportData.topMonth}</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Month with peak financial returns</p>
+            </div>
+
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ background: '#3b82f615', padding: '0.4rem', borderRadius: '8px' }}>
+                  <FileText size={20} color="#3b82f6" />
+                </div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Projected / In-Flight</span>
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0.25rem 0', color: '#0f172a' }}>{formatCurrency(reportData.projectedEarnings)}</p>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>From pending invoices & active bids</p>
+            </div>
+
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div style={{ background: '#f59e0b15', padding: '0.4rem', borderRadius: '8px' }}>
+                  <DollarSign size={20} color="#f59e0b" />
+                </div>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>Average per Month</span>
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, margin: '0.25rem 0', color: '#0f172a' }}>
+                {formatCurrency(reportData.totalRevenue / 12)}
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>Calculated monthly rate this year</p>
+            </div>
+          </div>
+
+          {/* Earnings Breakdown */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1.25rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                ⚙️ Earnings Channel Breakdown
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 500, color: '#475569' }}>Direct Client Invoices</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      {formatCurrency(reportData.invoiceEarnings)} ({reportData.totalRevenue > 0 ? ((reportData.invoiceEarnings / reportData.totalRevenue) * 100).toFixed(0) : 0}%)
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${reportData.totalRevenue > 0 ? (reportData.invoiceEarnings / reportData.totalRevenue) * 100 : 0}%`,
+                      height: '100%',
+                      background: '#4f46e5'
+                    }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.4rem' }}>
+                    <span style={{ fontWeight: 500, color: '#475569' }}>Marketplace Contract Wins</span>
+                    <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                      {formatCurrency(reportData.marketplaceEarnings)} ({reportData.totalRevenue > 0 ? ((reportData.marketplaceEarnings / reportData.totalRevenue) * 100).toFixed(0) : 0}%)
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${reportData.totalRevenue > 0 ? (reportData.marketplaceEarnings / reportData.totalRevenue) * 100 : 0}%`,
+                      height: '100%',
+                      background: '#10b981'
+                    }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+              <h4 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1.25rem', color: '#0f172a' }}>🚀 Earnings Projection Summary</h4>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', lineHeight: 1.6 }}>
+                Based on your current platform activity, you have **{formatCurrency(reportData.projectedEarnings)}** in potential upcoming cashflow.
+              </p>
+              <ul style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#475569', lineHeight: 1.8 }}>
+                <li>Direct unpaid / pending invoices: **{formatCurrency(reportData.pendingInvoices * (reportData.totalRevenue / Math.max(1, reportData.paidInvoices)))}**</li>
+                <li>In-flight marketplace contract bids: **{formatCurrency(reportData.projectedEarnings - (reportData.pendingInvoices * (reportData.totalRevenue / Math.max(1, reportData.paidInvoices))))}**</li>
+              </ul>
+              <div style={{
+                background: '#eff6ff',
+                color: '#1e40af',
+                fontSize: '0.8rem',
+                padding: '0.6rem 0.8rem',
+                borderRadius: '6px',
+                marginTop: '1rem',
+                fontWeight: 500
+              }}>
+                💡 Tip: Follow up with clients on overdue invoices to speed up payment collections!
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Earnings Table */}
+          <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+            <h4 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', color: '#0f172a' }}>Earning Performance History</h4>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                  <th style={{ padding: '0.75rem 0.5rem', color: '#64748b' }}>Month</th>
+                  <th style={{ padding: '0.75rem 0.5rem', color: '#64748b', textAlign: 'right' }}>Revenue</th>
+                  <th style={{ padding: '0.75rem 0.5rem', color: '#64748b', textAlign: 'right' }}>Operating Expenses</th>
+                  <th style={{ padding: '0.75rem 0.5rem', color: '#64748b', textAlign: 'right' }}>Net Profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportData.monthlyData.map((d, index) => (
+                  <tr key={index} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '0.75rem 0.5rem', fontWeight: 500, color: '#334155' }}>{d.month}</td>
+                    <td style={{ padding: '0.75rem 0.5rem', color: '#10b981', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(d.revenue)}</td>
+                    <td style={{ padding: '0.75rem 0.5rem', color: '#ef4444', textAlign: 'right' }}>-{formatCurrency(d.expenses)}</td>
+                    <td style={{ padding: '0.75rem 0.5rem', color: d.profit >= 0 ? '#4f46e5' : '#ef4444', textAlign: 'right', fontWeight: 700 }}>
+                      {formatCurrency(d.profit)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* If no data */}
-      {reportData.totalRevenue === 0 && reportData.totalClients === 0 && (
-        <div style={{
-          background: '#fef3c7',
-          borderRadius: '12px',
-          padding: '2rem',
-          textAlign: 'center'
-        }}>
-          <p style={{ color: '#92400e' }}>
-            No data available yet. Start by adding clients, creating projects, and generating invoices to see your business analytics.
-          </p>
+      {/* Tab 3: Unified Transaction Ledger */}
+      {activeTab === 'ledger' && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+          {/* Filters Row */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1.5rem',
+            gap: '1rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ position: 'relative', flex: '1 1 300px' }}>
+              <input
+                type="text"
+                placeholder="Search ledger by description, category, client, vendor..."
+                value={ledgerSearch}
+                onChange={e => setLedgerSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.6rem 1rem',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '0.875rem',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => setLedgerFilter('all')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: ledgerFilter === 'all' ? '#4f46e5' : 'white',
+                  color: ledgerFilter === 'all' ? 'white' : '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setLedgerFilter('income')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: ledgerFilter === 'income' ? '#10b981' : 'white',
+                  color: ledgerFilter === 'income' ? 'white' : '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Income / Invoices
+              </button>
+              <button
+                onClick={() => setLedgerFilter('expense')}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  background: ledgerFilter === 'expense' ? '#ef4444' : 'white',
+                  color: ledgerFilter === 'expense' ? 'white' : '#475569',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Expenses
+              </button>
+            </div>
+          </div>
+
+          {/* Transactions Table Ledger */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e2e8f0', textAlign: 'left', background: '#f8fafc' }}>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Date</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Type</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Category</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Description</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b' }}>Client / Vendor</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b', textAlign: 'right' }}>Amount</th>
+                  <th style={{ padding: '0.75rem 1rem', color: '#64748b', textAlign: 'center' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+                      No matching transaction entries found in the ledger.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTransactions.map((tx, idx) => (
+                    <tr key={idx} style={{ 
+                      borderBottom: '1px solid #f1f5f9',
+                      background: tx.type === 'income' ? 'rgba(16, 185, 129, 0.02)' : 'rgba(239, 68, 68, 0.02)'
+                    }}>
+                      <td style={{ padding: '1rem', whiteSpace: 'nowrap', color: '#475569' }}>
+                        {new Date(tx.date).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
+                        <span style={{
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          background: tx.type === 'income' ? '#d1fae5' : '#fee2e2',
+                          color: tx.type === 'income' ? '#065f46' : '#991b1b'
+                        }}>
+                          {tx.type === 'income' ? 'INCOMING' : 'OUTGOING'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', color: '#334155', fontWeight: 500 }}>
+                        {tx.category}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#1e293b' }}>
+                        {tx.description}
+                      </td>
+                      <td style={{ padding: '1rem', color: '#475569' }}>
+                        {tx.entity}
+                      </td>
+                      <td style={{ 
+                        padding: '1rem', 
+                        textAlign: 'right', 
+                        fontWeight: 700,
+                        color: tx.type === 'income' ? '#10b981' : '#ef4444' 
+                      }}>
+                        {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                      </td>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '0.2rem 0.4rem',
+                          borderRadius: '4px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          background: tx.status === 'paid' ? '#d1fae5' : tx.status === 'pending' ? '#fef3c7' : '#fee2e2',
+                          color: tx.status === 'paid' ? '#065f46' : tx.status === 'pending' ? '#92400e' : '#991b1b'
+                        }}>
+                          {tx.status?.toUpperCase() || 'PAID'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Invoices Manager */}
+      {activeTab === 'invoices' && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+          <Invoices />
+        </div>
+      )}
+
+      {/* Tab: Expenses Manager */}
+      {activeTab === 'expenses' && (
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+          <Expenses />
         </div>
       )}
     </div>

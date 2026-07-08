@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, Users, FolderKanban, FileText, 
+import {
+  LayoutDashboard, Users, FolderKanban, FileText,
   Kanban, CreditCard, BarChart3, Settings, LogOut,
   Crown, Shield, Zap, Briefcase, Menu, X,
-  User, ChevronDown, DollarSign
+  User, ChevronDown, DollarSign, Sparkles, TrendingUp
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -37,12 +37,12 @@ const Navbar = () => {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Clients', path: '/clients', icon: Users },
     { name: 'Projects', path: '/projects', icon: FolderKanban },
-    { name: 'Invoices', path: '/invoices', icon: FileText },
     { name: 'Task Board', path: '/kanban', icon: Kanban },
-    { name: 'Expenses', path: '/expenses', icon: CreditCard },
+    { name: 'Reports', path: '/reports', icon: BarChart3 },
     { name: 'Marketplace', path: '/marketplace', icon: Briefcase },
     { name: 'Connects', path: '/connects', icon: Zap },
-    { name: 'Reports', path: '/reports', icon: BarChart3 },
+    { name: 'AI Toolkit', path: '/ai-toolkit', icon: Sparkles },
+    { name: 'AI Insights', path: '/ai-analytics', icon: TrendingUp },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
@@ -218,7 +218,7 @@ const Navbar = () => {
               }}>
                 {getInitials()}
               </div>
-              
+
               <div style={{ textAlign: 'left' }}>
                 <div style={{
                   fontSize: '0.8rem',
@@ -248,7 +248,7 @@ const Navbar = () => {
                   </span>
                 </div>
               </div>
-              
+
               <ChevronDown size={16} style={{
                 color: '#6b7280',
                 transition: 'transform 0.2s',
@@ -333,7 +333,7 @@ const Navbar = () => {
                     <User size={16} />
                     Profile Settings
                   </Link>
-                  
+
                   <Link
                     to="/subscription"
                     onClick={() => setIsDropdownOpen(false)}
@@ -439,7 +439,7 @@ const Navbar = () => {
               <span>{item.name}</span>
             </Link>
           ))}
-          
+
           {/* Mobile Logout */}
           <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '0.5rem', paddingTop: '0.5rem' }}>
             <button
