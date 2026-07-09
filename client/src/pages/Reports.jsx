@@ -67,7 +67,7 @@ const Reports = () => {
       let marketplaceEarnings = 0;
       if (mpProjects.length > 0) {
         marketplaceEarnings += mpProjects
-          .filter(p => p.payment_status === 'paid' || p.status === 'completed')
+          .filter(p => p.payment_status === 'paid' && p.status === 'completed')
           .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
       }
       
@@ -221,7 +221,7 @@ const Reports = () => {
       if (mpProjects && mpProjects.length > 0) {
         mpRevenue = mpProjects
           .filter(p => {
-            if (p.payment_status !== 'paid' && p.status !== 'completed') return false;
+            if (p.payment_status !== 'paid' || p.status !== 'completed') return false;
             const pDate = new Date(p.payment_date || p.completed_at || p.updated_at);
             return pDate.getFullYear() === currentYear && pDate.getMonth() + 1 === monthNum;
           })
