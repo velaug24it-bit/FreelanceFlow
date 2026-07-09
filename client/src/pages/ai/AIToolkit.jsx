@@ -88,10 +88,40 @@ const AIToolkit = () => {
   const [conSaved,       setConSaved]       = useState(false);
   const [conSaving,      setConSaving]      = useState(false);
 
-  // Clean up URL params without triggering a reload
+  // Clean up URL params and automatically generate contract if redirected from Marketplace
   useEffect(() => {
     if (_fromMarketplace) {
       window.history.replaceState({}, '', '/ai-toolkit');
+
+      const clientName = _urlParams.get('clientName');
+      const freelancerName = _urlParams.get('freelancerName');
+      const amount = _urlParams.get('amount');
+      const startDate = _urlParams.get('startDate');
+      const endDate = _urlParams.get('endDate');
+
+      if (clientName && freelancerName && amount) {
+        const triggerAutoGenerate = async () => {
+          setConLoading(true);
+          try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API_URL}/ai/documents/generate-contract`, {
+              client_name: clientName,
+              freelancer_name: freelancerName,
+              amount: parseFloat(amount),
+              start_date: startDate || new Date().toISOString().split('T')[0],
+              end_date: endDate || new Date().toISOString().split('T')[0],
+              milestones: [{ title: 'Final Phase Delivery', amount: parseFloat(amount) }]
+            }, { headers: { Authorization: `Bearer ${token}` } });
+            if (res.data?.success) setConOutput(res.data.contract);
+          } catch (err) {
+            console.error(err);
+            alert('Contract creation failed.');
+          } finally {
+            setConLoading(false);
+          }
+        };
+        triggerAutoGenerate();
+      }
     }
   }, []);
 

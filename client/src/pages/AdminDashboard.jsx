@@ -67,6 +67,27 @@ const AdminDashboard = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Auto-refresh dashboard data every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAdminData();
+    }, 30000); // Refresh every 30 seconds
+
+    // Also refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchAdminData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const fetchAdminData = async () => {
     try {
       setLoading(true);

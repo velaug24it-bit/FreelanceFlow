@@ -21,8 +21,8 @@ async function createAdmin() {
         
         const User = mongoose.model('User', userSchema);
         
-        // Create admin user with password 'velraj2006'
-        const passwordHash = await bcrypt.hash('velraj2006', 10);
+        // Create admin user with password 'vel2006raj'
+        const passwordHash = await bcrypt.hash('vel2006raj', 10);
         
         // Check if admin exists
         const existingAdmin = await User.findOne({ email: 'velr012006@gmail.com' });

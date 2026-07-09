@@ -16,10 +16,12 @@ const { generatePlatformAnalytics } = require('../services/ai/analytics');
 const { generateContractDocument, generateInvoiceDetails } = require('../services/ai/documentGen');
 const { predictProjectRisk } = require('../services/ai/riskPredictor');
 const { analyzePortfolio } = require('../services/ai/portfolioAnalyzer');
+const { generateDealCopilotPlan } = require('../services/ai/copilot');
 const Project = require('../models/Project');
 const User = require('../models/User');
 const Client = require('../models/Client');
 const Invoice = require('../models/Invoice');
+const ProjectPost = require('../models/ProjectPost');
 
 // Local JWT Authentication Verification middleware
 const verifyToken = (req, res, next) => {
@@ -140,7 +142,7 @@ router.post('/chatbot', verifyToken, async (req, res) => {
       .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
       
     // Include completed marketplace projects in revenue
-    const mpProjects = projects.filter(p => p.selected_freelancer_id && p.selected_freelancer_id.toString() === req.userId.toString() && p.payment_status === 'paid' && p.status === 'completed');
+    const mpProjects = projects.filter(p => p.selected_freelancer_id && p.selected_freelancer_id.toString() === req.userId.toString() && (p.payment_status === 'paid' || p.status === 'completed'));
     totalRevenue += mpProjects.reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
 
     const pendingInvoices = myInvoices.filter(inv => inv.status === 'pending');
@@ -296,6 +298,34 @@ router.post('/freelancers/analyze-portfolio', verifyToken, async (req, res) => {
     res.json({ success: true, analysis });
   } catch (err) {
     res.status(500).json({ error: 'Portfolio analysis failed', message: err.message });
+  }
+});
+
+// 16. AI Deal Copilot & Scope Negotiator
+router.get('/deal-copilot/active-projects', verifyToken, async (req, res) => {
+  try {
+    const projects = await ProjectPost.find({
+      $or: [
+        { client_id: req.userId, selected_freelancer_id: { $exists: true, $ne: null } },
+        { selected_freelancer_id: req.userId }
+      ]
+    }).select('title client_name selected_freelancer_name bid_amount status');
+    res.json({ success: true, projects });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch active projects', message: err.message });
+  }
+});
+
+router.post('/deal-copilot', verifyToken, async (req, res) => {
+  try {
+    const { projectId } = req.body;
+    if (!projectId) {
+      return res.status(400).json({ error: 'Project ID is required' });
+    }
+    const copilotPlan = await generateDealCopilotPlan(projectId);
+    res.json({ success: true, copilotPlan });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate Deal Copilot plan', message: err.message });
   }
 });
 

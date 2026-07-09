@@ -122,7 +122,8 @@ router.post('/register', async (req, res) => {
                 company_name: user.company_name,
                 subscription_tier: user.subscription_tier,
                 role: user.role,
-                is_email_verified: user.is_email_verified
+                is_email_verified: user.is_email_verified,
+                phone: user.phone || ''
             }
         });
     } catch (err) {
@@ -186,7 +187,8 @@ router.post('/login', async (req, res) => {
                 hourly_rate: user.hourly_rate,
                 availability_status: user.availability_status,
                 response_time_hours: user.response_time_hours,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                phone: user.phone || ''
             }
         });
     } catch (err) {
@@ -228,7 +230,8 @@ router.get('/verify', async (req, res) => {
                 response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url,
                 is_2fa_enabled: user.is_2fa_enabled,
-                payment_info: user.payment_info
+                payment_info: user.payment_info,
+                phone: user.phone || ''
             }
         });
     } catch (err) {
@@ -697,7 +700,7 @@ router.post('/reset-password/:token', async (req, res) => {
 // ============================================
 router.put('/profile', authenticateToken, async (req, res) => {
     try {
-        const { full_name, bio, skills, portfolio_links, hourly_rate, availability_status, response_time_hours, company_name, avatar_url, payment_info } = req.body;
+        const { full_name, bio, skills, portfolio_links, hourly_rate, availability_status, response_time_hours, company_name, avatar_url, payment_info, phone } = req.body;
         const user = req.user;
 
         if (full_name) user.full_name = full_name;
@@ -709,6 +712,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
         if (response_time_hours !== undefined) user.response_time_hours = response_time_hours;
         if (company_name) user.company_name = company_name;
         if (avatar_url) user.avatar_url = avatar_url;
+        if (phone !== undefined) user.phone = phone;
         if (payment_info) {
             user.payment_info = {
                 ...user.payment_info,
@@ -735,7 +739,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
                 availability_status: user.availability_status,
                 response_time_hours: user.response_time_hours,
                 avatar_url: user.avatar_url,
-                payment_info: user.payment_info
+                payment_info: user.payment_info,
+                phone: user.phone || ''
             }
         });
     } catch (err) {

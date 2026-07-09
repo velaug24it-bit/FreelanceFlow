@@ -64,6 +64,7 @@ const Settings = () => {
   const [hourlyRate, setHourlyRate] = useState(0);
   const [availabilityStatus, setAvailabilityStatus] = useState('available');
   const [responseTimeHours, setResponseTimeHours] = useState(24);
+  const [phone, setPhone] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
@@ -99,6 +100,7 @@ const Settings = () => {
       setHourlyRate(user.hourly_rate || 0);
       setAvailabilityStatus(user.availability_status || 'available');
       setResponseTimeHours(user.response_time_hours || 24);
+      setPhone(user.phone || '');
       setIs2FAEnabled(user.is_2fa_enabled || false);
       
       if (user.payment_info) {
@@ -142,6 +144,7 @@ const Settings = () => {
       availability_status: availabilityStatus,
       response_time_hours: Number(responseTimeHours) || 24,
       hourly_rate: Number(hourlyRate),
+      phone,
       payment_info: {
         upi_id: upiId,
         payment_app: paymentApp,
@@ -396,6 +399,16 @@ const Settings = () => {
                   />
                 </div>
                 <div className="form-group">
+                  <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Phone Number</label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. +1 555-0199"
+                    style={{ padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', width: '100%', fontSize: '0.95rem' }}
+                  />
+                </div>
+                <div className="form-group">
                   <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Skills (comma separated)</label>
                   <input
                     type="text"
@@ -515,6 +528,10 @@ const Settings = () => {
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Email</label>
                 <p className="settings-email" style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b', wordBreak: 'break-all' }}>{user?.email || 'Not set'}</p>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Phone Number</label>
+                <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user?.phone || 'Not set'}</p>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Company</label>

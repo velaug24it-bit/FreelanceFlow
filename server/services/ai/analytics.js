@@ -80,19 +80,21 @@ async function generatePlatformAnalytics() {
     `;
 
     const prompt = `
-      You are a Senior Business Intelligence Analyst.
+      You are an AI Business Advisor for a Freelance Marketplace.
       Analyze these platform operational metrics:
       ${analyticsContext}
 
-      Generate 3 highly strategic business insights and growth actions for the platform administrator.
+      Generate 3 highly useful market insights that directly help the Freelancers and Clients using this platform. 
+      For example, advise freelancers on earning potential, pricing, or demand trends, and advise clients on hiring strategies, budgets, or market activity based on these stats.
+      Make the insights sound like actionable advice for the platform's users (not administrators).
       Return a JSON object with this exact structure:
       {
         "forecasted_revenue_next_month": number,
         "growth_rate": number,
         "insights": [
-          "Actionable Insight 1 (mentioning revenue or categories)",
-          "Actionable Insight 2 (mentioning user growth or project completion)",
-          "Actionable Insight 3 (marketing or optimization recommendation)"
+          "Market Insight 1 (e.g., advice for freelancers on maximizing revenue or demand)",
+          "Market Insight 2 (e.g., advice for clients on project completion trends or hiring)",
+          "Market Insight 3 (e.g., general platform momentum and what it means for users)"
         ]
       }
     `;
@@ -106,9 +108,9 @@ async function generatePlatformAnalytics() {
       totalProjects,
       totalUsers,
       insights: result?.insights || [
-        "Revenue is showing standard cyclical patterns. Focus on boosting high-value technical projects.",
-        "User acquisition remains steady. Target freelancer engagement in high-demand technical categories.",
-        "Increase milestone checkout reminders to reduce pending invoice release times."
+        "Platform revenue is growing steadily. Freelancers should consider increasing their rates for high-demand skills to match the rising market value.",
+        "With consistent user growth, clients have access to a larger talent pool. Now is a great time to post complex projects and attract top-tier freelancers.",
+        "The project completion rate indicates strong reliability. Freelancers who consistently deliver on time are positioned to capture the forecasted revenue growth."
       ],
       forecastedRevenue: result?.forecasted_revenue_next_month || forecastedRev,
       growthRate: result?.growth_rate || avgGrowthRate

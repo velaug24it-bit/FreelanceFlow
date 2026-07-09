@@ -192,7 +192,38 @@ app.use((err, req, res, next) => {
 
 // ============ START SERVER ============
 const PORT = process.env.PORT || 5000;
+const { exec } = require('child_process');
+const mongoose = require('mongoose');
+
 initializeSocket(server);
+
+// Self-healing port EADDRINUSE handler
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.warn(`⚠️ Port ${PORT} is busy. Clearing it...`);
+        
+        // Command to kill whatever is using the port
+        const cmd = process.platform === 'win32'
+            ? `powershell -Command "Get-NetTCPConnection -LocalPort ${PORT} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }"`
+            : `fuser -k ${PORT}/tcp || kill -9 $(lsof -t -i:${PORT})`;
+            
+        exec(cmd, (execErr) => {
+            if (execErr) {
+                console.error(`❌ Failed to automatically clear port ${PORT}:`, execErr.message);
+                process.exit(1);
+            } else {
+                console.log(`✅ Cleared port ${PORT}. Retrying boot in 1.5s...`);
+                setTimeout(() => {
+                    server.listen(PORT, () => {
+                        console.log(`🚀 Server running on port ${PORT} (after port recovery)`);
+                    });
+                }, 1500);
+            }
+        });
+    } else {
+        console.error('❌ Server error:', err);
+    }
+});
 
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
@@ -200,3 +231,27 @@ server.listen(PORT, () => {
     console.log(`🏠 Root: http://localhost:${PORT}/`);
     console.log(`✅ CORS enabled for: ${allowedOrigins.join(', ')}`);
 });
+
+// Graceful shutdown handlers
+const gracefulShutdown = (signal) => {
+    console.log(`📡 Received signal ${signal}. Starting graceful shutdown...`);
+    server.close(() => {
+        console.log('🛑 HTTP server closed.');
+        mongoose.connection.close(false, () => {
+            console.log('🗄️ MongoDB connection closed.');
+            process.exit(0);
+        });
+    });
+};
+
+process.once('SIGUSR2', () => {
+    console.log('🔄 Nodemon restart. Cleaning up connections...');
+    server.close(() => {
+        mongoose.connection.close(false, () => {
+            process.exit(0);
+        });
+    });
+});
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

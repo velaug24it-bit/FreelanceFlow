@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
     role: { type: String, enum: ['user', 'admin', 'freelancer'], default: 'user' },
     subscription_tier: { type: String, enum: ['free', 'pro', 'business'], default: 'free' },
     subscription_status: { type: String, default: 'active' },
+    phone: { type: String, default: '' },
     
     // ========== CONNECTS SYSTEM ==========
     connects_balance: { type: Number, default: 20 },

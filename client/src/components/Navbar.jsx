@@ -42,7 +42,7 @@ const Navbar = () => {
     { name: 'Marketplace', path: '/marketplace', icon: Briefcase },
     { name: 'Connects', path: '/connects', icon: Zap },
     { name: 'AI Toolkit', path: '/ai-toolkit', icon: Sparkles },
-    { name: 'AI Insights', path: '/ai-analytics', icon: TrendingUp },
+    { name: 'AI Deal Copilot', path: '/ai-analytics', icon: TrendingUp },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
