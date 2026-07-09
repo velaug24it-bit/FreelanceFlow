@@ -397,7 +397,7 @@ const NotificationBell = () => {
 
             {/* Dropdown Panel */}
             {isOpen && (
-                <div style={{
+                <div className="notification-dropdown" style={{
                     position: 'absolute',
                     top: 'calc(100% + 8px)',
                     right: '0',
@@ -962,6 +962,21 @@ const NotificationBell = () => {
                 }
                 @keyframes spin {
                     to { transform: rotate(360deg); }
+                }
+                @media (max-width: 600px) {
+                    .notification-dropdown {
+                        position: fixed !important;
+                        top: 0 !important;
+                        bottom: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        margin: auto !important;
+                        width: 90vw !important;
+                        max-width: 400px !important;
+                        height: fit-content !important;
+                        max-height: 80vh !important;
+                        z-index: 10000 !important;
+                    }
                 }
             `}</style>
         </div>

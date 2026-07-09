@@ -69,7 +69,7 @@ const AIBusinessAssistant = () => {
   ];
 
   return (
-    <div style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="ai-assistant-container" style={{ position: 'fixed', bottom: '2rem', right: '2rem', zIndex: 9999, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Floating Action Button */}
       {!isOpen && (
         <button
@@ -105,6 +105,7 @@ const AIBusinessAssistant = () => {
       {/* Expanded Chat Box */}
       {isOpen && (
         <div
+          className="ai-assistant-chat"
           style={{
             width: '380px',
             height: '520px',
@@ -314,6 +315,24 @@ const AIBusinessAssistant = () => {
         @keyframes bounce {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-4px); }
+        }
+        @media (max-width: 600px) {
+          .ai-assistant-container {
+            bottom: 1rem !important;
+            right: 1rem !important;
+          }
+          .ai-assistant-chat {
+            position: fixed !important;
+            top: 0 !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            margin: auto !important;
+            width: 90vw !important;
+            height: 80vh !important;
+            max-height: 600px !important;
+            z-index: 10000;
+          }
         }
       `}</style>
     </div>
