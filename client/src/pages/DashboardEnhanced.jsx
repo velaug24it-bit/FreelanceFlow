@@ -83,6 +83,7 @@ const DashboardEnhanced = () => {
     previous_clients: 0,
     clients_trend: 0,
     active_projects: 0,
+    active_mp_projects: 0,
     previous_projects: 0,
     projects_trend: 0,
     pending_invoices_amount: 0,
@@ -158,6 +159,7 @@ const DashboardEnhanced = () => {
         previous_clients: Math.max(0, clients.length - 5),
         clients_trend: clientsTrend,
         active_projects: projects.filter(p => p.status !== 'completed').length,
+        active_mp_projects: mpProjects.filter(p => p.status !== 'completed').length,
         previous_projects: Math.max(0, projects.filter(p => p.status !== 'completed').length - 2),
         projects_trend: projectsTrend,
         pending_invoices_amount: pendingAmount,
@@ -280,8 +282,8 @@ const DashboardEnhanced = () => {
       trendValue: `${stats.clients_trend > 0 ? '+' : ''}${stats.clients_trend} from last month`
     },
     {
-      title: 'Active Projects',
-      value: stats.active_projects,
+      title: 'Active Projects (Pers. | Mkt.)',
+      value: `${stats.active_projects} | ${stats.active_mp_projects}`,
       icon: Briefcase,
       color: 'bg-purple-500',
       trend: renderTrend(stats.projects_trend, false),

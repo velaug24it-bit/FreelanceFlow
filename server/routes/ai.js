@@ -16,6 +16,10 @@ const { generatePlatformAnalytics } = require('../services/ai/analytics');
 const { generateContractDocument, generateInvoiceDetails } = require('../services/ai/documentGen');
 const { predictProjectRisk } = require('../services/ai/riskPredictor');
 const { analyzePortfolio } = require('../services/ai/portfolioAnalyzer');
+const Project = require('../models/Project');
+const User = require('../models/User');
+const Client = require('../models/Client');
+const Invoice = require('../models/Invoice');
 
 // Local JWT Authentication Verification middleware
 const verifyToken = (req, res, next) => {
@@ -107,6 +111,62 @@ router.post('/chatbot', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    // Fetch user context
+    const user = await User.findById(req.userId);
+    const userRole = user ? user.role : 'User';
+    const userName = user ? user.name : 'User';
+    
+    // Fetch user's projects
+    const projects = await Project.find({
+      $or: [
+        { user_id: req.userId },
+        { client_id: req.userId },
+        { selected_freelancer_id: req.userId }
+      ]
+    }).select('title status progress budget currency project_type');
+
+    // Fetch user's clients and invoices
+    const clients = await Client.find({ user_id: req.userId });
+    const invoices = await Invoice.find({
+      $or: [
+        { user_id: req.userId },
+        { client_id: req.userId }
+      ]
+    });
+
+    const myInvoices = invoices.filter(i => i.user_id && i.user_id.toString() === req.userId.toString());
+    let totalRevenue = myInvoices
+      .filter(inv => inv.status === 'paid')
+      .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+      
+    // Include completed marketplace projects in revenue
+    const mpProjects = projects.filter(p => p.selected_freelancer_id && p.selected_freelancer_id.toString() === req.userId.toString() && (p.payment_status === 'paid' || p.status === 'completed'));
+    totalRevenue += mpProjects.reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
+
+    const pendingInvoices = myInvoices.filter(inv => inv.status === 'pending');
+    const pendingInvoicesAmount = pendingInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+
+    const completedProjects = projects.filter(p => p.status === 'completed');
+    const activeProjectDocs = projects.filter(p => p.status !== 'completed' && p.user_id && p.user_id.toString() === req.userId.toString());
+    const activeMpProjectDocs = projects.filter(p => p.status !== 'completed' && p.selected_freelancer_id && p.selected_freelancer_id.toString() === req.userId.toString());
+
+    // Build the data context
+    let projectContext = `\nDashboard Overview Data (Use EXACTLY these numbers if asked for an overview):\n`;
+    projectContext += `Name: ${userName}\nRole: ${userRole}\n`;
+    projectContext += `Total Clients: ${clients.length}\n`;
+    projectContext += `Total Revenue: $${totalRevenue.toFixed(2)}\n`;
+    projectContext += `Pending Invoices: $${pendingInvoicesAmount.toFixed(2)} (${pendingInvoices.length} invoices pending)\n`;
+    projectContext += `Active Personal Projects Count: ${activeProjectDocs.length}\n`;
+    projectContext += `Active Marketplace Projects Count: ${activeMpProjectDocs.length}\n`;
+    
+    // Only list up to 5 projects to save context space
+    const displayActive = activeProjectDocs.slice(0, 5).map(p => `"${p.title}"`).join(', ');
+    const displayActiveMp = activeMpProjectDocs.slice(0, 5).map(p => `"${p.title}"`).join(', ');
+    
+    projectContext += `Active Personal Projects List (Sample): ${displayActive || 'None'}${activeProjectDocs.length > 5 ? ' ...and more' : ''}\n`;
+    projectContext += `Active Marketplace Projects List (Sample): ${displayActiveMp || 'None'}${activeMpProjectDocs.length > 5 ? ' ...and more' : ''}\n`;
+    projectContext += `Completed Projects Count: ${completedProjects.length}\n`;
+
     // Build context-aware chat system instruction
     const systemPrompt = `
       You are FreelanceFlow AI, an elite virtual Business Assistant, recruiter, and dashboard consultant.
@@ -116,6 +176,8 @@ router.post('/chatbot', verifyToken, async (req, res) => {
       - Estimating budgets and milestones
       - Writing contracts and generating GST invoices
       - Explaining dashboard statistics (milestones progress, earnings, invoice statuses)
+      - If the user asks about their own data, projects, completed projects, active projects, etc., use the "User Context" provided below to give them an EXACT list and answer, do NOT give generic steps on how to find them. Answer precisely based on their real data.
+      ${projectContext}
       Keep answers professional, brief, and structured in clean markdown list styles.
     `;
 

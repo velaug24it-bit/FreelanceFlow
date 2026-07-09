@@ -128,6 +128,7 @@ const AIBusinessAssistant = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexShrink: 0,
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -161,7 +162,7 @@ const AIBusinessAssistant = () => {
           </div>
 
           {/* Messages Container */}
-          <div style={{ flex: 1, padding: '1.25rem', overflowY: 'auto', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ flex: 1, padding: '1.25rem', overflowY: 'auto', overflowX: 'hidden', overscrollBehavior: 'contain', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {messages.map((m, idx) => (
               <div
                 key={idx}
@@ -201,7 +202,9 @@ const AIBusinessAssistant = () => {
                     lineHeight: 1.5,
                     boxShadow: '0 2px 8px rgba(15, 23, 42, 0.03)',
                     border: m.role === 'user' ? 'none' : '1px solid #f1f5f9',
-                    whiteSpace: 'pre-line'
+                    whiteSpace: 'pre-line',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere'
                   }}
                 >
                   {m.text}
@@ -227,7 +230,7 @@ const AIBusinessAssistant = () => {
 
           {/* Quick Actions Panel */}
           {messages.length === 1 && (
-            <div style={{ padding: '0.75rem 1rem', background: '#f1f5f9', display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ padding: '0.75rem 1rem', background: '#f1f5f9', display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <HelpCircle size={12} />
                 Suggested Queries
@@ -264,7 +267,7 @@ const AIBusinessAssistant = () => {
           )}
 
           {/* Input Area */}
-          <div style={{ padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#ffffff', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <div style={{ padding: '1rem', borderTop: '1px solid #f1f5f9', background: '#ffffff', display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
             <input
               type="text"
               value={input}
