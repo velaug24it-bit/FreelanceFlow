@@ -87,6 +87,7 @@ const syncFreelancerAcceptedAssignments = async (freelancer) => {
             client_company: client.company_name || '',
             budget: bid.bid_amount,
             status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
+            payment_status: projectPost.payment_status || 'unpaid',
             assigned_at: new Date(),
             deadline: projectPost.deadline,
             completed_at: projectPost.status === 'completed' ? projectPost.completed_at : null,
@@ -1685,6 +1686,7 @@ router.post('/sync-accepted-assignments', verifyToken, async (req, res) => {
                 client_email: client.email,
                 budget: bid.bid_amount,
                 status: projectPost.status === 'completed' ? 'completed' : 'ongoing',
+                payment_status: projectPost.payment_status || 'unpaid',
                 assigned_at: freelancer.my_projects[projectEntryIndex]?.assigned_at || new Date(),
                 deadline: projectPost.deadline,
                 completed_at: projectPost.status === 'completed' ? projectPost.completed_at : null
@@ -1740,6 +1742,8 @@ router.post('/sync-accepted-assignments', verifyToken, async (req, res) => {
         freelancer.total_projects_assigned = freelancer.my_projects.length;
         freelancer.total_clients = freelancer.my_clients.length;
 
+        freelancer.markModified('my_projects');
+        freelancer.markModified('my_clients');
         await freelancer.save();
         console.log(`🎉 Sync complete!`);
 

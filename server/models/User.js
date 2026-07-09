@@ -87,6 +87,10 @@ const userSchema = new mongoose.Schema({
             enum: ['ongoing', 'completed', 'cancelled'],
             default: 'ongoing'
         },
+        payment_status: {
+            type: String,
+            default: 'unpaid'
+        },
         assigned_at: {
             type: Date,
             default: Date.now

@@ -139,7 +139,7 @@ const DashboardEnhanced = () => {
         
       if (mpProjects.length > 0) {
         currentRevenue += mpProjects
-          .filter(p => p.payment_status === 'paid' || p.status === 'completed') // Include completed projects for total earnings
+          .filter(p => p.payment_status === 'paid' && p.status === 'completed') // Only count when paid AND completed
           .reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
       }
 

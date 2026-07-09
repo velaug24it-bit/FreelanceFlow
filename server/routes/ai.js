@@ -140,7 +140,7 @@ router.post('/chatbot', verifyToken, async (req, res) => {
       .reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
       
     // Include completed marketplace projects in revenue
-    const mpProjects = projects.filter(p => p.selected_freelancer_id && p.selected_freelancer_id.toString() === req.userId.toString() && (p.payment_status === 'paid' || p.status === 'completed'));
+    const mpProjects = projects.filter(p => p.selected_freelancer_id && p.selected_freelancer_id.toString() === req.userId.toString() && p.payment_status === 'paid' && p.status === 'completed');
     totalRevenue += mpProjects.reduce((sum, p) => sum + (parseFloat(p.bid_amount) || parseFloat(p.budget) || 0), 0);
 
     const pendingInvoices = myInvoices.filter(inv => inv.status === 'pending');
