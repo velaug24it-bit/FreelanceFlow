@@ -3,6 +3,7 @@ const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
 const ProjectPost = require('../models/ProjectPost');
 const ChatMessage = require('../models/ChatMessage');
+const NotificationHelper = require('../utils/notificationHelper');
 
 const getProjectChatAccess = async (projectId, userId) => {
     const project = await ProjectPost.findById(projectId);
@@ -74,6 +75,23 @@ router.post('/projects/:projectId/messages', verifyToken, async (req, res) => {
             global.io
                 .to(`project_chat_${req.params.projectId}`)
                 .emit('project_chat_message', chatMessage);
+        }
+
+        // Create notification for the other participant
+        const recipientId = access.senderRole === 'client'
+            ? access.project.selected_freelancer_id
+            : access.project.client_id;
+
+        if (recipientId) {
+            await NotificationHelper.createNotification({
+                userId: recipientId,
+                type: 'general',
+                title: `New chat message on ${access.project.title}`,
+                message: `${req.user.full_name}: ${cleanMessage}`,
+                referenceId: access.project._id,
+                referenceType: 'project',
+                actionUrl: `/projects/${access.project._id}`
+            });
         }
 
         res.status(201).json({ success: true, message: chatMessage });
