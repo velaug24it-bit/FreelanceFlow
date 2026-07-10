@@ -4,24 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle, Clock, AlertCircle, Loader, UploadCloud, XCircle } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const getBaseUrl = () => {
-  let baseUrl = API_URL.replace(/\/api$/, '');
-  const isLocal = (host) => {
-    return (
-      host === 'localhost' ||
-      host === '127.0.0.1' ||
-      host.startsWith('192.168.') ||
-      host.startsWith('10.') ||
-      host.startsWith('172.') ||
-      host.endsWith('.local')
-    );
-  };
-  if (baseUrl.includes('localhost') && window.location.hostname !== 'localhost' && isLocal(window.location.hostname)) {
-    baseUrl = baseUrl.replace('localhost', window.location.hostname);
-  }
-  return baseUrl;
+const BASE_URL = API_URL.replace(/\/api$/, '');
+
+// Safely resolve an image src:
+// - Base64 data URIs and full http(s) URLs are returned as-is
+// - Legacy disk paths like '/uploads/xxx.png' get the backend host prepended
+const getImageSrc = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('http')) return url;
+  return `${BASE_URL}${url}`;
 };
-const BASE_URL = getBaseUrl();
 
 const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const { user } = useAuth();
@@ -378,7 +370,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                             {freelancerPaymentInfo.qr_code_image && (
                               <div style={{ gridColumn: 'span 2', textAlign: 'center', marginTop: '1rem' }}>
                                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 0.5rem 0' }}>Scan to Pay</p>
-                                <img src={`${BASE_URL}${freelancerPaymentInfo.qr_code_image}`} alt="QR Code" style={{ width: '150px', height: '150px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                <img src={getImageSrc(freelancerPaymentInfo.qr_code_image)} alt="QR Code" style={{ width: '150px', height: '150px', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                               </div>
                             )}
                           </div>
@@ -399,7 +391,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                           {screenshotUrl && (
                             <div style={{ marginBottom: '1rem' }}>
                               <p style={{ fontSize: '0.85rem', color: '#10b981', marginBottom: '0.5rem' }}>Screenshot uploaded successfully</p>
-                              <img src={`${BASE_URL}${screenshotUrl}`} alt="Payment Proof" style={{ height: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                              <img src={getImageSrc(screenshotUrl)} alt="Payment Proof" style={{ height: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                             </div>
                           )}
 
@@ -469,7 +461,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
               
               {project.payment_screenshot && (
                 <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-                  <img src={project.payment_screenshot.startsWith('http') ? project.payment_screenshot : `${BASE_URL}${project.payment_screenshot}`} 
+                  <img src={getImageSrc(project.payment_screenshot)}
                        alt="Payment Proof" 
                        style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                 </div>

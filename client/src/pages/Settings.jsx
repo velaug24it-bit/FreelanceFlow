@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const BASE_URL = API_URL.replace(/\/api$/, '');
+const getImageSrc = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('http')) return url;
+  return `${BASE_URL}${url}`;
+};
 import axios from 'axios';
 import { User, Bell, Shield, CheckCircle, AlertCircle, Key, X, Download } from 'lucide-react';
 import ProfileProgress from '../components/ProfileProgress';
@@ -592,7 +600,7 @@ const Settings = () => {
                     {user.payment_info.qr_code_image && (
                       <div>
                         <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>QR Code</label>
-                        <img src={`http://localhost:5000${user.payment_info.qr_code_image}`} alt="QR Code" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                        <img src={getImageSrc(user.payment_info.qr_code_image)} alt="QR Code" style={{ width: '80px', height: '80px', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                       </div>
                     )}
                   </div>
