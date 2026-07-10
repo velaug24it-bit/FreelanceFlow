@@ -217,11 +217,9 @@ const AdminDashboard = () => {
         ['Generated:', new Date().toLocaleString()],
         [''],
         ['SUMMARY STATISTICS'],
-        ['Total Earnings', `₹${revenue.totalEarnings?.toFixed(2) || '0.00'}`],
-        ['Connects Revenue', `₹${revenue.connectsRevenue?.toFixed(2) || '0.00'}`],
+        ['Total Earnings', `₹${stats.totalRevenue?.toFixed(2) || '0.00'}`],
         ['Subscription Revenue', `₹${revenue.subscriptionRevenue?.toFixed(2) || '0.00'}`],
         ['Project Revenue', `₹${revenue.projectRevenue?.toFixed(2) || '0.00'}`],
-        ['Total Connects Sold', revenue.totalConnectsSold || 0],
         ['Total Users', stats.totalUsers || 0],
         ['Active Subscriptions', stats.activeSubscriptions || 0],
         [''],
@@ -234,7 +232,7 @@ const AdminDashboard = () => {
         ]),
         [''],
         ['ALL USERS'],
-        ['Name', 'Email', 'Plan', 'Clients', 'Projects', 'Revenue', 'Connects Revenue', 'Status'],
+        ['Name', 'Email', 'Plan', 'Clients', 'Projects', 'Revenue', 'Status'],
         ...users.map(u => [
           u.full_name || 'N/A',
           u.email || 'N/A',
@@ -242,7 +240,6 @@ const AdminDashboard = () => {
           u.client_count || 0,
           u.project_count || 0,
           `₹${u.total_revenue || 0}`,
-          `₹${u.connects_revenue || 0}`,
           u.status || 'inactive'
         ])
       ];
@@ -301,12 +298,11 @@ const AdminDashboard = () => {
   }));
 
   const pieData = [
-    { name: 'Connects', value: revenue.connectsRevenue || 0 },
     { name: 'Subscriptions', value: revenue.subscriptionRevenue || 0 },
     { name: 'Projects', value: revenue.projectRevenue || 0 }
   ].filter(item => item.value > 0);
 
-  const COLORS = ['#f59e0b', '#8b5cf6', '#10b981'];
+  const COLORS = ['#8b5cf6', '#10b981'];
 
   if (loading) {
     return (
@@ -499,16 +495,6 @@ const AdminDashboard = () => {
 
           <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              <div style={{ background: '#f59e0b20', padding: '0.4rem', borderRadius: '10px' }}>
-                <Package size={20} color="#f59e0b" />
-              </div>
-              <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Sold</span>
-            </div>
-            <p style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.totalConnectsSold || 0}</p>
-          </div>
-
-          <div style={{ background: 'white', borderRadius: '16px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
               <div style={{ background: '#8b5cf620', padding: '0.4rem', borderRadius: '10px' }}>
                 <Crown size={20} color="#8b5cf6" />
               </div>
@@ -538,12 +524,6 @@ const AdminDashboard = () => {
           <div style={{ background: 'white', borderRadius: '16px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Revenue Breakdown</h3>
             <div style={{ display: 'grid', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: '#f9fafb', borderRadius: '8px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Package size={16} color="#f59e0b" /> Connects
-                </span>
-                <span style={{ fontWeight: '600' }}>{formatCurrency(stats.connectsRevenue)}</span>
-              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: '#f9fafb', borderRadius: '8px' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Crown size={16} color="#8b5cf6" /> Subscriptions
@@ -673,7 +653,6 @@ const AdminDashboard = () => {
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Client</th>
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Email</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
-                  <th style={{ padding: '1rem', textAlign: 'center' }}>Connects</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Projects Posted</th>
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Total Spent</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Status</th>
@@ -683,7 +662,7 @@ const AdminDashboard = () => {
               <tbody>
                 {filteredUsers.filter(u => u.client_spent > 0 || u.project_count > 0 || u.client_count > 0 || (!u.total_revenue && u.role !== 'freelancer' && !u.is_freelancer)).length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                    <td colSpan="7" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
                       No clients found
                     </td>
                   </tr>
@@ -709,7 +688,6 @@ const AdminDashboard = () => {
                           {(user.plan || 'free').toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>{user.connects_balance || 0}</td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>{user.project_count || 0}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500' }}>
                         {formatCurrency(user.client_spent || 0)}
@@ -791,7 +769,6 @@ const AdminDashboard = () => {
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Freelancer</th>
                   <th style={{ padding: '1rem', textAlign: 'left' }}>Email</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Plan</th>
-                  <th style={{ padding: '1rem', textAlign: 'center' }}>Connects</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Clients Worked</th>
                   <th style={{ padding: '1rem', textAlign: 'right' }}>Total Revenue</th>
                   <th style={{ padding: '1rem', textAlign: 'center' }}>Status</th>
@@ -801,7 +778,7 @@ const AdminDashboard = () => {
               <tbody>
                 {filteredUsers.filter(u => u.role === 'freelancer' || u.is_freelancer || u.total_revenue > 0).length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
+                    <td colSpan="7" style={{ padding: '3rem', textAlign: 'center', color: '#9ca3af' }}>
                       No freelancers found
                     </td>
                   </tr>
@@ -827,7 +804,6 @@ const AdminDashboard = () => {
                           {(user.plan || 'free').toUpperCase()}
                         </span>
                       </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>{user.connects_balance || 0}</td>
                       <td style={{ padding: '1rem', textAlign: 'center' }}>{user.client_count || 0}</td>
                       <td style={{ padding: '1rem', textAlign: 'right', fontWeight: '500' }}>
                         {formatCurrency(user.total_revenue || 0)}
@@ -933,7 +909,6 @@ const AdminDashboard = () => {
                       <h2 style={{ fontSize: '1.5rem' }}>{userDetail.user?.name || userDetail.user?.full_name || 'User'}</h2>
                       <p style={{ color: '#6b7280' }}>{userDetail.user?.email}</p>
                       <p style={{ color: '#6b7280' }}>Plan: <strong>{userDetail.user?.subscription_tier || 'Free'}</strong></p>
-                      <p style={{ color: '#6b7280' }}>Connects: <strong>{userDetail.user?.connects_balance || 0}</strong></p>
                     </div>
                     <button 
                       onClick={() => {
@@ -965,21 +940,9 @@ const AdminDashboard = () => {
                       </p>
                     </div>
                     <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Revenue</p>
-                      <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>
-                        {formatCurrency(userDetail.stats?.connects_revenue || 0)}
-                      </p>
-                    </div>
-                    <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
                       <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Subscription Revenue</p>
                       <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#8b5cf6' }}>
                         {formatCurrency(userDetail.stats?.subscription_revenue || 0)}
-                      </p>
-                    </div>
-                    <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', textAlign: 'center' }}>
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>Connects Purchased</p>
-                      <p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#3b82f6' }}>
-                        {userDetail.stats?.total_connects_purchased || 0}
                       </p>
                     </div>
                   </div>
@@ -1005,8 +968,7 @@ const AdminDashboard = () => {
                                   {new Date(payment.created_at || payment.paid_at).toLocaleDateString()}
                                 </td>
                                 <td style={{ padding: '0.5rem' }}>
-                                  {payment.description || 
-                                   (payment.package_id ? `${payment.connects_purchased || 0} Connects` : 'Payment')}
+                                  {payment.description || 'Payment'}
                                 </td>
                                 <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: '600' }}>
                                   {formatCurrency(payment.amount)}
