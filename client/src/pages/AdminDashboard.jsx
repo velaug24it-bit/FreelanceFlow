@@ -7,33 +7,33 @@ import {
   Users, DollarSign, TrendingUp, Crown, 
   Download, Edit, Trash2, CheckCircle, 
   XCircle, LogOut, Shield, Eye, Search,
-  Calendar, Package, CreditCard, Briefcase,
+  Calendar, CreditCard, Briefcase,
   RefreshCw, AlertCircle, Flag
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+const emptyStats = {
+  totalUsers: 0,
+  totalRevenue: 0,
+  subscriptionRevenue: 0,
+  projectRevenue: 0,
+  activeSubscriptions: 0,
+  monthlyRevenue: []
+};
+
+const emptyRevenue = {
+  totalEarnings: 0,
+  monthlyRevenue: [],
+  subscriptionRevenue: 0,
+  projectRevenue: 0
+};
+
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalRevenue: 0,
-    connectsRevenue: 0,
-    subscriptionRevenue: 0,
-    projectRevenue: 0,
-    activeSubscriptions: 0,
-    totalConnectsSold: 0,
-    monthlyRevenue: []
-  });
-  const [revenue, setRevenue] = useState({ 
-    totalEarnings: 0, 
-    monthlyRevenue: [],
-    connectsRevenue: 0,
-    subscriptionRevenue: 0,
-    projectRevenue: 0,
-    totalConnectsSold: 0
-  });
+  const [stats, setStats] = useState(emptyStats);
+  const [revenue, setRevenue] = useState(emptyRevenue);
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payoutsLoading, setPayoutsLoading] = useState(false);
@@ -93,6 +93,9 @@ const AdminDashboard = () => {
       setLoading(true);
       setRefreshing(true);
       setError('');
+      setUsers([]);
+      setStats(emptyStats);
+      setRevenue(emptyRevenue);
       
       const token = localStorage.getItem('token');
       if (!token) {
@@ -116,28 +119,26 @@ const AdminDashboard = () => {
       console.log('📊 Stats:', statsRes.data);
       console.log('💰 Revenue:', revenueRes.data);
       
+      const currentRevenue = { ...emptyRevenue, ...(revenueRes.data || {}) };
+      const visibleTotalRevenue = (currentRevenue.subscriptionRevenue || 0) + (currentRevenue.projectRevenue || 0);
+      const currentStats = {
+        ...emptyStats,
+        ...(statsRes.data || {}),
+        totalRevenue: visibleTotalRevenue,
+        subscriptionRevenue: currentRevenue.subscriptionRevenue || statsRes.data?.subscriptionRevenue || 0,
+        projectRevenue: currentRevenue.projectRevenue || statsRes.data?.projectRevenue || 0
+      };
+
       setUsers(usersRes.data.users || []);
-      setStats(statsRes.data || {
-        totalUsers: 0,
-        totalRevenue: 0,
-        connectsRevenue: 0,
-        subscriptionRevenue: 0,
-        projectRevenue: 0,
-        activeSubscriptions: 0,
-        totalConnectsSold: 0
-      });
-      setRevenue(revenueRes.data || {
-        totalEarnings: 0,
-        monthlyRevenue: [],
-        connectsRevenue: 0,
-        subscriptionRevenue: 0,
-        projectRevenue: 0,
-        totalConnectsSold: 0
-      });
+      setStats(currentStats);
+      setRevenue(currentRevenue);
 
     } catch (err) {
       console.error('❌ Failed to fetch admin data:', err);
       console.error('❌ Error response:', err.response?.data);
+      setUsers([]);
+      setStats(emptyStats);
+      setRevenue(emptyRevenue);
       if (err.response?.status === 403) {
         setError('Admin access required. Please login with admin account.');
       } else if (err.response?.status === 401) {

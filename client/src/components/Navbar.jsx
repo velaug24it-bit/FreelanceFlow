@@ -85,13 +85,15 @@ const Navbar = () => {
       zIndex: 100
     }}>
       <div style={{
-        maxWidth: '1440px',
+        maxWidth: 'none',
         margin: '0 auto',
         padding: '0 0.75rem',
         height: '64px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        boxSizing: 'border-box',
+        width: '100%'
       }}>
         {/* Logo - Left */}
         <Link to="/" style={{
@@ -135,8 +137,9 @@ const Navbar = () => {
           flexWrap: 'nowrap',
           overflow: 'visible',
           flex: 1,
+          minWidth: 0,
           justifyContent: 'center',
-          padding: '0 1rem'
+          padding: '0 0.75rem'
         }}>
           {allNavItems.map((item) => (
             <Link
@@ -153,7 +156,9 @@ const Navbar = () => {
                 fontSize: '0.82rem',
                 fontWeight: '500',
                 transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                minWidth: 0
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = '#f3f4f6';
@@ -175,13 +180,14 @@ const Navbar = () => {
           display: 'flex',
           alignItems: 'center',
           gap: '0.5rem',
-          flexShrink: 0
+          flexShrink: 0,
+          minWidth: 0
         }}>
           {/* Notification Bell - always visible */}
           <NotificationBell />
 
           {/* User Profile Dropdown - FIXED ALIGNMENT - Hidden on Mobile */}
-          <div ref={dropdownRef} className="mobile-hidden" style={{ position: 'relative' }}>
+          <div ref={dropdownRef} className="mobile-hidden" style={{ position: 'relative', maxWidth: '180px', minWidth: 0 }}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               style={{
@@ -194,7 +200,10 @@ const Navbar = () => {
                 borderRadius: '50px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: isDropdownOpen ? '0 4px 12px rgba(0,0,0,0.1)' : 'none'
+                boxShadow: isDropdownOpen ? '0 4px 12px rgba(0,0,0,0.1)' : 'none',
+                maxWidth: '100%',
+                minWidth: 0,
+                boxSizing: 'border-box'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = '#3b82f6';
@@ -214,24 +223,32 @@ const Navbar = () => {
                 justifyContent: 'center',
                 color: 'white',
                 fontWeight: '600',
-                fontSize: '13px'
+                fontSize: '13px',
+                flexShrink: 0
               }}>
                 {getInitials()}
               </div>
 
-              <div style={{ textAlign: 'left' }}>
+              <div style={{ textAlign: 'left', minWidth: 0 }}>
                 <div style={{
                   fontSize: '0.8rem',
                   fontWeight: '600',
                   color: '#1f2937',
-                  lineHeight: '1.2'
+                  lineHeight: '1.2',
+                  maxWidth: '86px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
                 }}>
                   {user?.full_name?.split(' ')[0] || 'User'}
                 </div>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.25rem'
+                  gap: '0.25rem',
+                  maxWidth: '86px',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap'
                 }}>
                   <span style={{
                     fontSize: '0.65rem',
@@ -242,7 +259,8 @@ const Navbar = () => {
                   </span>
                   <span style={{
                     fontSize: '0.55rem',
-                    color: '#9ca3af'
+                    color: '#9ca3af',
+                    flexShrink: 0
                   }}>
                     Plan
                   </span>
@@ -252,7 +270,8 @@ const Navbar = () => {
               <ChevronDown size={16} style={{
                 color: '#6b7280',
                 transition: 'transform 0.2s',
-                transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)'
+                transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)',
+                flexShrink: 0
               }} />
             </button>
 
