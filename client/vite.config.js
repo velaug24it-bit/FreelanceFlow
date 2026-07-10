@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
         manifest: {
           name: 'FreelanceFlow',
           short_name: 'FreelanceFlow',
-          description: 'Freelance Marketplace for Clients and Freelancers',
+          description: 'Modern Freelance Marketplace',
           theme_color: '#4f46e5',
           background_color: '#ffffff',
           display: 'standalone',
