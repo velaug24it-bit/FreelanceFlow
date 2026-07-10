@@ -558,8 +558,8 @@ const AIToolkit = () => {
                     <strong style={{ textTransform: 'capitalize' }}>{user?.role}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}>
-                    <span>Connects Balance:</span>
-                    <strong>{user?.connects_balance} Connects</strong>
+                    <span>Active Plan:</span>
+                    <strong style={{ textTransform: 'capitalize' }}>{user?.subscription_tier || 'Free'}</strong>
                   </div>
                   <button
                     onClick={handleAnalyzeSkillGap}
