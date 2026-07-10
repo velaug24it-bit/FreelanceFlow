@@ -23,6 +23,8 @@ const Client = require('../models/Client');
 const Invoice = require('../models/Invoice');
 const ProjectPost = require('../models/ProjectPost');
 
+const { requireProPlan } = require('../middleware/planLimits');
+
 // Local JWT Authentication Verification middleware
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -38,6 +40,9 @@ const verifyToken = (req, res, next) => {
     res.status(401).json({ error: 'Invalid token' });
   }
 };
+
+router.use(verifyToken);
+router.use(requireProPlan('AI Toolkit'));
 
 // 1. Recommend Freelancers for a Project
 router.get('/projects/:projectId/recommendations', verifyToken, async (req, res) => {

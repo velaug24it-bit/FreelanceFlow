@@ -264,6 +264,115 @@ const AIToolkit = () => {
     }
   };
 
+  const plan = (user?.subscriptionPlan || user?.subscription_tier || 'FREE').toUpperCase();
+  const isFree = plan === 'FREE';
+
+  if (isFree) {
+    return (
+      <div style={{
+        padding: '3.5rem 1.5rem',
+        maxWidth: '700px',
+        margin: '4rem auto',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(37, 99, 235, 0.05) 100%)',
+        border: '1px solid rgba(226, 232, 240, 0.8)',
+        borderRadius: '24px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.03)',
+        backdropFilter: 'blur(8px)'
+      }}>
+        <div style={{
+          width: '72px',
+          height: '72px',
+          background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)',
+          borderRadius: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          margin: '0 auto 1.5rem',
+          boxShadow: '0 8px 16px rgba(79, 70, 229, 0.25)'
+        }}>
+          <Sparkles size={36} />
+        </div>
+        
+        <h2 style={{
+          fontSize: '2rem',
+          fontWeight: '800',
+          color: '#1e293b',
+          marginBottom: '0.75rem',
+          letterSpacing: '-0.5px'
+        }}>
+          AI Business Toolkit
+        </h2>
+        
+        <p style={{
+          fontSize: '1.05rem',
+          color: '#64748b',
+          lineHeight: '1.6',
+          maxWidth: '500px',
+          margin: '0 auto 2rem'
+        }}>
+          Unlock advanced intelligence, modular description generator, budget timelines, matching filters, and automated legal contract generators.
+        </p>
+
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '1.25rem',
+          border: '1px solid #f1f5f9',
+          textAlign: 'left',
+          maxWidth: '450px',
+          margin: '0 auto 2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> AI Project Spec Writer (Scope & Description)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> Timeline & Budget Forecasting Estimator
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> Freelancer Profile Skill Gap Scan
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> AI-Generated Contract Document Builder
+          </div>
+        </div>
+        
+        <a 
+          href="/subscription"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0.85rem 2rem',
+            background: 'linear-gradient(135deg, #4f46e5 0%, #2563eb 100%)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '12px',
+            fontWeight: '700',
+            fontSize: '1rem',
+            boxShadow: '0 4px 12px rgba(79, 70, 229, 0.15)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(79, 70, 229, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.15)';
+          }}
+        >
+          Upgrade to Pro Plan
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>

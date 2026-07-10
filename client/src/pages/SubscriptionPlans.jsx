@@ -106,7 +106,7 @@ const SubscriptionPlans = () => {
                         }, {
                             headers: { Authorization: `Bearer ${token}` }
                         });
-                        
+
                         if (verifyRes.data.success) {
                             setMessage({ type: 'success', text: `Successfully upgraded to ${plan.name} plan!` });
                             fetchCurrentSubscription();
@@ -128,7 +128,7 @@ const SubscriptionPlans = () => {
                     }
                 }
             };
-            
+
             const razorpayInstance = new window.Razorpay(options);
             razorpayInstance.on('payment.failed', (response) => {
                 setProcessing(null);
@@ -138,7 +138,7 @@ const SubscriptionPlans = () => {
                 });
             });
             razorpayInstance.open();
-            
+
         } catch (err) {
             console.error('Subscription error:', err);
             setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to process payment. Please try again.' });
@@ -254,7 +254,7 @@ const SubscriptionPlans = () => {
                 {plans.map((plan) => {
                     const isCurrentPlan = currentPlan === plan.name.toLowerCase();
                     const planColor = getPlanColor(plan.name);
-                    
+
                     return (
                         <div
                             key={plan.id}
@@ -284,7 +284,7 @@ const SubscriptionPlans = () => {
                                     MOST POPULAR
                                 </div>
                             )}
-                            
+
                             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                                 <div style={{
                                     width: '80px',
@@ -304,7 +304,7 @@ const SubscriptionPlans = () => {
                                     <span style={{ color: '#6b7280' }}>/{plan.interval}</span>
                                 </div>
                             </div>
-                            
+
                             <div style={{ marginBottom: '2rem' }}>
                                 {plan.features.map((feature, idx) => (
                                     <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
@@ -313,7 +313,7 @@ const SubscriptionPlans = () => {
                                     </div>
                                 ))}
                             </div>
-                            
+
                             {isCurrentPlan ? (
                                 <button
                                     disabled

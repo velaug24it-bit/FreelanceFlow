@@ -9,6 +9,8 @@ const Expense = require('../models/Expense');
 const Task = require('../models/Task');
 const ProjectPost = require('../models/ProjectPost');
 
+const { requireProPlan } = require('../middleware/planLimits');
+
 // Verify token middleware
 const verifyToken = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
@@ -25,7 +27,7 @@ const verifyToken = (req, res, next) => {
 };
 
 // Get business summary stats
-router.get('/business-summary', verifyToken, async (req, res) => {
+router.get('/business-summary', verifyToken, requireProPlan('Reports'), async (req, res) => {
     try {
         const userId = req.userId;
         
@@ -96,7 +98,7 @@ router.get('/business-summary', verifyToken, async (req, res) => {
 });
 
 // Export data as CSV
-router.get('/export/:type', verifyToken, async (req, res) => {
+router.get('/export/:type', verifyToken, requireProPlan('Reports'), async (req, res) => {
     try {
         const { type } = req.params;
         const userId = req.userId;
@@ -127,7 +129,7 @@ router.get('/export/:type', verifyToken, async (req, res) => {
 });
 
 // Get revenue breakdown by client
-router.get('/client-revenue', verifyToken, async (req, res) => {
+router.get('/client-revenue', verifyToken, requireProPlan('Reports'), async (req, res) => {
     try {
         const userId = req.userId;
         const clients = await Client.find({ user_id: userId });
@@ -160,7 +162,7 @@ router.get('/client-revenue', verifyToken, async (req, res) => {
 });
 
 // Get expense breakdown by category
-router.get('/expense-categories', verifyToken, async (req, res) => {
+router.get('/expense-categories', verifyToken, requireProPlan('Reports'), async (req, res) => {
     try {
         const userId = req.userId;
         const expenses = await Expense.find({ user_id: userId });

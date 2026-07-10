@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Invoices from './Invoices';
 import Expenses from './Expenses';
+import { useAuth } from '../context/AuthContext';
 
 const Reports = () => {
   const [activeTab, setActiveTab] = useState('overview'); // overview, earnings, ledger
@@ -34,10 +35,17 @@ const Reports = () => {
     topMonth: 'N/A'
   });
   const [timeRange, setTimeRange] = useState('year');
+  const { user } = useAuth();
+  const plan = (user?.subscriptionPlan || user?.subscription_tier || 'FREE').toUpperCase();
+  const isFree = plan === 'FREE';
 
   useEffect(() => {
-    fetchReportData();
-  }, [timeRange]);
+    if (!isFree) {
+      fetchReportData();
+    } else {
+      setLoading(false);
+    }
+  }, [timeRange, isFree]);
 
   const fetchReportData = async () => {
     try {
@@ -310,6 +318,113 @@ const Reports = () => {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
         <div style={{ fontSize: '1.25rem', color: '#6b7280' }}>Loading analytics...</div>
+      </div>
+    );
+  }
+
+  if (isFree) {
+    return (
+      <div style={{
+        padding: '3rem 1.5rem',
+        maxWidth: '700px',
+        margin: '4rem auto',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        textAlign: 'center',
+        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(168, 85, 247, 0.05) 100%)',
+        border: '1px solid rgba(226, 232, 240, 0.8)',
+        borderRadius: '24px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.03)',
+        backdropFilter: 'blur(8px)'
+      }}>
+        <div style={{
+          width: '72px',
+          height: '72px',
+          background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+          borderRadius: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          margin: '0 auto 1.5rem',
+          boxShadow: '0 8px 16px rgba(99, 102, 241, 0.25)'
+        }}>
+          <BarChart3 size={36} />
+        </div>
+        
+        <h2 style={{
+          fontSize: '2rem',
+          fontWeight: '800',
+          color: '#1e293b',
+          marginBottom: '0.75rem',
+          letterSpacing: '-0.5px'
+        }}>
+          Premium Analytics & Reports
+        </h2>
+        
+        <p style={{
+          fontSize: '1.05rem',
+          color: '#64748b',
+          lineHeight: '1.6',
+          maxWidth: '500px',
+          margin: '0 auto 2rem'
+        }}>
+          Unlock professional financial reporting, ledger breakdown, monthly growth overview, tax export features, and dynamic earnings calculations.
+        </p>
+
+        <div style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '1.25rem',
+          border: '1px solid #f1f5f9',
+          textAlign: 'left',
+          maxWidth: '450px',
+          margin: '0 auto 2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> Complete Financial Ledger (Income & Expenses)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> Interactive Revenue Breakdown by Client
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> Expense Categorization & Visual Charts
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.95rem', color: '#475569' }}>
+            <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span> One-Click CSV Export for Tax Reporting
+          </div>
+        </div>
+        
+        <a 
+          href="/subscription"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '0.85rem 2rem',
+            background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '12px',
+            fontWeight: '700',
+            fontSize: '1rem',
+            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)',
+            transition: 'transform 0.2s, box-shadow 0.2s',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(99, 102, 241, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.15)';
+          }}
+        >
+          Upgrade to Pro Plan
+        </a>
       </div>
     );
   }
