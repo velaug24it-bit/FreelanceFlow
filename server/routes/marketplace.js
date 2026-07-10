@@ -1005,6 +1005,7 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             status: 'in_progress',
             selected_freelancer_id: bid.freelancer_id,
             selected_freelancer_name: freelancer.full_name,
+            bid_amount: bid.bid_amount,
             started_at: new Date(),
             $push: {
                 status_updates: {
