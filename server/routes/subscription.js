@@ -11,15 +11,15 @@ const { authenticateJWT } = require('../middleware/auth');
 const router = express.Router();
 
 const limits = {
-    free: { maxClients: 5, maxProjects: 10, maxInvoices: 20, features: ['Basic Features', '5 Clients', '10 Projects', '20 Invoices'] },
-    pro: { maxClients: 50, maxProjects: 100, maxInvoices: 500, features: ['All Free Features', '50 Clients', '100 Projects', '500 Invoices', 'Expense Tracking', 'Task Board', 'Reports'] },
-    business: { maxClients: 999999, maxProjects: 999999, maxInvoices: 999999, features: ['All Pro Features', 'Unlimited Everything', 'Team Members', 'Priority Support', 'API Access', 'White Label'] }
+    free: { maxClients: 5, maxProjects: 10, maxInvoices: 20, features: ['Max 2 Bids & 2 Saved Projects', 'Max 2 Portfolio Items & 2 Boosts', 'Max 2 active contracts & hiring slots', 'Max 2 Projects Posted & 2 Active Projects', 'Basic Support'] },
+    pro: { maxClients: 50, maxProjects: 100, maxInvoices: 500, features: ['Max 10 Bids & 10 Saved Projects', 'Max 10 Portfolio Items & 10 Boosts', 'Max 10 active contracts & hiring slots', 'Max 10 Projects Posted & 10 Active Projects', 'Expense Tracking & Task Board', 'Priority Support'] },
+    business: { maxClients: 999999, maxProjects: 999999, maxInvoices: 999999, features: ['Unlimited Bids & Saved Projects', 'Unlimited Portfolio Items & Boosts', 'Unlimited contracts & hiring slots', 'Unlimited Projects Posted & Active Projects', 'Team member access & API access', '24/7 Dedicated Support'] }
 };
 
 router.get('/current', authenticateJWT, async (req, res) => {
     try {
         const [user, subscription] = await Promise.all([
-            User.findById(req.userId).select('subscription_tier subscription_plan subscription_status subscription_end_date'),
+            User.findById(req.userId).select('subscription_tier subscription_plan subscription_status subscription_end_date subscriptionPlan subscriptionStatus subscriptionStartDate subscriptionEndDate autoCalculatedExpiry remainingDays'),
             Subscription.findOne({ user_id: req.userId, status: 'active' }).sort({ created_at: -1 })
         ]);
 
@@ -28,9 +28,15 @@ router.get('/current', authenticateJWT, async (req, res) => {
         }
 
         res.json({
-            plan: user.subscription_tier || user.subscription_plan || 'free',
-            status: user.subscription_status,
-            endDate: user.subscription_end_date,
+            plan: user.subscriptionPlan?.toLowerCase() || user.subscription_tier || 'free',
+            status: user.subscriptionStatus?.toLowerCase() || user.subscription_status || 'active',
+            endDate: user.subscriptionEndDate || user.subscription_end_date,
+            subscriptionPlan: user.subscriptionPlan || 'FREE',
+            subscriptionStatus: user.subscriptionStatus || 'ACTIVE',
+            subscriptionStartDate: user.subscriptionStartDate || user.created_at,
+            subscriptionEndDate: user.subscriptionEndDate || user.subscription_end_date,
+            autoCalculatedExpiry: user.autoCalculatedExpiry || user.subscription_end_date,
+            remainingDays: user.remainingDays || 0,
             subscription
         });
     } catch (error) {
@@ -155,12 +161,19 @@ router.post('/webhook', async (req, res) => {
             const periodEnd = new Date();
             periodEnd.setMonth(periodEnd.getMonth() + 1);
 
+            const planUpper = session.metadata.plan.toUpperCase();
+
             await Promise.all([
                 User.findByIdAndUpdate(session.metadata.userId, {
-                    subscription_tier: session.metadata.plan,
-                    subscription_plan: session.metadata.plan,
+                    subscription_tier: session.metadata.plan.toLowerCase(),
+                    subscription_plan: session.metadata.plan.toLowerCase(),
                     subscription_status: 'active',
-                    subscription_end_date: periodEnd
+                    subscription_end_date: periodEnd,
+                    subscriptionPlan: planUpper,
+                    subscriptionStatus: 'ACTIVE',
+                    subscriptionStartDate: periodStart,
+                    subscriptionEndDate: periodEnd,
+                    autoCalculatedExpiry: periodEnd
                 }),
                 Subscription.findOneAndUpdate(
                     { stripe_subscription_id: session.subscription },
@@ -201,7 +214,9 @@ router.post('/webhook', async (req, res) => {
                 await User.findByIdAndUpdate(existing.user_id, {
                     subscription_tier: 'free',
                     subscription_plan: 'free',
-                    subscription_status: 'canceled'
+                    subscription_status: 'canceled',
+                    subscriptionPlan: 'FREE',
+                    subscriptionStatus: 'CANCELLED'
                 });
             }
         }

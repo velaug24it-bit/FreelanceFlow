@@ -16,11 +16,11 @@ const Pricing = () => {
       icon: Star,
       description: 'Perfect for getting started',
       features: [
-        'Up to 5 clients',
-        'Up to 10 projects',
-        'Up to 20 invoices',
-        'Basic client management',
-        'Email support'
+        'Max 2 Bids & 2 Saved Projects',
+        'Max 2 Portfolio Items & 2 Boosts',
+        'Max 2 active contracts & hiring slots',
+        'Max 2 Projects Posted & 2 Active Projects',
+        'Basic client support'
       ],
       color: 'gray',
       buttonText: 'Current Plan',
@@ -29,19 +29,19 @@ const Pricing = () => {
     {
       id: 'pro',
       name: 'Pro',
-      price: 19,
+      price: 249,
       period: 'month',
       icon: Zap,
       description: 'For growing freelancers',
       popular: true,
       features: [
-        'Up to 50 clients',
-        'Up to 100 projects',
-        'Up to 500 invoices',
+        'Max 10 Bids & 10 Saved Projects',
+        'Max 10 Portfolio Items & 10 Boosts',
+        'Max 10 active contracts & hiring slots',
+        'Max 10 Projects Posted & 10 Active Projects',
         'Expense tracking',
         'Task board (Kanban)',
-        'Advanced reports',
-        'Priority email support'
+        'Priority support'
       ],
       color: 'blue',
       buttonText: 'Upgrade to Pro',
@@ -50,19 +50,19 @@ const Pricing = () => {
     {
       id: 'business',
       name: 'Business',
-      price: 49,
+      price: 499,
       period: 'month',
       icon: Crown,
       description: 'For teams and agencies',
       features: [
-        'Unlimited clients',
-        'Unlimited projects',
-        'Unlimited invoices',
+        'Unlimited Bids & Saved Projects',
+        'Unlimited Portfolio Items & Boosts',
+        'Unlimited contracts & hiring slots',
+        'Unlimited Projects Posted & Active Projects',
         'Team member access',
         'API access',
         'White-label options',
-        'Dedicated support',
-        'Custom integrations'
+        'Dedicated 24/7 support'
       ],
       color: 'purple',
       buttonText: 'Upgrade to Business',

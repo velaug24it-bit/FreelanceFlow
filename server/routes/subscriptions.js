@@ -44,23 +44,28 @@ const verifyToken = (req, res, next) => {
 // Get all plans
 router.get('/plans', async (req, res) => {
     const plans = [
-        { id: 1, name: 'Free', price: 0, interval: 'month', features: ['5 Clients', '10 Projects', '20 Invoices', 'Basic Support'] },
-        { id: 2, name: 'Pro', price: 19, interval: 'month', features: ['50 Clients', '100 Projects', '500 Invoices', 'Expense Tracking', 'Task Board', 'Priority Support'], popular: true },
-        { id: 3, name: 'Business', price: 49, interval: 'month', features: ['Unlimited Clients', 'Unlimited Projects', 'Unlimited Invoices', 'All Features', 'API Access', '24/7 Support'] }
+        { id: 1, name: 'Free', price: 0, interval: 'month', features: ['Max 2 Bids & 2 Saved Projects', 'Max 2 Portfolio Items & 2 Boosts', 'Max 2 active contracts & hiring slots', 'Max 2 Projects Posted & 2 Active Projects', 'Basic Support'] },
+        { id: 2, name: 'Pro', price: 249, interval: 'month', features: ['Max 10 Bids & 10 Saved Projects', 'Max 10 Portfolio Items & 10 Boosts', 'Max 10 active contracts & hiring slots', 'Max 10 Projects Posted & 10 Active Projects', 'Expense Tracking & Task Board', 'Priority Support'], popular: true },
+        { id: 3, name: 'Business', price: 499, interval: 'month', features: ['Unlimited Bids & Saved Projects', 'Unlimited Portfolio Items & Boosts', 'Unlimited contracts & hiring slots', 'Unlimited Projects Posted & Active Projects', 'Team member access & API access', '24/7 Dedicated Support'] }
     ];
     res.json({ plans });
 });
 
-// Get current subscription
 router.get('/my-subscription', verifyToken, async (req, res) => {
     try {
         const user = await User.findById(req.userId);
         res.json({
             currentPlan: user?.subscription_tier || 'free',
-            status: user?.subscription_status || 'active'
+            status: user?.subscription_status || 'active',
+            subscriptionPlan: user?.subscriptionPlan || 'FREE',
+            subscriptionStatus: user?.subscriptionStatus || 'ACTIVE',
+            subscriptionStartDate: user?.subscriptionStartDate || user?.created_at,
+            subscriptionEndDate: user?.subscriptionEndDate,
+            autoCalculatedExpiry: user?.autoCalculatedExpiry,
+            remainingDays: user?.remainingDays || 0
         });
     } catch (err) {
-        res.json({ currentPlan: 'free', status: 'active' });
+        res.json({ currentPlan: 'free', status: 'active', subscriptionPlan: 'FREE', subscriptionStatus: 'ACTIVE' });
     }
 });
 
@@ -83,10 +88,19 @@ router.post('/confirm-payment', verifyToken, async (req, res) => {
         
         console.log(`🔄 Processing subscription for user ${userId}: ${planName} plan - $${amount}`);
         
+        const now = new Date();
+        const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        
         // Update user's subscription
         await User.findByIdAndUpdate(userId, {
             subscription_tier: planName.toLowerCase(),
-            subscription_status: 'active'
+            subscription_status: 'active',
+            subscription_end_date: endDate,
+            subscriptionPlan: planName.toUpperCase(),
+            subscriptionStatus: 'ACTIVE',
+            subscriptionStartDate: now,
+            subscriptionEndDate: endDate,
+            autoCalculatedExpiry: endDate
         });
         
         // Record payment
@@ -118,7 +132,9 @@ router.post('/cancel', verifyToken, async (req, res) => {
     try {
         await User.findByIdAndUpdate(req.userId, {
             subscription_tier: 'free',
-            subscription_status: 'canceled'
+            subscription_status: 'canceled',
+            subscriptionPlan: 'FREE',
+            subscriptionStatus: 'CANCELLED'
         });
         res.json({ success: true, message: 'Subscription cancelled' });
     } catch (err) {

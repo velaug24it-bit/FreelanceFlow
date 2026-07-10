@@ -9,6 +9,8 @@ const qrcode = require('qrcode');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const sendEmail = require('../utils/email');
+const { validateLimit, getCurrentUsage } = require('../middleware/planLimits');
+const { LIMITS } = require('../utils/constants');
 
 // ============================================
 // ENVIRONMENT VARIABLES WITH FALLBACKS
@@ -52,6 +54,7 @@ const authenticateToken = async (req, res, next) => {
             return res.status(401).json({ error: 'User not found' });
         }
         req.user = user;
+        req.userId = user._id;
         next();
     } catch (err) {
         return res.status(401).json({ error: 'Invalid token' });
@@ -179,6 +182,9 @@ router.post('/login', async (req, res) => {
                 full_name: user.full_name,
                 company_name: user.company_name,
                 subscription_tier: user.subscription_tier,
+                subscriptionPlan: user.subscriptionPlan || (user.subscription_tier ? user.subscription_tier.toUpperCase() : 'FREE'),
+                subscriptionStatus: user.subscriptionStatus || (user.subscription_status ? user.subscription_status.toUpperCase() : 'ACTIVE'),
+                subscriptionEndDate: user.subscriptionEndDate || user.subscription_end_date,
                 role: user.role,
                 is_email_verified: user.is_email_verified,
                 bio: user.bio,
@@ -220,6 +226,9 @@ router.get('/verify', async (req, res) => {
                 full_name: user.full_name,
                 company_name: user.company_name,
                 subscription_tier: user.subscription_tier,
+                subscriptionPlan: user.subscriptionPlan || (user.subscription_tier ? user.subscription_tier.toUpperCase() : 'FREE'),
+                subscriptionStatus: user.subscriptionStatus || (user.subscription_status ? user.subscription_status.toUpperCase() : 'ACTIVE'),
+                subscriptionEndDate: user.subscriptionEndDate || user.subscription_end_date,
                 role: user.role,
                 is_email_verified: user.is_email_verified,
                 bio: user.bio,
@@ -706,7 +715,20 @@ router.put('/profile', authenticateToken, async (req, res) => {
         if (full_name) user.full_name = full_name;
         if (bio !== undefined) user.bio = bio;
         if (skills !== undefined) user.skills = skills;
-        if (portfolio_links !== undefined) user.portfolio_links = portfolio_links;
+        if (portfolio_links !== undefined) {
+            const plan = (user.subscriptionPlan || user.subscription_tier || 'FREE').toUpperCase();
+            if (plan !== 'BUSINESS') {
+                const limit = LIMITS[plan]?.portfolio_items || LIMITS.FREE.portfolio_items;
+                if (portfolio_links.length > limit) {
+                    const upgradeTo = plan === 'FREE' ? 'PRO' : 'BUSINESS';
+                    return res.status(403).json({
+                        error: 'LIMIT_REACHED',
+                        message: `You have reached your ${plan} plan limit. Upgrade to ${upgradeTo} to continue.`
+                    });
+                }
+            }
+            user.portfolio_links = portfolio_links;
+        }
         if (hourly_rate !== undefined) user.hourly_rate = hourly_rate;
         if (availability_status !== undefined) user.availability_status = availability_status;
         if (response_time_hours !== undefined) user.response_time_hours = response_time_hours;
@@ -730,6 +752,9 @@ router.put('/profile', authenticateToken, async (req, res) => {
                 full_name: user.full_name,
                 company_name: user.company_name,
                 subscription_tier: user.subscription_tier,
+                subscriptionPlan: user.subscriptionPlan || (user.subscription_tier ? user.subscription_tier.toUpperCase() : 'FREE'),
+                subscriptionStatus: user.subscriptionStatus || (user.subscription_status ? user.subscription_status.toUpperCase() : 'ACTIVE'),
+                subscriptionEndDate: user.subscriptionEndDate || user.subscription_end_date,
                 role: user.role,
                 is_email_verified: user.is_email_verified,
                 bio: user.bio,
@@ -855,6 +880,9 @@ router.post('/verify-2fa', async (req, res) => {
                 full_name: user.full_name,
                 company_name: user.company_name,
                 subscription_tier: user.subscription_tier,
+                subscriptionPlan: user.subscriptionPlan || (user.subscription_tier ? user.subscription_tier.toUpperCase() : 'FREE'),
+                subscriptionStatus: user.subscriptionStatus || (user.subscription_status ? user.subscription_status.toUpperCase() : 'ACTIVE'),
+                subscriptionEndDate: user.subscriptionEndDate || user.subscription_end_date,
                 role: user.role,
                 is_email_verified: user.is_email_verified,
                 bio: user.bio,
@@ -896,6 +924,30 @@ router.get('/user/:id', async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found' });
         res.json({ user });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /profile/boost - Boost a freelancer profile
+router.post('/profile/boost', authenticateToken, validateLimit('profile_boosts'), async (req, res) => {
+    try {
+        const user = req.user;
+        if (user.role !== 'freelancer') {
+            return res.status(403).json({ error: 'Only freelancers can boost their profile' });
+        }
+        
+        user.is_boosted = true;
+        user.boosts_count = (user.boosts_count || 0) + 1;
+        await user.save();
+        
+        res.json({
+            success: true,
+            message: 'Profile boosted successfully!',
+            is_boosted: user.is_boosted,
+            boosts_count: user.boosts_count
+        });
+    } catch (err) {
+        console.error('Error boosting profile:', err);
         res.status(500).json({ error: err.message });
     }
 });

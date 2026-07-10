@@ -25,7 +25,7 @@ import Pricing from './pages/Pricing';
 import SubscriptionPlans from './pages/SubscriptionPlans';
 import Marketplace from './pages/Marketplace';
 import FreelancerProfile from './pages/FreelancerProfile';
-import ConnectsShop from './pages/ConnectsShop';
+
 import RazorpayCheckout from './pages/RazorpayCheckout';
 import AIToolkit from './pages/ai/AIToolkit';
 import AIAnalyticsDashboard from './pages/ai/AIAnalyticsDashboard';
@@ -137,14 +137,7 @@ function MainAppContent() {
           </ProtectedRoute>
         } />
         
-        <Route path="/connects" element={
-          <ProtectedRoute>
-            <>
-              <Navbar />
-              <ConnectsShop />
-            </>
-          </ProtectedRoute>
-        } />
+
 
         <Route path="/checkout" element={
           <ProtectedRoute>

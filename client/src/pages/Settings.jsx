@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { Crown, User, Bell, Shield, ArrowRight, CheckCircle, AlertCircle, Key, X, Download } from 'lucide-react';
+import { User, Bell, Shield, CheckCircle, AlertCircle, Key, X, Download } from 'lucide-react';
 import ProfileProgress from '../components/ProfileProgress';
 
 // Inject mobile-responsive styles for Settings page
@@ -66,8 +66,6 @@ if (!document.querySelector('style[data-settings-responsive]')) {
 
 const Settings = () => {
   const { user, updateProfile, refreshUser } = useAuth();
-  const [subscription, setSubscription] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
 
   useEffect(() => {
@@ -136,10 +134,6 @@ const Settings = () => {
   const [twoFactorSuccess, setTwoFactorSuccess] = useState('');
 
   useEffect(() => {
-    fetchSubscription();
-  }, []);
-
-  useEffect(() => {
     if (user) {
       setFullName(user.full_name || '');
       setCompanyName(user.company_name || '');
@@ -160,20 +154,6 @@ const Settings = () => {
       }
     }
   }, [user]);
-
-  const fetchSubscription = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('/api/subscriptions/my-subscription', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSubscription(response.data);
-    } catch (err) {
-      console.error('Failed to fetch subscription:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -304,39 +284,6 @@ const Settings = () => {
       setTwoFactorLoading(false);
     }
   };
-
-  const getPlanDisplay = () => {
-    if (!user) return 'Free';
-    const plan = user.subscription_tier;
-    if (!plan || plan === 'free') return 'Free';
-    if (plan === 'pro') return 'Pro';
-    if (plan === 'business') return 'Business';
-    return 'Free';
-  };
-
-  const getPlanColor = () => {
-    const plan = getPlanDisplay();
-    if (plan === 'Free') return '#fef3c7';
-    if (plan === 'Pro') return '#d1fae5';
-    if (plan === 'Business') return '#e0e7ff';
-    return '#f3f4f6';
-  };
-
-  const getPlanTextColor = () => {
-    const plan = getPlanDisplay();
-    if (plan === 'Free') return '#92400e';
-    if (plan === 'Pro') return '#065f46';
-    if (plan === 'Business') return '#3730a3';
-    return '#6b7280';
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <div>Loading settings...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="settings-root" style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
@@ -655,76 +602,6 @@ const Settings = () => {
               </div>
             </div>
           )}
-        </div>
-
-        {/* ==================== SUBSCRIPTION SECTION ==================== */}
-        <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Crown size={24} color="#f59e0b" />
-            <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Subscription Plan</h2>
-          </div>
-          
-          <div>
-            <div style={{
-              display: 'inline-block',
-              padding: '0.5rem 1.5rem',
-              borderRadius: '20px',
-              background: getPlanColor(),
-              color: getPlanTextColor(),
-              marginBottom: '1rem',
-              fontWeight: '600'
-            }}>
-              {getPlanDisplay()} Plan
-            </div>
-            
-            {getPlanDisplay() === 'Free' ? (
-              <div>
-                <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
-                  You are on the Free plan. Upgrade to Pro or Business for unlimited features.
-                </p>
-                <a
-                  href="/subscription"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.75rem 1.5rem',
-                    background: '#3b82f6',
-                    color: 'white',
-                    textDecoration: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '500'
-                  }}
-                >
-                  View Plans
-                  <ArrowRight size={16} />
-                </a>
-              </div>
-            ) : (
-              <div>
-                <p style={{ color: '#6b7280', marginBottom: '1rem' }}>
-                  Your {getPlanDisplay()} subscription is active. You have access to all premium features.
-                </p>
-                <a
-                  href="/subscription"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.75rem 1.5rem',
-                    background: '#6b7280',
-                    color: 'white',
-                    textDecoration: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '500'
-                  }}
-                >
-                  Manage Subscription
-                  <ArrowRight size={16} />
-                </a>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ==================== 2FA SECURITY SECTION ==================== */}

@@ -10,6 +10,8 @@ const bidSchema = new mongoose.Schema({
     phone_number: { type: String, required: true },
     portfolio_link: String,
     status: { type: String, enum: ['pending', 'accepted', 'rejected'], default: 'pending' },
+    is_featured: { type: Boolean, default: false },
+    is_shortlisted: { type: Boolean, default: false },
     created_at: { type: Date, default: Date.now }
 });
 

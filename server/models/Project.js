@@ -148,6 +148,10 @@ const projectSchema = new mongoose.Schema({
   tags: {
     type: [String],
     default: []
+  },
+  is_featured: {
+    type: Boolean,
+    default: false
   }
   ,
   // Project tasking, milestones and template reference

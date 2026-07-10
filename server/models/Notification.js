@@ -22,6 +22,8 @@ const notificationSchema = new mongoose.Schema({
       'job_match',
       'prehire_message',
       'moderation_report',
+      'subscription_expiring',
+      'subscription_expired',
       'general'
     ],
     required: true

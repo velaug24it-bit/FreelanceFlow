@@ -101,9 +101,8 @@ router.get('/users', verifyAdmin, async (req, res) => {
             {
                 $addFields: {
                     id: '$_id',
-                    // PRESERVED: Get subscription_tier from user document
-                    plan: { $ifNull: ['$subscription_tier', 'free'] },
-                    status: { $ifNull: ['$subscription_status', 'active'] },
+                    plan: { $toLower: { $ifNull: ['$subscriptionPlan', { $ifNull: ['$subscription_tier', 'free'] }] } },
+                    status: { $toLower: { $ifNull: ['$subscriptionStatus', { $ifNull: ['$subscription_status', 'active'] }] } },
                     client_count: { $size: '$clients' },
                     project_count: { $size: '$projects' },
                     invoice_count: { $size: '$invoices' },
@@ -313,26 +312,14 @@ router.get('/stats', verifyAdmin, async (req, res) => {
 
         // PRESERVED: Active subscriptions
         const activeSubscriptions = await User.countDocuments({
-            subscription_tier: { $in: ['pro', 'business'] },
-            subscription_status: 'active',
+            $or: [
+                { subscriptionPlan: { $in: ['PRO', 'BUSINESS'] }, subscriptionStatus: 'ACTIVE' },
+                { subscription_tier: { $in: ['pro', 'business'] }, subscription_status: 'active' }
+            ],
             role: { $ne: 'admin' }
         });
 
-        // NEW: Connects revenue
-        const connectsRevenue = await Payment.aggregate([
-            {
-                $match: {
-                    status: 'completed',
-                    $or: [
-                        { package_id: { $ne: null, $exists: true } },
-                        { description: { $regex: /connects/i } }
-                    ]
-                }
-            },
-            { $group: { _id: null, total: { $sum: '$amount' } } }
-        ]);
-
-        // NEW: Subscription revenue
+        // Subscription revenue
         const subscriptionRevenue = await Payment.aggregate([
             {
                 $match: {
@@ -344,7 +331,7 @@ router.get('/stats', verifyAdmin, async (req, res) => {
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
-        // NEW: Project revenue
+        // Project revenue
         const projectRevenue = await Payment.aggregate([
             {
                 $match: {
@@ -353,25 +340,6 @@ router.get('/stats', verifyAdmin, async (req, res) => {
                 }
             },
             { $group: { _id: null, total: { $sum: '$amount' } } }
-        ]);
-
-        // NEW: Total connects sold
-        const totalConnectsSold = await Payment.aggregate([
-            {
-                $match: {
-                    status: 'completed',
-                    $or: [
-                        { package_id: { $ne: null, $exists: true } },
-                        { description: { $regex: /connects/i } }
-                    ]
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    total: { $sum: '$connects_purchased' }
-                }
-            }
         ]);
 
         // PRESERVED: Monthly revenue (last 6 months)
@@ -398,11 +366,8 @@ router.get('/stats', verifyAdmin, async (req, res) => {
                 revenue: m.revenue,
                 new_subscribers: m.new_subscribers
             })),
-            // NEW
-            connectsRevenue: connectsRevenue[0]?.total || 0,
             subscriptionRevenue: subscriptionRevenue[0]?.total || 0,
-            projectRevenue: projectRevenue[0]?.total || 0,
-            totalConnectsSold: totalConnectsSold[0]?.total || 0
+            projectRevenue: projectRevenue[0]?.total || 0
         });
     } catch (err) {
         console.error('❌ Error fetching stats:', err);
@@ -411,10 +376,8 @@ router.get('/stats', verifyAdmin, async (req, res) => {
             totalRevenue: 0,
             activeSubscriptions: 0,
             monthlyRevenue: [],
-            connectsRevenue: 0,
             subscriptionRevenue: 0,
-            projectRevenue: 0,
-            totalConnectsSold: 0
+            projectRevenue: 0
         });
     }
 });
@@ -956,15 +919,25 @@ router.get('/moderation/overview', verifyAdmin, async (req, res) => {
 router.put('/users/:id/subscription', verifyAdmin, async (req, res) => {
     try {
         const { plan, status } = req.body;
+        const planName = plan.toUpperCase();
+        const statusName = status.toUpperCase();
+        const now = new Date();
+        const endDate = planName !== 'FREE' ? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
 
         await User.findByIdAndUpdate(req.params.id, {
-            subscription_tier: plan,
-            subscription_status: status
+            subscription_tier: plan.toLowerCase(),
+            subscription_status: status.toLowerCase(),
+            subscription_end_date: endDate,
+            subscriptionPlan: planName,
+            subscriptionStatus: statusName,
+            subscriptionStartDate: planName !== 'FREE' ? now : null,
+            subscriptionEndDate: endDate,
+            autoCalculatedExpiry: endDate
         });
 
         // If upgrading to paid plan, add a payment record
-        if (plan !== 'free') {
-            const amount = plan === 'pro' ? 19 : 49;
+        if (planName !== 'FREE') {
+            const amount = planName === 'PRO' ? 249 : 499;
             await Payment.create({
                 user_id: req.params.id,
                 amount: amount,
@@ -1004,6 +977,56 @@ router.get('/debug-plans', verifyAdmin, async (req, res) => {
         const users = await User.find({}, { email: 1, full_name: 1, subscription_tier: 1, subscription_status: 1 });
         res.json({ users });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /subscriptions - View active/expired subscriptions and statistics for admin
+router.get('/subscriptions', verifyAdmin, async (req, res) => {
+    try {
+        const users = await User.find({ role: { $ne: 'admin' } })
+            .select('full_name email role subscriptionPlan subscriptionStatus subscriptionStartDate subscriptionEndDate autoCalculatedExpiry remainingDays subscription_tier subscription_status created_at')
+            .lean();
+
+        // Calculate stats
+        const activePlans = users.filter(u => (u.subscriptionStatus === 'ACTIVE' || u.subscription_status === 'active') && (u.subscriptionPlan !== 'FREE' && u.subscription_tier !== 'free'));
+        const expiredPlans = users.filter(u => u.subscriptionStatus === 'EXPIRED' || u.subscription_status === 'expired');
+        const freePlans = users.filter(u => !u.subscriptionPlan || u.subscriptionPlan === 'FREE' || u.subscription_tier === 'free');
+
+        // Revenue statistics
+        const subscriptionPayments = await Payment.find({
+            status: 'completed',
+            package_id: null,
+            description: { $regex: /plan|subscription/i }
+        }).lean();
+        const revenue = subscriptionPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        res.json({
+            success: true,
+            totalSubscriptions: users.length,
+            revenue,
+            stats: {
+                active: activePlans.length,
+                expired: expiredPlans.length,
+                free: freePlans.length,
+                pro: users.filter(u => (u.subscriptionPlan === 'PRO' || u.subscription_tier === 'pro')).length,
+                business: users.filter(u => (u.subscriptionPlan === 'BUSINESS' || u.subscription_tier === 'business')).length
+            },
+            subscriptions: users.map(u => ({
+                id: u._id,
+                full_name: u.full_name,
+                email: u.email,
+                role: u.role,
+                subscriptionPlan: u.subscriptionPlan || (u.subscription_tier ? u.subscription_tier.toUpperCase() : 'FREE'),
+                subscriptionStatus: u.subscriptionStatus || (u.subscription_status ? u.subscription_status.toUpperCase() : 'ACTIVE'),
+                subscriptionStartDate: u.subscriptionStartDate || u.created_at,
+                subscriptionEndDate: u.subscriptionEndDate,
+                autoCalculatedExpiry: u.autoCalculatedExpiry,
+                remainingDays: u.remainingDays || 0
+            }))
+        });
+    } catch (err) {
+        console.error('Error fetching admin subscriptions:', err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -8,6 +8,13 @@ const userSchema = new mongoose.Schema({
     role: { type: String, enum: ['user', 'admin', 'freelancer'], default: 'user' },
     subscription_tier: { type: String, enum: ['free', 'pro', 'business'], default: 'free' },
     subscription_status: { type: String, default: 'active' },
+    subscriptionPlan: { type: String, enum: ['FREE', 'PRO', 'BUSINESS'], default: 'FREE' },
+    subscriptionStatus: { type: String, enum: ['ACTIVE', 'EXPIRED', 'CANCELLED'], default: 'ACTIVE' },
+    subscriptionStartDate: { type: Date },
+    subscriptionEndDate: { type: Date },
+    autoCalculatedExpiry: { type: Date },
+    is_boosted: { type: Boolean, default: false },
+    boosts_count: { type: Number, default: 0 },
     phone: { type: String, default: '' },
     
     // ========== CONNECTS SYSTEM ==========
@@ -169,5 +176,15 @@ const userSchema = new mongoose.Schema({
 }, {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
+
+userSchema.virtual('remainingDays').get(function() {
+    if (!this.subscriptionEndDate) return 0;
+    const diff = new Date(this.subscriptionEndDate) - new Date();
+    const days = Math.ceil(diff / (24 * 60 * 60 * 1000));
+    return days > 0 ? days : 0;
+});
+
+userSchema.set('toJSON', { virtuals: true });
+userSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('User', userSchema);

@@ -193,6 +193,10 @@ const projectPostSchema = new mongoose.Schema({
 
     payment_released_at: {
         type: Date
+    },
+    is_featured: {
+        type: Boolean,
+        default: false
     }
 
 }, {

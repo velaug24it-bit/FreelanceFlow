@@ -350,8 +350,18 @@ router.post('/verify-payment', verifyToken, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        const now = new Date();
+        const endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
         user.subscription_tier = planName.toLowerCase();
         user.subscription_status = 'active';
+        user.subscription_end_date = endDate;
+
+        user.subscriptionPlan = planName.toUpperCase();
+        user.subscriptionStatus = 'ACTIVE';
+        user.subscriptionStartDate = now;
+        user.subscriptionEndDate = endDate;
+        user.autoCalculatedExpiry = endDate;
         await user.save();
 
         // Record payment

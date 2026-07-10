@@ -34,9 +34,9 @@ const SubscriptionPlans = () => {
         } catch (err) {
             console.error('Failed to fetch plans:', err);
             setPlans([
-                { id: 1, name: 'Free', price: 0, interval: 'month', features: ['5 Clients', '10 Projects', '20 Invoices', 'Basic Support'] },
-                { id: 2, name: 'Pro', price: 19, interval: 'month', features: ['50 Clients', '100 Projects', '500 Invoices', 'Expense Tracking', 'Task Board', 'Priority Support'], popular: true },
-                { id: 3, name: 'Business', price: 49, interval: 'month', features: ['Unlimited Clients', 'Unlimited Projects', 'Unlimited Invoices', 'All Features', 'API Access', '24/7 Support'] }
+                { id: 1, name: 'Free', price: 0, interval: 'month', features: ['Max 2 Bids & 2 Saved Projects', 'Max 2 Portfolio Items & 2 Boosts', 'Max 2 active contracts & hiring slots', 'Max 2 Projects Posted & 2 Active Projects', 'Basic Support'] },
+                { id: 2, name: 'Pro', price: 249, interval: 'month', features: ['Max 10 Bids & 10 Saved Projects', 'Max 10 Portfolio Items & 10 Boosts', 'Max 10 active contracts & hiring slots', 'Max 10 Projects Posted & 10 Active Projects', 'Expense Tracking & Task Board', 'Priority Support'], popular: true },
+                { id: 3, name: 'Business', price: 499, interval: 'month', features: ['Unlimited Bids & Saved Projects', 'Unlimited Portfolio Items & Boosts', 'Unlimited contracts & hiring slots', 'Unlimited Projects Posted & Active Projects', 'Team member access & API access', '24/7 Dedicated Support'] }
             ]);
         }
     };
@@ -67,7 +67,6 @@ const SubscriptionPlans = () => {
 
         try {
             const token = localStorage.getItem('token');
-            
             // Create Razorpay order
             const { data } = await axios.post('/api/razorpay/create-order', {
                 planId: plan.id,
@@ -80,7 +79,6 @@ const SubscriptionPlans = () => {
             if (!data.key) {
                 throw new Error('Razorpay key was not returned by the server');
             }
-            
             // Open Razorpay Checkout
             const options = {
                 key: data.key,

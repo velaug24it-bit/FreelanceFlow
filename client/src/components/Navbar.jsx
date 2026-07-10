@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  LayoutDashboard, Users, FolderKanban, FileText,
-  Kanban, CreditCard, BarChart3, Settings, LogOut,
-  Crown, Shield, Zap, Briefcase, Menu, X,
-  User, ChevronDown, DollarSign, Sparkles, TrendingUp
+  LayoutDashboard, Users, FolderKanban,
+  Kanban, BarChart3, Settings, LogOut,
+  Crown, Shield, Briefcase, Menu, X,
+  User, ChevronDown, Sparkles, TrendingUp
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -40,9 +40,9 @@ const Navbar = () => {
     { name: 'Task Board', path: '/kanban', icon: Kanban },
     { name: 'Reports', path: '/reports', icon: BarChart3 },
     { name: 'Marketplace', path: '/marketplace', icon: Briefcase },
-    { name: 'Connects', path: '/connects', icon: Zap },
     { name: 'AI Toolkit', path: '/ai-toolkit', icon: Sparkles },
     { name: 'AI Deal Copilot', path: '/ai-analytics', icon: TrendingUp },
+    { name: 'Subscription', path: '/subscription', icon: Crown },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
@@ -334,25 +334,6 @@ const Navbar = () => {
                     Profile Settings
                   </Link>
 
-                  <Link
-                    to="/subscription"
-                    onClick={() => setIsDropdownOpen(false)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.6rem 1.25rem',
-                      textDecoration: 'none',
-                      color: '#4b5563',
-                      fontSize: '0.85rem',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <DollarSign size={16} />
-                    Subscription
-                  </Link>
                 </div>
 
                 {/* Logout */}

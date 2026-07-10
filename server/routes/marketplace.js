@@ -14,6 +14,8 @@ const SavedSearch = require('../models/SavedSearch');
 const BidMessage = require('../models/BidMessage');
 const Report = require('../models/Report');
 const NotificationHelper = require('../utils/notificationHelper');
+const { validateLimit, getCurrentUsage } = require('../middleware/planLimits');
+const { LIMITS } = require('../utils/constants');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -332,7 +334,7 @@ const notifySavedSearchMatches = async (project) => {
 // ============ CLIENT ROUTES ============
 
 // Post a new project - WITH NOTIFICATION
-router.post('/projects', verifyToken, async (req, res) => {
+router.post('/projects', verifyToken, validateLimit('projects_posted'), validateLimit('active_projects'), async (req, res) => {
     try {
         const { title, description, category, budget_min, budget_max, duration, skills_required, deadline } = req.body;
 
@@ -499,19 +501,11 @@ router.get('/my-awarded-projects', verifyToken, async (req, res) => {
 // ============ BIDDING ROUTES WITH NOTIFICATIONS ============
 
 // Place a bid - WITH NOTIFICATION
-router.post('/bids', verifyToken, async (req, res) => {
+router.post('/bids', verifyToken, validateLimit('bids'), validateLimit('proposals_in_progress'), async (req, res) => {
     try {
         const { project_id, bid_amount, estimated_days, proposal, phone_number, portfolio_link } = req.body;
 
         const user = await User.findById(req.userId);
-        const CONNECTS_COST = 1;
-
-        if (user.connects_balance < CONNECTS_COST) {
-            return res.status(400).json({
-                error: 'Insufficient connects. Please purchase more connects to place bids.',
-                needs_connects: true
-            });
-        }
 
         const existingBid = await Bid.findOne({ project_id, freelancer_id: req.userId });
         if (existingBid) {
@@ -528,10 +522,6 @@ router.post('/bids', verifyToken, async (req, res) => {
             phone_number,
             portfolio_link,
             status: 'pending'
-        });
-
-        await User.findByIdAndUpdate(req.userId, {
-            $inc: { connects_balance: -CONNECTS_COST, total_connects_used: CONNECTS_COST }
         });
 
         await ProjectPost.findByIdAndUpdate(project_id, { $inc: { bids_count: 1 } });
@@ -686,7 +676,7 @@ router.get('/saved-searches', verifyToken, async (req, res) => {
     }
 });
 
-router.post('/saved-searches', verifyToken, async (req, res) => {
+router.post('/saved-searches', verifyToken, validateLimit('saved_projects'), async (req, res) => {
     try {
         const { name, category = 'Any', skills = [], budget_min = 0, budget_max = 0 } = req.body;
         const user = await User.findById(req.userId);
@@ -870,6 +860,40 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
+        const freelancer = await User.findById(bid.freelancer_id);
+        const client = await User.findById(projectPost.client_id);
+
+        if (!freelancer || !client) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Validate Client Hiring Slots limit
+        const clientPlan = (client.subscriptionPlan || client.subscription_tier || 'FREE').toUpperCase();
+        if (clientPlan !== 'BUSINESS') {
+            const clientLimit = LIMITS[clientPlan]?.hiring_slots || LIMITS.FREE.hiring_slots;
+            const clientUsage = await getCurrentUsage(req.userId, 'hiring_slots');
+            if (clientUsage >= clientLimit) {
+                const upgradeTo = clientPlan === 'FREE' ? 'PRO' : 'BUSINESS';
+                return res.status(403).json({
+                    error: 'LIMIT_REACHED',
+                    message: `You have reached your ${clientPlan} plan limit. Upgrade to ${upgradeTo} to continue.`
+                });
+            }
+        }
+
+        // Validate Freelancer Active Contracts limit
+        const freelancerPlan = (freelancer.subscriptionPlan || freelancer.subscription_tier || 'FREE').toUpperCase();
+        if (freelancerPlan !== 'BUSINESS') {
+            const freelancerLimit = LIMITS[freelancerPlan]?.active_contracts || LIMITS.FREE.active_contracts;
+            const freelancerUsage = await getCurrentUsage(bid.freelancer_id, 'active_contracts');
+            if (freelancerUsage >= freelancerLimit) {
+                return res.status(403).json({
+                    error: 'LIMIT_REACHED',
+                    message: `The freelancer has reached their plan limit of active contracts.`
+                });
+            }
+        }
+
         // ✅ Check if project already has a freelancer assigned
         if (projectPost.selected_freelancer_id) {
             const selectedFreelancerId = projectPost.selected_freelancer_id.toString();
@@ -893,13 +917,6 @@ router.put('/bids/:bidId/accept', verifyToken, async (req, res) => {
         const clientFee = (bid.bid_amount * CLIENT_FEE_PERCENTAGE) / 100;
         const platformEarns = clientFee;
         const clientTotal = bid.bid_amount + clientFee;
-
-        const freelancer = await User.findById(bid.freelancer_id);
-        const client = await User.findById(projectPost.client_id);
-
-        if (!freelancer || !client) {
-            return res.status(404).json({ error: 'User not found' });
-        }
 
         console.log(`🔍 Accepting bid from ${freelancer.full_name} for project ${projectPost.title}`);
 
@@ -1484,7 +1501,7 @@ router.get('/stats', verifyToken, async (req, res) => {
 });
 
 // Create a marketplace project
-router.post('/projects', verifyToken, async (req, res) => {
+router.post('/projects', verifyToken, validateLimit('projects_posted'), validateLimit('active_projects'), async (req, res) => {
     try {
         const {
             title,
@@ -1910,6 +1927,69 @@ router.get('/payments/dashboard', verifyToken, async (req, res) => {
     } catch (err) {
         console.error('Error fetching payments dashboard:', err);
         res.status(500).json({ error: 'Failed to fetch payments data' });
+    }
+});
+
+// PUT /projects/:projectId/feature - Feature a project (Client)
+router.put('/projects/:projectId/feature', verifyToken, validateLimit('featured_projects'), async (req, res) => {
+    try {
+        const project = await ProjectPost.findById(req.params.projectId);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.client_id.toString() !== req.userId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+        if (project.is_featured) {
+            return res.status(400).json({ error: 'Project is already featured' });
+        }
+        project.is_featured = true;
+        await project.save();
+        res.json({ success: true, message: 'Project featured successfully', project });
+    } catch (err) {
+        console.error('Error featuring project:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /bids/:bidId/feature - Feature a bid/application (Freelancer)
+router.put('/bids/:bidId/feature', verifyToken, validateLimit('featured_applications'), async (req, res) => {
+    try {
+        const bid = await Bid.findById(req.params.bidId);
+        if (!bid) return res.status(404).json({ error: 'Bid not found' });
+        if (bid.freelancer_id.toString() !== req.userId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+        if (bid.is_featured) {
+            return res.status(400).json({ error: 'Application is already featured' });
+        }
+        bid.is_featured = true;
+        await bid.save();
+        res.json({ success: true, message: 'Application featured successfully', bid });
+    } catch (err) {
+        console.error('Error featuring application:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /bids/:bidId/shortlist - Shortlist a bid (Client)
+router.put('/bids/:bidId/shortlist', verifyToken, validateLimit('shortlisted_freelancers'), async (req, res) => {
+    try {
+        const bid = await Bid.findById(req.params.bidId);
+        if (!bid) return res.status(404).json({ error: 'Bid not found' });
+        
+        const project = await ProjectPost.findById(bid.project_id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        if (project.client_id.toString() !== req.userId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+        if (bid.is_shortlisted) {
+            return res.status(400).json({ error: 'Freelancer is already shortlisted' });
+        }
+        bid.is_shortlisted = true;
+        await bid.save();
+        res.json({ success: true, message: 'Freelancer shortlisted successfully', bid });
+    } catch (err) {
+        console.error('Error shortlisting freelancer:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 
