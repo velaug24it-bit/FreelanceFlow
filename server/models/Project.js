@@ -152,8 +152,11 @@ const projectSchema = new mongoose.Schema({
   is_featured: {
     type: Boolean,
     default: false
-  }
-  ,
+  },
+  demo_video_url: {
+    type: String,
+    default: ''
+  },
   // Project tasking, milestones and template reference
   tasks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Task' }],
   milestones: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Milestone' }],

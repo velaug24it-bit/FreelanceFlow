@@ -20,6 +20,7 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const [paymentStatus, setPaymentStatus] = useState(project?.payment_status || 'pending');
+  const [hasViewedDemo, setHasViewedDemo] = useState(false);
 
   const fetchFreelancerInfo = useCallback(async () => {
     if (!project?.selected_freelancer_id) {
@@ -245,16 +246,54 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
         <>
           {paymentStatus === 'pending' || paymentStatus === 'unpaid' || paymentStatus === 'failed' ? (
             <div>
+              {project?.demo_video_url && (
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1.25rem',
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px',
+                  textAlign: 'left'
+                }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b' }}>
+                    📽️ Project Demo Video
+                  </h4>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0 0 1rem 0' }}>
+                    The freelancer has uploaded a screen recording of their local implementation. Please watch it and check the box to unlock the payment button.
+                  </p>
+                  
+                  <video 
+                    src={project.demo_video_url.startsWith('http') ? project.demo_video_url : `${BASE_URL}${project.demo_video_url}`} 
+                    controls 
+                    style={{ width: '100%', maxHeight: '300px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#000', marginBottom: '1rem' }}
+                    onPlay={() => setHasViewedDemo(true)}
+                  />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <input 
+                      type="checkbox" 
+                      id="confirm-demo-checkbox"
+                      checked={hasViewedDemo} 
+                      onChange={(e) => setHasViewedDemo(e.target.checked)} 
+                    />
+                    <label htmlFor="confirm-demo-checkbox" style={{ fontSize: '0.85rem', fontWeight: '500', color: '#334155', cursor: 'pointer' }}>
+                      I have reviewed and approved the demo video of the project.
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={() => setShowPaymentModal(true)}
+                disabled={project?.demo_video_url && !hasViewedDemo}
                 style={{
                   width: '100%',
                   padding: '1rem',
-                  background: '#10b981',
+                  background: (project?.demo_video_url && !hasViewedDemo) ? '#9ca3af' : '#10b981',
                   color: 'white',
                   border: 'none',
                   borderRadius: '8px',
-                  cursor: 'pointer',
+                  cursor: (project?.demo_video_url && !hasViewedDemo) ? 'not-allowed' : 'pointer',
                   fontSize: '1.1rem',
                   fontWeight: '600',
                   display: 'flex',
@@ -263,8 +302,8 @@ const ProjectPayment = ({ project, isClient, isFreelancer }) => {
                   gap: '0.5rem',
                   transition: 'background 0.2s'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#059669'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#10b981'}
+                onMouseEnter={(e) => { if (!(project?.demo_video_url && !hasViewedDemo)) e.currentTarget.style.background = '#059669'; }}
+                onMouseLeave={(e) => { if (!(project?.demo_video_url && !hasViewedDemo)) e.currentTarget.style.background = '#10b981'; }}
               >
                 <CreditCard size={20} />
                 Pay ₹{bidAmt.toLocaleString()}

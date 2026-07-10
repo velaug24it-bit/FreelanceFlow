@@ -1348,7 +1348,7 @@ router.patch('/projects/:projectId/complete', verifyToken, async (req, res) => {
 // Update project status - WITH NOTIFICATION
 router.put('/projects/:id/status', verifyToken, async (req, res) => {
     try {
-        const { status, progress, message, current_phase } = req.body;
+        const { status, progress, message, current_phase, demo_video_url } = req.body;
         const projectId = req.params.id;
         const userId = req.userId;
 
@@ -1370,6 +1370,13 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
             progress: progress !== undefined ? progress : project.progress,
             current_phase: current_phase || project.current_phase
         };
+
+        if (status === 'review' && isFreelancer) {
+            if (!demo_video_url) {
+                return res.status(400).json({ error: 'Demo video is required when submitting the project for review.' });
+            }
+            updateData.demo_video_url = demo_video_url;
+        }
 
         if (status === 'completed') {
             updateData.completed_at = new Date();
@@ -1405,7 +1412,8 @@ router.put('/projects/:id/status', verifyToken, async (req, res) => {
                     progress: updatedProject.progress,
                     current_phase: updatedProject.current_phase,
                     completed_at: updatedProject.completed_at,
-                    payment_status: updatedProject.payment_status
+                    payment_status: updatedProject.payment_status,
+                    demo_video_url: updatedProject.demo_video_url
                 }
             }
         );

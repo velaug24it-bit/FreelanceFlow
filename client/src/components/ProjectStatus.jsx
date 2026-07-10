@@ -18,8 +18,42 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
         status: project.status || 'in_progress',
         progress: project.progress || 0,
         message: '',
-        current_phase: project.current_phase || 'development'
+        current_phase: project.current_phase || 'development',
+        demo_video_url: ''
     });
+    const [uploadingVideo, setUploadingVideo] = useState(false);
+
+    const handleVideoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('video/')) {
+            alert('Please select a valid video file');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        setUploadingVideo(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API_URL}/upload`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            setStatusData(prev => ({ ...prev, demo_video_url: res.data.url }));
+            alert('Demo video uploaded successfully!');
+        } catch (err) {
+            console.error('Failed to upload video', err);
+            alert('Failed to upload video: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setStatusData(prev => ({ ...prev })); // trigger re-render
+            setUploadingVideo(false);
+        }
+    };
 
     const getId = (value) => value?._id || value?.id || value;
 
@@ -54,6 +88,11 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
             return;
         }
 
+        if (statusData.status === 'review' && !statusData.demo_video_url) {
+            alert('Please upload a demo video before submitting for review.');
+            return;
+        }
+
         setLoading(true);
         setSubmitSuccess(false);
         setSubmitMessage('');
@@ -80,7 +119,8 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                 status: 'in_progress',
                 progress: 0,
                 message: '',
-                current_phase: 'development'
+                current_phase: 'development',
+                demo_video_url: ''
             });
             
             if (onStatusUpdate) {
@@ -335,6 +375,35 @@ const ProjectStatus = ({ project, isOwner, isFreelancer, onStatusUpdate }) => {
                                 ))}
                             </select>
                         </div>
+
+                        {isFreelancerUser && statusData.status === 'review' && (
+                            <div style={{ border: '1px dashed #cbd5e1', padding: '1rem', borderRadius: '8px', background: '#f8fafc' }}>
+                                <label style={{ fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)', marginBottom: '0.5rem', display: 'block', fontWeight: '600', color: '#1e293b' }}>
+                                    Upload Local Demo Video *
+                                </label>
+                                <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>
+                                    Please record a short video demonstrating your local implementation and upload it here (MP4/WebM, up to 100MB).
+                                </p>
+                                <input
+                                    type="file"
+                                    accept="video/*"
+                                    onChange={handleVideoUpload}
+                                    disabled={uploadingVideo}
+                                    style={{ display: 'block', marginBottom: '0.5rem' }}
+                                />
+                                {uploadingVideo && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#3b82f6', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                                        <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                        Uploading video file... Please wait.
+                                    </div>
+                                )}
+                                {statusData.demo_video_url && (
+                                    <div style={{ color: '#10b981', fontSize: '0.8rem', marginTop: '0.25rem', fontWeight: '500' }}>
+                                        ✓ Demo video uploaded successfully!
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                         {/* Progress slider - only for freelancers */}
                         {isFreelancerUser && (

@@ -197,6 +197,10 @@ const projectPostSchema = new mongoose.Schema({
     is_featured: {
         type: Boolean,
         default: false
+    },
+    demo_video_url: {
+        type: String,
+        default: ''
     }
 
 }, {
