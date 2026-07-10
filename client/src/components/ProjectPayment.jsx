@@ -4,7 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { CreditCard, CheckCircle, Clock, AlertCircle, Loader, UploadCloud, XCircle } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const BASE_URL = API_URL.replace(/\/api$/, '');
+const getBaseUrl = () => {
+  let baseUrl = API_URL.replace(/\/api$/, '');
+  if (baseUrl.includes('localhost') && window.location.hostname !== 'localhost') {
+    baseUrl = baseUrl.replace('localhost', window.location.hostname);
+  }
+  return baseUrl;
+};
+const BASE_URL = getBaseUrl();
 
 const ProjectPayment = ({ project, isClient, isFreelancer }) => {
   const { user } = useAuth();
