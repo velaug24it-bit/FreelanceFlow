@@ -24,6 +24,9 @@ const notificationSchema = new mongoose.Schema({
       'moderation_report',
       'subscription_expiring',
       'subscription_expired',
+      'contract_created',
+      'message',
+      'payment',
       'general'
     ],
     required: true

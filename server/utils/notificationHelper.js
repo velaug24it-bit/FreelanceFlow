@@ -3,6 +3,42 @@ const User = require('../models/User');
 const sendEmail = require('./email');
 const { sendPush } = require('./push');
 
+const mapTypeToCategory = (type) => {
+    switch (type) {
+        case 'invoice_created':
+        case 'invoice_paid':
+        case 'invoice':
+            return 'invoice';
+        case 'bid_received':
+        case 'bid_accepted':
+        case 'bid_rejected':
+        case 'project_assigned':
+        case 'project_status_updated':
+        case 'new_project':
+        case 'contract_created':
+        case 'job_match':
+        case 'prehire_message':
+        case 'project':
+            return 'project';
+        case 'message':
+        case 'chat':
+            return 'message';
+        case 'subscription_expiring':
+        case 'subscription_expired':
+        case 'subscription':
+            return 'subscription';
+        case 'payment_received':
+        case 'payment_released':
+        case 'payment_submitted':
+        case 'payment_approved':
+        case 'payment_rejected':
+        case 'payment':
+            return 'payment';
+        default:
+            return null;
+    }
+};
+
 class NotificationHelper {
     // Create a notification
     static async createNotification({ userId, type, title, message, referenceId, referenceType, actionUrl }) {
@@ -32,10 +68,12 @@ class NotificationHelper {
                         const emailPrefs = prefs.email || {};
                         const pushPrefs = prefs.push || {};
 
-                        // Default to sending in-app always (we already created it)
+                        const category = mapTypeToCategory(type);
+                        const isEmailEnabled = category ? (emailPrefs[category] === undefined ? true : emailPrefs[category]) : true;
+                        const isPushEnabled = category ? (pushPrefs[category] === undefined ? true : pushPrefs[category]) : true;
 
                         // Email
-                        if ((emailPrefs[type] === undefined ? true : emailPrefs[type]) && user.email) {
+                        if (isEmailEnabled && user.email) {
                             await sendEmail({
                                 to: user.email,
                                 subject: title,
@@ -45,7 +83,7 @@ class NotificationHelper {
                         }
 
                         // Push
-                        if ((pushPrefs[type] === undefined ? true : pushPrefs[type]) && user.push_subscription) {
+                        if (isPushEnabled && user.push_subscription) {
                             await sendPush(user.push_subscription, {
                                 title,
                                 body: message,
@@ -88,6 +126,47 @@ class NotificationHelper {
                     global.io.to(notification.user_id.toString()).emit('new_notification', notification);
                 });
             }
+
+            // Send email / push depending on user preferences asynchronously (non-blocking)
+            (async () => {
+                try {
+                    const users = await User.find({ _id: { $in: userIds } });
+                    const category = mapTypeToCategory(type);
+
+                    for (const user of users) {
+                        if (!user) continue;
+
+                        const prefs = user.notification_preferences || {};
+                        const emailPrefs = prefs.email || {};
+                        const pushPrefs = prefs.push || {};
+
+                        const isEmailEnabled = category ? (emailPrefs[category] === undefined ? true : emailPrefs[category]) : true;
+                        const isPushEnabled = category ? (pushPrefs[category] === undefined ? true : pushPrefs[category]) : true;
+
+                        // Email
+                        if (isEmailEnabled && user.email) {
+                            await sendEmail({
+                                to: user.email,
+                                subject: title,
+                                text: message,
+                                html: `<div style="font-family: sans-serif; padding: 10px;"><h3>${title}</h3><p>${message}</p><p><a href="${(process.env.CLIENT_URL||'http://localhost:3000') + (actionUrl||'')}">View</a></p></div>`
+                            }).catch(err => console.error(`Error sending email to ${user.email} in bulk notification:`, err));
+                        }
+
+                        // Push
+                        if (isPushEnabled && user.push_subscription) {
+                            await sendPush(user.push_subscription, {
+                                title,
+                                body: message,
+                                icon: '/logo192.png',
+                                url: (process.env.CLIENT_URL||'http://localhost:3000') + (actionUrl||'/')
+                            }).catch(err => console.error(`Error sending push to ${user.email} in bulk notification:`, err));
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error sending bulk email/push notifications in background:', err);
+                }
+            })();
             
             return result;
         } catch (err) {

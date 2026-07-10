@@ -85,7 +85,7 @@ router.post('/projects/:projectId/messages', verifyToken, async (req, res) => {
         if (recipientId) {
             await NotificationHelper.createNotification({
                 userId: recipientId,
-                type: 'general',
+                type: 'message',
                 title: `New chat message on ${access.project.title}`,
                 message: `${req.user.full_name}: ${cleanMessage}`,
                 referenceId: access.project._id,
