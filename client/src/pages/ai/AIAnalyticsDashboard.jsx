@@ -76,7 +76,88 @@ const AIAnalyticsDashboard = () => {
   const selectedProject = projects.find(p => p._id === selectedProjectId);
 
   return (
-    <div style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>
+    <div className="copilot-root" style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif', color: '#1e293b' }}>
+      <style>{`
+        .copilot-grid {
+          display: grid;
+          grid-template-columns: 300px 1fr;
+          gap: 2rem;
+        }
+        .copilot-tabs {
+          display: flex;
+          flex-direction: column;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          padding: 0.75rem;
+          gap: 4px;
+        }
+        .copilot-tab-btn {
+          width: 100%;
+          padding: 0.75rem 1rem;
+          border-radius: 12px;
+          border: none;
+          background: transparent;
+          color: #475569;
+          font-weight: 600;
+          font-size: 0.9rem;
+          cursor: pointer;
+          text-align: left;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: all 0.2s;
+        }
+        .copilot-tab-btn.active {
+          background: #4f46e5;
+          color: white;
+        }
+        .spin-anim {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @media (max-width: 768px) {
+          .copilot-root {
+            padding: 1rem 0.75rem !important;
+          }
+          .copilot-card {
+            padding: 1rem !important;
+            border-radius: 16px !important;
+          }
+          .copilot-details-card {
+            padding: 1rem !important;
+            border-radius: 16px !important;
+          }
+          .copilot-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.25rem !important;
+          }
+          .copilot-tabs {
+            flex-direction: column !important;
+            flex-wrap: nowrap !important;
+            overflow-x: visible !important;
+            white-space: normal !important;
+            padding: 0.5rem !important;
+            border-radius: 16px !important;
+          }
+          .copilot-tab-btn {
+            width: 100% !important;
+            flex-shrink: 1 !important;
+            white-space: normal !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+            font-size: 0.85rem !important;
+            padding: 0.75rem 1rem !important;
+          }
+          .responsive-grid {
+            grid-template-columns: 1fr !important;
+            gap: 1.25rem !important;
+          }
+        }
+      `}</style>
       
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
@@ -122,7 +203,7 @@ const AIAnalyticsDashboard = () => {
       )}
 
       {/* Project Selector Panel */}
-      <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+      <div className="copilot-card" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <h3 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Briefcase size={18} style={{ color: '#4f46e5' }} />
           Select Active Contract to Analyze
@@ -137,7 +218,7 @@ const AIAnalyticsDashboard = () => {
           </div>
         ) : (
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '280px' }}>
+            <div style={{ flex: 1, minWidth: '240px' }}>
               <select
                 value={selectedProjectId}
                 onChange={e => setSelectedProjectId(e.target.value)}
@@ -205,16 +286,14 @@ const AIAnalyticsDashboard = () => {
             We're comparing project requirements, skills required, pricing metrics, and proposal scope to create the ultimate mediation blueprint...
           </p>
         </div>
-      )}
-
-      {!loadingAnalysis && copilotData && (
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '2rem' }} className="responsive-grid">
+      )}       {!loadingAnalysis && copilotData && (
+        <div className="copilot-grid">
           
           {/* Left Sidebar Plan Summary */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             
             {/* Overview Card */}
-            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+            <div className="copilot-card" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '1.25rem', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', tracking: '0.05em' }}>Deal Rating</span>
               
               {/* Pricing Evaluation */}
@@ -244,25 +323,10 @@ const AIAnalyticsDashboard = () => {
             </div>
 
             {/* Navigation Tabs */}
-            <div style={{ display: 'flex', flexDirection: 'column', background: 'white', border: '1px solid #e2e8f0', borderRadius: '20px', padding: '0.75rem', gap: '4px' }}>
+            <div className="copilot-tabs">
               <button
                 onClick={() => setActiveSubTab('roadmap')}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: activeSubTab === 'roadmap' ? '#4f46e5' : 'transparent',
-                  color: activeSubTab === 'roadmap' ? 'white' : '#475569',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s'
-                }}
+                className={`copilot-tab-btn ${activeSubTab === 'roadmap' ? 'active' : ''}`}
               >
                 <ListChecks size={16} />
                 Agile Scope & Verification
@@ -270,22 +334,7 @@ const AIAnalyticsDashboard = () => {
               
               <button
                 onClick={() => setActiveSubTab('pricing')}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: activeSubTab === 'pricing' ? '#4f46e5' : 'transparent',
-                  color: activeSubTab === 'pricing' ? 'white' : '#475569',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s'
-                }}
+                className={`copilot-tab-btn ${activeSubTab === 'pricing' ? 'active' : ''}`}
               >
                 <DollarSign size={16} />
                 Valuation & Improvements
@@ -293,22 +342,7 @@ const AIAnalyticsDashboard = () => {
               
               <button
                 onClick={() => setActiveSubTab('risk')}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '12px',
-                  border: 'none',
-                  background: activeSubTab === 'risk' ? '#4f46e5' : 'transparent',
-                  color: activeSubTab === 'risk' ? 'white' : '#475569',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s'
-                }}
+                className={`copilot-tab-btn ${activeSubTab === 'risk' ? 'active' : ''}`}
               >
                 <ShieldAlert size={16} />
                 Escrow & Risk Mitigation
@@ -331,7 +365,7 @@ const AIAnalyticsDashboard = () => {
           </div>
 
           {/* Right Main Details Content */}
-          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+          <div className="copilot-details-card" style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '2rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
             
             {/* TAB 1: ROADMAP & VERIFICATION */}
             {activeSubTab === 'roadmap' && (
@@ -516,16 +550,6 @@ const AIAnalyticsDashboard = () => {
         </div>
       )}
 
-      {/* Embedded Styles */}
-      <style>{`
-        .spin-anim {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
 
     </div>
   );

@@ -10,3 +10,10 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// Global PWA installation listener
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.deferredPrompt = e;
+  window.dispatchEvent(new Event('pwa-installable'));
+});

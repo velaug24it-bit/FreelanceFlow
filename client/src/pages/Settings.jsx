@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { Crown, User, Bell, Shield, ArrowRight, CheckCircle, AlertCircle, Key, X } from 'lucide-react';
+import { Crown, User, Bell, Shield, ArrowRight, CheckCircle, AlertCircle, Key, X, Download } from 'lucide-react';
 import ProfileProgress from '../components/ProfileProgress';
 
 // Inject mobile-responsive styles for Settings page
@@ -9,7 +9,31 @@ if (!document.querySelector('style[data-settings-responsive]')) {
   const s = document.createElement('style');
   s.setAttribute('data-settings-responsive', 'true');
   s.textContent = `
-    @media (max-width: 640px) {
+    .settings-info-grid {
+      display: grid;
+      gap: 1.5rem;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .settings-form-grid {
+      display: grid;
+      gap: 1.25rem;
+      grid-template-columns: repeat(2, 1fr);
+    }
+    @media (max-width: 1024px) {
+      .settings-info-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+    }
+    @media (max-width: 768px) {
+      .settings-info-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .settings-info-grid .span-2 {
+        grid-column: span 1 !important;
+      }
+      .settings-form-grid {
+        grid-template-columns: 1fr !important;
+      }
       .settings-root {
         padding: 1rem 0.75rem !important;
       }
@@ -24,18 +48,9 @@ if (!document.querySelector('style[data-settings-responsive]')) {
         align-self: flex-end;
         margin-left: auto;
       }
-      .settings-info-grid {
-        grid-template-columns: 1fr !important;
-      }
-      .settings-info-grid .span-2 {
-        grid-column: span 1 !important;
-      }
       .settings-2fa-inner {
         flex-direction: column !important;
         align-items: flex-start !important;
-      }
-      .settings-form-grid {
-        grid-template-columns: 1fr !important;
       }
       .settings-section {
         padding: 1rem !important;
@@ -53,6 +68,40 @@ const Settings = () => {
   const { user, updateProfile, refreshUser } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  useEffect(() => {
+    if (window.deferredPrompt) {
+      setShowInstallBtn(true);
+    }
+    const handleInstallable = () => setShowInstallBtn(true);
+    window.addEventListener('pwa-installable', handleInstallable);
+    
+    const handleAppInstalled = () => {
+      setShowInstallBtn(false);
+      window.deferredPrompt = null;
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      setShowInstallBtn(false);
+    }
+
+    return () => {
+      window.removeEventListener('pwa-installable', handleInstallable);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    const promptEvent = window.deferredPrompt;
+    if (!promptEvent) return;
+    promptEvent.prompt();
+    const { outcome } = await promptEvent.userChoice;
+    console.log(`PWA install prompt outcome from Settings: ${outcome}`);
+    window.deferredPrompt = null;
+    setShowInstallBtn(false);
+  };
 
   // Profile Edit States
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -347,7 +396,7 @@ const Settings = () => {
 
           {isEditingProfile ? (
             <form onSubmit={handleSaveProfile}>
-              <div className="settings-form-grid" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+              <div className="settings-form-grid">
                 <div className="form-group">
                   <label style={{ fontWeight: '600', fontSize: '0.875rem', color: '#475569' }}>Full Name</label>
                   <input
@@ -520,7 +569,7 @@ const Settings = () => {
               </div>
             </form>
           ) : (
-            <div className="settings-info-grid" style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            <div className="settings-info-grid">
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>Full Name</label>
                 <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user?.full_name || 'Not set'}</p>
@@ -578,7 +627,7 @@ const Settings = () => {
               <div className="span-2" style={{ gridColumn: 'span 2', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                 <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#1e293b' }}>Payment Information</h3>
                 {user?.payment_info?.upi_id ? (
-                  <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                  <div className="settings-info-grid" style={{ marginTop: '0.75rem' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: '0.25rem' }}>UPI ID</label>
                       <p style={{ fontSize: '1rem', fontWeight: '600', color: '#1e293b' }}>{user.payment_info.upi_id}</p>
@@ -850,6 +899,40 @@ const Settings = () => {
           </div>
           <p style={{ color: '#6b7280' }}>Email notifications for invoices, payments, and reminders coming soon.</p>
         </div>
+
+        {/* ==================== PWA INSTALL CARD ==================== */}
+        {showInstallBtn && (
+          <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #cbd5e1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <Download size={24} color="#4f46e5" />
+              <h2 style={{ fontSize: '1.25rem', margin: 0, fontWeight: '700', color: '#1e293b' }}>Install Application</h2>
+            </div>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+              Install FreelanceFlow on your desktop or mobile device. Running as a standalone application gives you faster startup times, a clean distraction-free window, and native integration.
+            </p>
+            <button
+              onClick={handleInstallApp}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1.5rem',
+                background: '#4f46e5',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#4338ca'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#4f46e5'}
+            >
+              <Download size={16} />
+              Install FreelanceFlow App
+            </button>
+          </div>
+        )}
 
         {/* ==================== SECURITY / DELETE ACCOUNT SECTION ==================== */}
         <div className="settings-section" style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
