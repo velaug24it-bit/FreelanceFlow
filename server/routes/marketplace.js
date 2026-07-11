@@ -1814,8 +1814,8 @@ router.post('/:id/submit-payment', verifyToken, async (req, res) => {
         await NotificationHelper.createNotification({
             userId: project.selected_freelancer_id,
             type: 'payment',
-            title: 'payment_submitted',
-            message: `Client has submitted payment proof for ${project.title}. Please review and approve.`,
+            title: '💸 Payment Proof Submitted',
+            message: `Client has submitted payment proof for "${project.title}". Please review and approve.`,
             actionUrl: `/dashboard?tab=payments`
         });
 
@@ -1858,8 +1858,8 @@ router.post('/:id/verify-payment', verifyToken, async (req, res) => {
             await NotificationHelper.createNotification({
                 userId: project.client_id,
                 type: 'payment',
-                title: 'payment_approved',
-                message: `Freelancer has approved your payment for ${project.title}. Project is now marked completed!`,
+                title: '✅ Payment Approved',
+                message: `Freelancer has approved your payment for "${project.title}". Project is now marked completed!`,
                 actionUrl: `/dashboard?tab=payments`
             });
         } else {
@@ -1871,8 +1871,8 @@ router.post('/:id/verify-payment', verifyToken, async (req, res) => {
             await NotificationHelper.createNotification({
                 userId: project.client_id,
                 type: 'payment',
-                title: 'payment_rejected',
-                message: `Your payment for ${project.title} was rejected. Reason: ${reason}`,
+                title: '❌ Payment Rejected',
+                message: `Your payment for "${project.title}" was rejected. Reason: ${reason}`,
                 actionUrl: `/manage-project/${project._id}`
             });
         }

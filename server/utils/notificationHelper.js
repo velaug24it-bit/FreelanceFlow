@@ -14,6 +14,7 @@ const mapTypeToCategory = (type) => {
         case 'bid_rejected':
         case 'project_assigned':
         case 'project_status_updated':
+        case 'project_completed':
         case 'new_project':
         case 'contract_created':
         case 'job_match':
@@ -74,11 +75,13 @@ class NotificationHelper {
 
                         // Email
                         if (isEmailEnabled && user.email) {
+                            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                            const fullUrl = actionUrl ? clientUrl + actionUrl : clientUrl;
                             await sendEmail({
                                 to: user.email,
-                                subject: title,
-                                text: message,
-                                html: `<div style="font-family: sans-serif; padding: 10px;"><h3>${title}</h3><p>${message}</p><p><a href="${(process.env.CLIENT_URL||'http://localhost:3000') + (actionUrl||'')}">View</a></p></div>`
+                                subject: `[FreelanceFlow] ${title}`,
+                                text: `${title}\n\n${message}\n\nView here: ${fullUrl}\n\nYou received this because you have email notifications enabled on FreelanceFlow.`,
+                                html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><tr><td style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);padding:32px 40px;text-align:center"><h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700">FreelanceFlow</h1><p style="color:#bfdbfe;margin:6px 0 0;font-size:13px">Professional Freelancing Platform</p></td></tr><tr><td style="padding:36px 40px"><h2 style="color:#1e293b;margin:0 0 16px;font-size:20px">${title}</h2><p style="color:#475569;margin:0 0 24px;font-size:15px;line-height:1.6">${message}</p><a href="${fullUrl}" style="display:inline-block;padding:12px 28px;background:#3b82f6;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">View Details</a></td></tr><tr><td style="padding:20px 40px;border-top:1px solid #e2e8f0;background:#f8fafc"><p style="color:#94a3b8;font-size:12px;margin:0;text-align:center">You received this because you have email notifications enabled on FreelanceFlow.<br>To manage your notification preferences, visit your <a href="${clientUrl}/settings" style="color:#3b82f6">account settings</a>.</p></td></tr></table></td></tr></table></body></html>`
                             });
                         }
 
@@ -145,11 +148,13 @@ class NotificationHelper {
 
                         // Email
                         if (isEmailEnabled && user.email) {
+                            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                            const fullUrl = actionUrl ? clientUrl + actionUrl : clientUrl;
                             await sendEmail({
                                 to: user.email,
-                                subject: title,
-                                text: message,
-                                html: `<div style="font-family: sans-serif; padding: 10px;"><h3>${title}</h3><p>${message}</p><p><a href="${(process.env.CLIENT_URL||'http://localhost:3000') + (actionUrl||'')}">View</a></p></div>`
+                                subject: `[FreelanceFlow] ${title}`,
+                                text: `${title}\n\n${message}\n\nView here: ${fullUrl}\n\nYou received this because you have email notifications enabled on FreelanceFlow.`,
+                                html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head><body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0"><tr><td align="center"><table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><tr><td style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);padding:32px 40px;text-align:center"><h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700">FreelanceFlow</h1><p style="color:#bfdbfe;margin:6px 0 0;font-size:13px">Professional Freelancing Platform</p></td></tr><tr><td style="padding:36px 40px"><h2 style="color:#1e293b;margin:0 0 16px;font-size:20px">${title}</h2><p style="color:#475569;margin:0 0 24px;font-size:15px;line-height:1.6">${message}</p><a href="${fullUrl}" style="display:inline-block;padding:12px 28px;background:#3b82f6;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">View Details</a></td></tr><tr><td style="padding:20px 40px;border-top:1px solid #e2e8f0;background:#f8fafc"><p style="color:#94a3b8;font-size:12px;margin:0;text-align:center">You received this because you have email notifications enabled on FreelanceFlow.<br>To manage your notification preferences, visit your <a href="${clientUrl}/settings" style="color:#3b82f6">account settings</a>.</p></td></tr></table></td></tr></table></body></html>`
                             }).catch(err => console.error(`Error sending email to ${user.email} in bulk notification:`, err));
                         }
 
