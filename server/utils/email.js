@@ -2,6 +2,51 @@ const nodemailer = require('nodemailer');
 
 const getEnv = (key) => (process.env[key] || '').trim();
 
+const postJson = async (url, headers, body) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...headers
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        });
+
+        const text = await response.text();
+        let data = {};
+
+        try {
+            data = text ? JSON.parse(text) : {};
+        } catch (err) {
+            data = { raw: text };
+        }
+
+        if (!response.ok) {
+            const message = data.message || data.error || data.errors?.[0]?.message || text || response.statusText;
+            throw new Error(`${response.status} ${message}`);
+        }
+
+        return data;
+    } finally {
+        clearTimeout(timeout);
+    }
+};
+
+const getDefaultFrom = () => {
+    const configuredFrom = getEnv('EMAIL_FROM');
+    if (configuredFrom) return configuredFrom;
+
+    const smtpUser = getEnv('SMTP_USER');
+    if (smtpUser) return `"FreelanceFlow" <${smtpUser}>`;
+
+    return '"FreelanceFlow" <notifications@freelanceflow.app>';
+};
+
 const getSmtpConfig = () => {
     const host = getEnv('SMTP_HOST');
     const user = getEnv('SMTP_USER');
@@ -20,8 +65,88 @@ const getSmtpConfig = () => {
         port,
         secure: getEnv('SMTP_SECURE') ? getEnv('SMTP_SECURE') === 'true' : port === 465,
         auth: { user, pass },
-        from: getEnv('EMAIL_FROM') || `"FreelanceFlow" <${user}>`
+        from: getDefaultFrom()
     };
+};
+
+const sendWithBrevo = async (options) => {
+    const apiKey = getEnv('BREVO_API_KEY');
+    if (!apiKey) return null;
+
+    const fromAddress = parseEmailAddress(getDefaultFrom());
+
+    const data = await postJson(
+        'https://api.brevo.com/v3/smtp/email',
+        {
+            'api-key': apiKey,
+            'accept': 'application/json'
+        },
+        {
+            sender: {
+                name: fromAddress.name || 'FreelanceFlow',
+                email: fromAddress.email
+            },
+            to: [{ email: options.to }],
+            subject: options.subject,
+            textContent: options.text || '',
+            htmlContent: options.html || options.text || ''
+        }
+    );
+
+    console.log(`Email sent with Brevo to ${options.to} | Id: ${data.messageId || 'unknown'}`);
+    return { provider: 'brevo', messageId: data.messageId || null };
+};
+
+const sendWithResend = async (options) => {
+    const apiKey = getEnv('RESEND_API_KEY');
+    if (!apiKey) return null;
+
+    const data = await postJson(
+        'https://api.resend.com/emails',
+        { Authorization: `Bearer ${apiKey}` },
+        {
+            from: getDefaultFrom(),
+            to: [options.to],
+            subject: options.subject,
+            text: options.text,
+            html: options.html
+        }
+    );
+
+    console.log(`Email sent with Resend to ${options.to} | Id: ${data.id || 'unknown'}`);
+    return { provider: 'resend', messageId: data.id || null };
+};
+
+const sendWithSendGrid = async (options) => {
+    const apiKey = getEnv('SENDGRID_API_KEY');
+    if (!apiKey) return null;
+
+    await postJson(
+        'https://api.sendgrid.com/v3/mail/send',
+        { Authorization: `Bearer ${apiKey}` },
+        {
+            personalizations: [{ to: [{ email: options.to }] }],
+            from: parseEmailAddress(getDefaultFrom()),
+            subject: options.subject,
+            content: [
+                { type: 'text/plain', value: options.text || '' },
+                { type: 'text/html', value: options.html || options.text || '' }
+            ]
+        }
+    );
+
+    console.log(`Email sent with SendGrid to ${options.to}`);
+    return { provider: 'sendgrid', messageId: null };
+};
+
+const parseEmailAddress = (value) => {
+    const match = value.match(/^(.*)<(.+)>$/);
+    if (!match) return { email: value };
+
+    const name = match[1].replace(/"/g, '').trim();
+    const email = match[2].trim();
+
+    return name ? { email, name } : { email };
 };
 
 /**
@@ -34,6 +159,12 @@ const sendEmail = async (options) => {
     let previewUrl = null;
 
     try {
+        const providerResult = await sendWithBrevo(options) || await sendWithResend(options) || await sendWithSendGrid(options);
+
+        if (providerResult) {
+            return { previewUrl, ...providerResult };
+        }
+
         const smtpConfig = getSmtpConfig();
 
         if (smtpConfig) {
@@ -93,6 +224,7 @@ const sendEmail = async (options) => {
         console.log(`   Subject: ${options.subject}`);
         console.log('─────────────────────────────────────────────────────');
         console.log(options.text);
+        return { previewUrl, error: error.message };
         console.log('─────────────────────────────────────────────────────\n');
     }
 
