@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const NotificationHelper = require('../utils/notificationHelper');
+const { getPublicVapidKey } = require('../utils/push');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -54,6 +55,19 @@ router.get('/unread-count', verifyToken, async (req, res) => {
         console.error('Error fetching unread count:', err);
         res.status(500).json({ error: 'Server error' });
     }
+});
+
+// Public VAPID key used by browsers to create a Web Push subscription
+router.get('/push-public-key', verifyToken, (req, res) => {
+    const publicKey = getPublicVapidKey();
+
+    if (!publicKey) {
+        return res.status(503).json({
+            error: 'Push notifications are not configured'
+        });
+    }
+
+    res.json({ publicKey });
 });
 
 // Mark a single notification as read

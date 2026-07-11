@@ -1,19 +1,25 @@
 const webpush = require('web-push');
 
 const setup = () => {
-  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    webpush.setVapidDetails(
-      process.env.EMAIL_FROM || 'mailto:admin@freelanceflow.com',
-      process.env.VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    return false;
   }
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || 'mailto:admin@freelanceflow.com',
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+  return true;
 };
 
 const sendPush = async (subscription, payload = {}) => {
   try {
     if (!subscription) return;
-    setup();
+    if (!setup()) {
+      console.error('Error sending push: VAPID keys are not configured');
+      return false;
+    }
     await webpush.sendNotification(subscription, JSON.stringify(payload));
     return true;
   } catch (err) {
@@ -22,4 +28,6 @@ const sendPush = async (subscription, payload = {}) => {
   }
 };
 
-module.exports = { sendPush };
+const getPublicVapidKey = () => process.env.VAPID_PUBLIC_KEY || null;
+
+module.exports = { sendPush, getPublicVapidKey };

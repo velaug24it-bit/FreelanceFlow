@@ -85,6 +85,14 @@ const NotificationBell = () => {
         setTimeout(() => setPushMessage(null), 3500);
     };
 
+    const fetchVapidPublicKey = async () => {
+        const response = await axios.get(`${API_URL}/notifications/push-public-key`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+
+        return response.data.publicKey;
+    };
+
     // Check if push is already enabled on component mount
     useEffect(() => {
         const checkPushStatus = async () => {
@@ -134,7 +142,7 @@ const NotificationBell = () => {
                 const reg = await navigator.serviceWorker.register('/sw.js');
                 await navigator.serviceWorker.ready;
 
-                const vapidKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
+                const vapidKey = await fetchVapidPublicKey();
                 if (!vapidKey) {
                     showPushMessage('Push configuration is missing. Contact support.', 'error');
                     return;
@@ -157,7 +165,11 @@ const NotificationBell = () => {
             }
         } catch (err) {
             console.error('Push toggle error:', err);
-            showPushMessage('Something went wrong. Please try again.', 'error');
+            if (err.response?.status === 503) {
+                showPushMessage('Push configuration is missing. Contact support.', 'error');
+            } else {
+                showPushMessage('Something went wrong. Please try again.', 'error');
+            }
         } finally {
             setPushLoading(false);
         }
