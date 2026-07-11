@@ -3,6 +3,30 @@ const User = require('../models/User');
 const sendEmail = require('./email');
 const { sendPush } = require('./push');
 
+const DEFAULT_CHANNEL_PREFERENCES = {
+    email: {
+        invoice: true,
+        project: true,
+        message: true,
+        subscription: true,
+        payment: true
+    },
+    in_app: {
+        invoice: true,
+        project: true,
+        message: true,
+        subscription: true,
+        payment: true
+    },
+    push: {
+        invoice: true,
+        project: true,
+        message: true,
+        subscription: true,
+        payment: true
+    }
+};
+
 const mapTypeToCategory = (type) => {
     switch (type) {
         case 'invoice_created':
@@ -40,6 +64,24 @@ const mapTypeToCategory = (type) => {
     }
 };
 
+const isChannelEnabled = (prefs, channel, category, type) => {
+    const channelPrefs = prefs?.[channel] || {};
+
+    if (type && channelPrefs[type] !== undefined) {
+        return channelPrefs[type] !== false;
+    }
+
+    if (category && channelPrefs[category] !== undefined) {
+        return channelPrefs[category] !== false;
+    }
+
+    if (type && prefs?.[type] !== undefined) {
+        return prefs[type] !== false;
+    }
+
+    return true;
+};
+
 class NotificationHelper {
     // Create a notification
     static async createNotification({ userId, type, title, message, referenceId, referenceType, actionUrl }) {
@@ -66,12 +108,9 @@ class NotificationHelper {
                     const user = await User.findById(userId);
                     if (user) {
                         const prefs = user.notification_preferences || {};
-                        const emailPrefs = prefs.email || {};
-                        const pushPrefs = prefs.push || {};
-
                         const category = mapTypeToCategory(type);
-                        const isEmailEnabled = category ? (emailPrefs[category] === undefined ? true : emailPrefs[category]) : true;
-                        const isPushEnabled = category ? (pushPrefs[category] === undefined ? true : pushPrefs[category]) : true;
+                        const isEmailEnabled = isChannelEnabled(prefs, 'email', category, type);
+                        const isPushEnabled = isChannelEnabled(prefs, 'push', category, type);
 
                         // Email
                         if (isEmailEnabled && user.email) {
@@ -140,11 +179,8 @@ class NotificationHelper {
                         if (!user) continue;
 
                         const prefs = user.notification_preferences || {};
-                        const emailPrefs = prefs.email || {};
-                        const pushPrefs = prefs.push || {};
-
-                        const isEmailEnabled = category ? (emailPrefs[category] === undefined ? true : emailPrefs[category]) : true;
-                        const isPushEnabled = category ? (pushPrefs[category] === undefined ? true : pushPrefs[category]) : true;
+                        const isEmailEnabled = isChannelEnabled(prefs, 'email', category, type);
+                        const isPushEnabled = isChannelEnabled(prefs, 'push', category, type);
 
                         // Email
                         if (isEmailEnabled && user.email) {
@@ -182,20 +218,16 @@ class NotificationHelper {
 
     // Get notification preferences
     static getDefaultPreferences() {
+        return JSON.parse(JSON.stringify(DEFAULT_CHANNEL_PREFERENCES));
+    }
+
+    static normalizePreferences(preferences = {}) {
+        const defaults = NotificationHelper.getDefaultPreferences();
+
         return {
-            bid_received: true,
-            bid_accepted: true,
-            bid_rejected: true,
-            project_assigned: true,
-            project_status_updated: true,
-            invoice_paid: true,
-            invoice_created: true,
-            new_project: true,
-            contract_created: true,
-            subscription_expiring: true,
-            subscription_expired: true,
-            payment_received: true,
-            general: true
+            email: { ...defaults.email, ...(preferences.email || {}) },
+            in_app: { ...defaults.in_app, ...(preferences.in_app || {}) },
+            push: { ...defaults.push, ...(preferences.push || {}) }
         };
     }
 }

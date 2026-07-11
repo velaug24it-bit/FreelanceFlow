@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const NotificationHelper = require('../utils/notificationHelper');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -123,7 +124,9 @@ router.delete('/', verifyToken, async (req, res) => {
 router.get('/preferences', verifyToken, async (req, res) => {
     try {
         const user = await User.findById(req.userId).select('notification_preferences');
-        res.json({ notification_preferences: user.notification_preferences || {} });
+        res.json({
+            notification_preferences: NotificationHelper.normalizePreferences(user.notification_preferences || {})
+        });
     } catch (err) {
         console.error('Error fetching preferences:', err);
         res.status(500).json({ error: 'Server error' });
@@ -135,7 +138,22 @@ router.put('/preferences', verifyToken, async (req, res) => {
     try {
         const updates = req.body.notification_preferences || req.body;
         const user = await User.findById(req.userId);
-        user.notification_preferences = Object.assign({}, user.notification_preferences || {}, updates);
+        user.notification_preferences = NotificationHelper.normalizePreferences({
+            ...(user.notification_preferences || {}),
+            ...updates,
+            email: {
+                ...((user.notification_preferences || {}).email || {}),
+                ...(updates.email || {})
+            },
+            in_app: {
+                ...((user.notification_preferences || {}).in_app || {}),
+                ...(updates.in_app || {})
+            },
+            push: {
+                ...((user.notification_preferences || {}).push || {}),
+                ...(updates.push || {})
+            }
+        });
         await user.save();
         res.json({ success: true, notification_preferences: user.notification_preferences });
     } catch (err) {
