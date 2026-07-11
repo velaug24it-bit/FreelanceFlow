@@ -38,13 +38,13 @@ const postJson = async (url, headers, body) => {
 };
 
 const getDefaultFrom = () => {
-    const configuredFrom = getEnv('EMAIL_FROM');
-    if (configuredFrom) return configuredFrom;
+    let configuredFrom = getEnv('EMAIL_FROM');
+    if (configuredFrom && !configuredFrom.includes('onboarding@resend.dev')) return configuredFrom;
 
-    const smtpUser = getEnv('SMTP_USER');
-    if (smtpUser) return `"FreelanceFlow" <${smtpUser}>`;
+    let smtpUser = getEnv('SMTP_USER');
+    if (smtpUser && !smtpUser.includes('onboarding@resend.dev')) return `"FreelanceFlow" <${smtpUser}>`;
 
-    return '"FreelanceFlow" <notifications@freelanceflow.app>';
+    return '"FreelanceFlow" <velr012006@gmail.com>';
 };
 
 const getSmtpConfig = () => {
