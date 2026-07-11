@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const NotificationHelper = require('../utils/notificationHelper');
 const { getPublicVapidKey } = require('../utils/push');
+const sendEmail = require('../utils/email');
 
 // Verify token middleware
 const verifyToken = (req, res, next) => {
@@ -68,6 +69,44 @@ router.get('/push-public-key', verifyToken, (req, res) => {
     }
 
     res.json({ publicKey });
+});
+
+// Send a test email to the logged-in user's email address
+router.post('/test-email', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId).select('email full_name');
+
+        if (!user?.email) {
+            return res.status(400).json({ error: 'No email address found for this user' });
+        }
+
+        const result = await sendEmail({
+            to: user.email,
+            subject: '[FreelanceFlow] Test notification email',
+            text: `Hi ${user.full_name || 'there'},\n\nThis is a test notification email from FreelanceFlow.\n\nIf you received this, email delivery is working.`,
+            html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;color:#1f2937"><h2>FreelanceFlow test email</h2><p>Hi ${user.full_name || 'there'},</p><p>This is a test notification email from FreelanceFlow.</p><p>If you received this, email delivery is working.</p></body></html>`
+        });
+
+        if (result.error) {
+            return res.status(502).json({
+                error: 'Email provider rejected the message',
+                details: result.error
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Test email sent to ${user.email}`,
+            provider: result.provider || 'smtp-or-dev',
+            previewUrl: result.previewUrl || null
+        });
+    } catch (err) {
+        console.error('Error sending test notification email:', err);
+        res.status(500).json({
+            error: 'Failed to send test email',
+            details: process.env.NODE_ENV === 'production' ? undefined : err.message
+        });
+    }
 });
 
 // Mark a single notification as read
