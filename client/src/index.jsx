@@ -11,6 +11,15 @@ root.render(
   </React.StrictMode>
 );
 
+let refreshing = false;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+}
+
 // Global PWA installation listener
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();

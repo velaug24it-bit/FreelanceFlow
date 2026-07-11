@@ -82,6 +82,12 @@ const isChannelEnabled = (prefs, channel, category, type) => {
     return true;
 };
 
+const getClientUrl = () => (
+    process.env.CLIENT_URL ||
+    process.env.FRONTEND_URL ||
+    'https://freelanceflow-frontend-uh18.onrender.com'
+).replace(/\/$/, '');
+
 class NotificationHelper {
     // Create a notification
     static async createNotification({ userId, type, title, message, referenceId, referenceType, actionUrl }) {
@@ -114,7 +120,7 @@ class NotificationHelper {
 
                         // Email
                         if (isEmailEnabled && user.email) {
-                            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                            const clientUrl = getClientUrl();
                             const fullUrl = actionUrl ? clientUrl + actionUrl : clientUrl;
                             await sendEmail({
                                 to: user.email,
@@ -184,7 +190,7 @@ class NotificationHelper {
 
                         // Email
                         if (isEmailEnabled && user.email) {
-                            const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+                            const clientUrl = getClientUrl();
                             const fullUrl = actionUrl ? clientUrl + actionUrl : clientUrl;
                             await sendEmail({
                                 to: user.email,

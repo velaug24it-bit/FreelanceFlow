@@ -1,5 +1,29 @@
 const nodemailer = require('nodemailer');
 
+const getEnv = (key) => (process.env[key] || '').trim();
+
+const getSmtpConfig = () => {
+    const host = getEnv('SMTP_HOST');
+    const user = getEnv('SMTP_USER');
+    const rawPass = getEnv('SMTP_PASS');
+
+    if (!host || !user || !rawPass) {
+        return null;
+    }
+
+    const port = parseInt(getEnv('SMTP_PORT') || '587', 10);
+    const isGmail = host.toLowerCase().includes('gmail.com');
+    const pass = isGmail ? rawPass.replace(/\s+/g, '') : rawPass;
+
+    return {
+        host,
+        port,
+        secure: getEnv('SMTP_SECURE') ? getEnv('SMTP_SECURE') === 'true' : port === 465,
+        auth: { user, pass },
+        from: getEnv('EMAIL_FROM') || `"FreelanceFlow" <${user}>`
+    };
+};
+
 /**
  * sendEmail - Sends an email via SMTP or Ethereal (dev/test).
  *
@@ -10,20 +34,19 @@ const sendEmail = async (options) => {
     let previewUrl = null;
 
     try {
-        if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        const smtpConfig = getSmtpConfig();
+
+        if (smtpConfig) {
             // ─── Production: use configured SMTP ───────────────────────────
             const transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: parseInt(process.env.SMTP_PORT || '587', 10),
-                secure: process.env.SMTP_SECURE === 'true',
-                auth: {
-                    user: process.env.SMTP_USER,
-                    pass: process.env.SMTP_PASS
-                }
+                host: smtpConfig.host,
+                port: smtpConfig.port,
+                secure: smtpConfig.secure,
+                auth: smtpConfig.auth
             });
 
             const info = await transporter.sendMail({
-                from: process.env.EMAIL_FROM || '"FreelanceFlow" <noreply@freelanceflow.com>',
+                from: smtpConfig.from,
                 to: options.to,
                 subject: options.subject,
                 text: options.text,
