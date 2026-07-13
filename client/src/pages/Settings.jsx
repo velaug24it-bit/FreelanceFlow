@@ -473,7 +473,7 @@ const Settings = () => {
                     {uploadingQr && <span style={{ fontSize: '0.85rem', color: '#3b82f6' }}>Uploading...</span>}
                     {qrCodeImage && !uploadingQr && (
                       <div style={{ marginTop: '0.5rem' }}>
-                        <img src={`http://localhost:5000${qrCodeImage}`} alt="QR Code" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
+                        <img src={`${BASE_URL}${qrCodeImage}`} alt="QR Code" style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #cbd5e1' }} />
                       </div>
                     )}
                   </div>

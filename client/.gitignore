@@ -133,11 +133,8 @@ session-*
 /public/uploads/
 /private/uploads/
 
-# Environment specific
+# Environment specific - ALL env files are excluded from git
+# Set these as environment variables in Netlify/Render dashboard instead
 .env.production
 .env.staging
 .env.development
-
-# Frontend public build-time environment files
-!.env.development
-!.env.production

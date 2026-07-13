@@ -103,9 +103,9 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       proxy: {
-        '/api': 'http://localhost:5000',
+        '/api': env.REACT_APP_API_URL ? env.REACT_APP_API_URL.replace('/api', '') : 'http://localhost:5000',
         '/socket.io': {
-          target: 'http://localhost:5000',
+          target: env.REACT_APP_SOCKET_URL || 'http://localhost:5000',
           ws: true
         }
       }
