@@ -5,6 +5,19 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 require('dotenv').config();
 
+// Sanitize CLIENT_URL to prevent common deployment/configuration mistakes
+if (process.env.CLIENT_URL) {
+    let cleaned = process.env.CLIENT_URL.trim();
+    if (cleaned.startsWith('CLIENT_URL=')) {
+        cleaned = cleaned.substring('CLIENT_URL='.length).trim();
+    }
+    // Remove surrounding quotes
+    cleaned = cleaned.replace(/^['"`]|['"`]$/g, '');
+    // Strip trailing slashes and paths like /oauth-redirect or /login
+    cleaned = cleaned.replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
+    process.env.CLIENT_URL = cleaned;
+}
+
 const connectDB = require('./config/mongodb');
 const authRoutes = require('./routes/auth');
 const clientRoutes = require('./routes/clients');

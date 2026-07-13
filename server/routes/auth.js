@@ -474,7 +474,11 @@ router.get('/google/callback', (req, res, next) => {
     let clientBase = CLIENT_URL;
     if (req.query.state) {
         try {
-            const decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii');
+            let decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii').trim();
+            if (decodedUrl.startsWith('CLIENT_URL=')) {
+                decodedUrl = decodedUrl.substring('CLIENT_URL='.length).trim();
+            }
+            decodedUrl = decodedUrl.replace(/^['"`]|['"`]$/g, '').replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
             if (decodedUrl && (decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://'))) {
                 clientBase = decodedUrl;
             }
@@ -528,7 +532,11 @@ router.get('/github/callback', (req, res, next) => {
     let clientBase = CLIENT_URL;
     if (req.query.state) {
         try {
-            const decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii');
+            let decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii').trim();
+            if (decodedUrl.startsWith('CLIENT_URL=')) {
+                decodedUrl = decodedUrl.substring('CLIENT_URL='.length).trim();
+            }
+            decodedUrl = decodedUrl.replace(/^['"`]|['"`]$/g, '').replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
             if (decodedUrl && (decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://'))) {
                 clientBase = decodedUrl;
             }

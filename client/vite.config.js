@@ -6,11 +6,18 @@ export default defineConfig(({ mode }) => {
   // Load environment variables from .env files
   const env = loadEnv(mode, process.cwd(), '');
   
-  // Filter env to only include REACT_APP_ prefixed variables and NODE_ENV
+  // Filter and sanitize env to only include REACT_APP_ prefixed variables and NODE_ENV
   const processEnv = {};
   for (const key in env) {
+    let val = env[key] ? env[key].trim() : '';
+    if (val.startsWith(`${key}=`)) {
+      val = val.substring(`${key}=`.length).trim();
+    }
+    val = val.replace(/^['"`]|['"`]$/g, '');
+    env[key] = val; // Update in loaded env for server proxy configs
+    
     if (key.startsWith('REACT_APP_') || key === 'NODE_ENV') {
-      processEnv[key] = env[key];
+      processEnv[key] = val;
     }
   }
 
