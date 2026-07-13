@@ -39,6 +39,32 @@ const getClientUrl = (req) => {
     return CLIENT_URL;
 };
 
+const parseOAuthState = (stateStr) => {
+    if (!stateStr) return { provider: 'google', clientUrl: CLIENT_URL };
+    try {
+        let decoded = Buffer.from(stateStr, 'base64').toString('ascii').trim();
+        if (decoded.includes('|')) {
+            const parts = decoded.split('|');
+            let clientUrl = parts[1];
+            if (clientUrl.startsWith('CLIENT_URL=')) {
+                clientUrl = clientUrl.substring('CLIENT_URL='.length).trim();
+            }
+            clientUrl = clientUrl.replace(/^['"`]|['"`]$/g, '').replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
+            return { provider: parts[0], clientUrl };
+        }
+        
+        // Backward compatibility
+        if (decoded.startsWith('CLIENT_URL=')) {
+            decoded = decoded.substring('CLIENT_URL='.length).trim();
+        }
+        decoded = decoded.replace(/^['"`]|['"`]$/g, '').replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
+        return { provider: 'google', clientUrl: decoded };
+    } catch (e) {
+        console.error('Error parsing OAuth state:', e);
+        return { provider: 'google', clientUrl: CLIENT_URL };
+    }
+};
+
 // ============================================
 // HELPER: AUTHENTICATE TOKEN
 // ============================================
@@ -461,37 +487,28 @@ router.get('/google', (req, res, next) => {
         return res.redirect(`${getClientUrl(req)}/login?error=Google OAuth keys are not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server .env file.`);
     }
     const clientUrl = getClientUrl(req);
-    const state = Buffer.from(clientUrl).toString('base64');
+    const state = Buffer.from(`google|${clientUrl}`).toString('base64');
+    const callbackURL = `${clientUrl}/oauth-redirect`;
     passport.authenticate('google', {
         scope: ['profile', 'email'],
         session: false,
         prompt: 'select_account',
-        state: state
+        state: state,
+        callbackURL: callbackURL
     })(req, res, next);
 });
 
 router.get('/google/callback', (req, res, next) => {
-    let clientBase = CLIENT_URL;
-    if (req.query.state) {
-        try {
-            let decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii').trim();
-            if (decodedUrl.startsWith('CLIENT_URL=')) {
-                decodedUrl = decodedUrl.substring('CLIENT_URL='.length).trim();
-            }
-            decodedUrl = decodedUrl.replace(/^['"`]|['"`]$/g, '').replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
-            if (decodedUrl && (decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://'))) {
-                clientBase = decodedUrl;
-            }
-        } catch (e) {
-            console.error('Error decoding Google OAuth state:', e);
-        }
-    }
+    const { clientUrl: clientBase } = parseOAuthState(req.query.state);
 
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.redirect(`${clientBase}/login?error=Google OAuth keys are not configured on the server.`);
     }
+    
+    const callbackURL = `${clientBase}/oauth-redirect`;
     passport.authenticate('google', {
         session: false,
+        callbackURL: callbackURL,
         failureRedirect: `${clientBase}/login?error=Google authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
@@ -520,36 +537,27 @@ router.get('/github', (req, res, next) => {
         return res.redirect(`${getClientUrl(req)}/login?error=GitHub OAuth keys are not configured on the server. Please add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to the server .env file.`);
     }
     const clientUrl = getClientUrl(req);
-    const state = Buffer.from(clientUrl).toString('base64');
+    const state = Buffer.from(`github|${clientUrl}`).toString('base64');
+    const callbackURL = `${clientUrl}/oauth-redirect`;
     passport.authenticate('github', {
         scope: ['user:email'],
         session: false,
-        state: state
+        state: state,
+        callbackURL: callbackURL
     })(req, res, next);
 });
 
 router.get('/github/callback', (req, res, next) => {
-    let clientBase = CLIENT_URL;
-    if (req.query.state) {
-        try {
-            let decodedUrl = Buffer.from(req.query.state, 'base64').toString('ascii').trim();
-            if (decodedUrl.startsWith('CLIENT_URL=')) {
-                decodedUrl = decodedUrl.substring('CLIENT_URL='.length).trim();
-            }
-            decodedUrl = decodedUrl.replace(/^['"`]|['"`]$/g, '').replace(/\/$/, '').replace(/\/oauth-redirect$/, '').replace(/\/login$/, '').replace(/\/$/, '');
-            if (decodedUrl && (decodedUrl.startsWith('http://') || decodedUrl.startsWith('https://'))) {
-                clientBase = decodedUrl;
-            }
-        } catch (e) {
-            console.error('Error decoding GitHub OAuth state:', e);
-        }
-    }
+    const { clientUrl: clientBase } = parseOAuthState(req.query.state);
 
     if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
         return res.redirect(`${clientBase}/login?error=GitHub OAuth keys are not configured on the server.`);
     }
+    
+    const callbackURL = `${clientBase}/oauth-redirect`;
     passport.authenticate('github', {
         session: false,
+        callbackURL: callbackURL,
         failureRedirect: `${clientBase}/login?error=GitHub authentication failed.`
     }, async (err, user) => {
         if (err || !user) {

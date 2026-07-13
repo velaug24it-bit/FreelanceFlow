@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
 const OAuthRedirect = () => {
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -10,9 +12,25 @@ const OAuthRedirect = () => {
   useEffect(() => {
     const params = new URLSearchParams(search);
     const token = params.get('token');
+    const code = params.get('code');
+    const state = params.get('state');
+
     if (token) {
       handleOAuthSuccess(token);
       navigate('/');
+    } else if (code && state) {
+      // Parse state to determine the social provider
+      let provider = 'google';
+      try {
+        const decoded = atob(state).trim();
+        if (decoded.includes('|')) {
+          provider = decoded.split('|')[0];
+        }
+      } catch (e) {
+        console.error('Error parsing OAuth state:', e);
+      }
+      // Redirect browser to server callback endpoint to exchange authorization code for JWT
+      window.location.href = `${API_URL}/auth/${provider}/callback?code=${code}&state=${state}`;
     } else {
       navigate('/login');
     }
