@@ -488,14 +488,15 @@ router.get('/google', (req, res, next) => {
         return res.redirect(`${getClientUrl(req)}/login?error=Google OAuth keys are not configured on the server. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server .env file.`);
     }
     const clientUrl = getClientUrl(req);
+    // Encode the client URL in state so the callback knows where to redirect the user
     const state = Buffer.from(`google|${clientUrl}`).toString('base64');
-    const callbackURL = `${clientUrl}/oauth-redirect`;
+    // Use the default server-side callbackURL from passport strategy config (passport.js)
+    // Do NOT override callbackURL here — it must match what's registered in Google Cloud Console
     passport.authenticate('google', {
         scope: ['profile', 'email'],
         session: false,
         prompt: 'select_account',
-        state: state,
-        callbackURL: callbackURL
+        state: state
     })(req, res, next);
 });
 
@@ -506,10 +507,10 @@ router.get('/google/callback', (req, res, next) => {
         return res.redirect(`${clientBase}/login?error=Google OAuth keys are not configured on the server.`);
     }
     
-    const callbackURL = `${clientBase}/oauth-redirect`;
+    // Do NOT override callbackURL — passport will use the default from the strategy config
+    // which matches what's registered in Google Cloud Console
     passport.authenticate('google', {
         session: false,
-        callbackURL: callbackURL,
         failureRedirect: `${clientBase}/login?error=Google authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
@@ -539,12 +540,11 @@ router.get('/github', (req, res, next) => {
     }
     const clientUrl = getClientUrl(req);
     const state = Buffer.from(`github|${clientUrl}`).toString('base64');
-    const callbackURL = `${clientUrl}/oauth-redirect`;
+    // Use the default server-side callbackURL from passport strategy config (passport.js)
     passport.authenticate('github', {
         scope: ['user:email'],
         session: false,
-        state: state,
-        callbackURL: callbackURL
+        state: state
     })(req, res, next);
 });
 
@@ -555,10 +555,9 @@ router.get('/github/callback', (req, res, next) => {
         return res.redirect(`${clientBase}/login?error=GitHub OAuth keys are not configured on the server.`);
     }
     
-    const callbackURL = `${clientBase}/oauth-redirect`;
+    // Do NOT override callbackURL — passport will use the default from the strategy config
     passport.authenticate('github', {
         session: false,
-        callbackURL: callbackURL,
         failureRedirect: `${clientBase}/login?error=GitHub authentication failed.`
     }, async (err, user) => {
         if (err || !user) {
