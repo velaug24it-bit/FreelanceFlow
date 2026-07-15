@@ -18,12 +18,19 @@ const { LIMITS } = require('../utils/constants');
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
-// Smart CLIENT_URL: if running in production (CLIENT_URL is localhost but request is from a real domain),
-// use the request origin so OAuth redirect lands on the correct deployed frontend.
+// Smart CLIENT_URL: determine the frontend origin for OAuth redirects.
+// Priority: 1) explicit ?origin= query param (most reliable), 2) request headers, 3) CLIENT_URL env var
 const getClientUrl = (req) => {
+    // 1. Explicit origin from frontend query param (bulletproof, doesn't depend on browser headers)
+    if (req.query && req.query.origin) {
+        try {
+            const url = new URL(req.query.origin);
+            return `${url.protocol}//${url.host}`;
+        } catch (_) {}
+    }
+
+    // 2. Request headers (may be stripped on cross-origin full-page navigations)
     const origin = req.get('origin') || req.get('referer') || '';
-    
-    // Prioritize the dynamic origin/referer if it's a real non-localhost domain
     if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
         try {
             const url = new URL(origin);
@@ -33,7 +40,7 @@ const getClientUrl = (req) => {
         }
     }
     
-    // Otherwise, fall back to configured CLIENT_URL
+    // 3. Fall back to configured CLIENT_URL
     if (CLIENT_URL) {
         return CLIENT_URL;
     }

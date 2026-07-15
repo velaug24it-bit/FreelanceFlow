@@ -27,11 +27,11 @@ const Login = () => {
   }, []);
 
   const handleGoogleClick = () => {
-    window.location.href = `${API_URL}/auth/google`;
+    window.location.href = `${API_URL}/auth/google?origin=${encodeURIComponent(window.location.origin)}`;
   };
 
   const handleGithubClick = () => {
-    window.location.href = `${API_URL}/auth/github`;
+    window.location.href = `${API_URL}/auth/github?origin=${encodeURIComponent(window.location.origin)}`;
   };
 
   const handleSubmit = async (e) => {

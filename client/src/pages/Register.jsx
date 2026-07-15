@@ -28,7 +28,7 @@ const Register = () => {
   }, []);
 
   const handleSocialClick = (provider) => {
-    window.location.href = `${API_URL}/auth/${provider}`;
+    window.location.href = `${API_URL}/auth/${provider}?origin=${encodeURIComponent(window.location.origin)}`;
   };
 
   const handleChange = (e) => {
