@@ -139,10 +139,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const handleOAuthSuccess = (newToken) => {
-    setLoading(true);
+  const handleOAuthSuccess = async (newToken) => {
     localStorage.setItem('token', newToken);
     setToken(newToken);
+    // Verify the token and load user data before returning
+    // so the caller can await full authentication completion
+    setLoading(true);
+    try {
+      const response = await axios.get('/api/auth/verify', {
+        headers: { Authorization: `Bearer ${newToken}` }
+      });
+      setUser(response.data.user);
+    } catch (err) {
+      console.error('OAuth token verification failed:', err);
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = {

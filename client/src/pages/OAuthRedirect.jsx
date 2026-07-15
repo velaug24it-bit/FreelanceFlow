@@ -12,9 +12,12 @@ const OAuthRedirect = () => {
     const token = params.get('token');
 
     if (token) {
-      // Server already exchanged the authorization code and gave us a JWT
-      handleOAuthSuccess(token);
-      navigate('/');
+      // Wait for token verification to complete before navigating
+      const completeAuth = async () => {
+        await handleOAuthSuccess(token);
+        navigate('/');
+      };
+      completeAuth();
     } else {
       // No token — something went wrong, go back to login
       navigate('/login');
