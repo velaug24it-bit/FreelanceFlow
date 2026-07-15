@@ -22,13 +22,9 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 // use the request origin so OAuth redirect lands on the correct deployed frontend.
 const getClientUrl = (req) => {
     const origin = req.get('origin') || req.get('referer') || '';
-    // If CLIENT_URL is already a real production URL, use it
-    if (CLIENT_URL && !CLIENT_URL.includes('localhost')) {
-        return CLIENT_URL;
-    }
-    // Otherwise, if the request came from a real (non-localhost) origin, use that
-    if (origin && !origin.includes('localhost')) {
-        // Strip trailing slash and path from referer if needed
+    
+    // Prioritize the dynamic origin/referer if it's a real non-localhost domain
+    if (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
         try {
             const url = new URL(origin);
             return `${url.protocol}//${url.host}`;
@@ -36,7 +32,12 @@ const getClientUrl = (req) => {
             return origin.split('/').slice(0, 3).join('/');
         }
     }
-    return CLIENT_URL;
+    
+    // Otherwise, fall back to configured CLIENT_URL
+    if (CLIENT_URL) {
+        return CLIENT_URL;
+    }
+    return 'http://localhost:3000';
 };
 
 const parseOAuthState = (stateStr) => {
@@ -125,7 +126,7 @@ router.post('/register', async (req, res) => {
         );
 
         // Send email
-        const verifyUrl = `${CLIENT_URL}/verify-email/${verification_token}`;
+        const verifyUrl = `${getClientUrl(req)}/verify-email/${verification_token}`;
 
         const { previewUrl } = await sendEmail({
             to: user.email,
@@ -619,7 +620,7 @@ router.post('/resend-verification', authenticateToken, async (req, res) => {
         user.verification_token_expires = Date.now() + 24 * 60 * 60 * 1000;
         await user.save();
 
-        const verifyUrl = `${CLIENT_URL}/verify-email/${token}`;
+        const verifyUrl = `${getClientUrl(req)}/verify-email/${token}`;
 
         const { previewUrl } = await sendEmail({
             to: user.email,
@@ -664,7 +665,7 @@ router.post('/forgot-password', async (req, res) => {
         user.reset_password_expires = Date.now() + 3600000;
         await user.save();
 
-        const resetUrl = `${CLIENT_URL}/reset-password/${token}`;
+        const resetUrl = `${getClientUrl(req)}/reset-password/${token}`;
 
         const { previewUrl } = await sendEmail({
             to: user.email,
